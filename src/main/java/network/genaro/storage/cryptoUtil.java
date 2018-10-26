@@ -1,15 +1,32 @@
 package network.genaro.storage;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.util.Arrays;
+
+import org.apache.commons.lang3.ArrayUtils;
 import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
+import org.web3j.crypto.MnemonicUtils;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public final class cryptoUtil {
 
+    static {
+        Security.addProvider(new BouncyCastleProvider());
+    }
     static final int RIPEMD160_DIGEST_SIZE = 20;
+    private static final int AES_GCM_DIGEST_LENGTH = 16;
+    private static final int AES_GCM_IV_LENGTH = 32;
     static final String BUCKET_NAME_MAGIC = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
 
     protected static byte[] string2Bytes(final String input) {
@@ -18,15 +35,8 @@ public final class cryptoUtil {
     private static String bytes2String(final byte[] input) {
         return new String(input, StandardCharsets.UTF_8);
     }
-    private static String bytes2HexString(final byte[] input) {
-        return Hex.toHexString(input);
-    }
-    private static byte[] hexString2Bytes(final String input) {
-        return Hex.decode(input);
-    }
 
-
-    private static byte[] sha256(final byte[] input) {
+    protected static byte[] sha256(final byte[] input) {
         MessageDigest digest = null;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -37,7 +47,7 @@ public final class cryptoUtil {
         return digest.digest(input);
     }
 
-    private static byte[] sha512(final byte[] input) {
+    protected static byte[] sha512(final byte[] input) {
         MessageDigest digest = null;
         try {
             digest = MessageDigest.getInstance("SHA-512");
@@ -49,7 +59,7 @@ public final class cryptoUtil {
         return digest.digest();
     }
 
-    private static byte[] ripemd160(final byte[] input) {
+    protected static byte[] ripemd160(final byte[] input) {
         Digest ripemd160DG = new RIPEMD160Digest();
         ripemd160DG.update(input, 0, input.length);
         byte[] out = new byte[RIPEMD160_DIGEST_SIZE];
@@ -67,19 +77,90 @@ public final class cryptoUtil {
     }
 
     public static String ripemd160Sha256HexString(final byte[] input) {
-        return bytes2String(ripemd160Sha256(input));
+        return Hex.toHexString(ripemd160Sha256(input));
     }
 
     public static String ripemd160Sha256HexStringDouble(final byte[] input) {
-        return bytes2String(ripemd160Sha256Double(input));
+        return Hex.toHexString(ripemd160Sha256Double(input));
     }
 
-    public static String getDeterministicKey(final String keyHex, final String idHex ) {
-        byte[] sha512input = hexString2Bytes(keyHex + idHex);
-        return bytes2HexString(sha512(sha512input));
+    public static byte[] generateDeterministicKey(final byte[] key, final byte[] id ) {
+        byte[] sha512input = ArrayUtils.addAll(key, id);
+        byte[] bytess = Arrays.copyOfRange(sha512(sha512input), 0, 32);
+        return bytess;
     }
 
-//    public static String generateBucketKey(final byte[] privKey, final String bucketId) {
-//
-//    }
+    public static byte[] generateBucketKey(final byte[] privKey, final byte[] bucketId) {
+        byte[] seed = MnemonicUtils.generateSeed(new String(privKey), "");
+        byte[] key = generateDeterministicKey(seed, bucketId);
+        return key;
+    }
+
+    public static byte[] generateFileKey(final byte[] privKey, final byte[] bucketId, final byte[] index) {
+        byte[] bKey = generateBucketKey(privKey, bucketId);
+        byte[] fKey = generateDeterministicKey(bKey, index);
+        return fKey;
+    }
+
+    // 6390959111c0ebf1f35ea599f856ed66
+    public static String encryptMeta(final byte[] fileMeta, final byte[] encryptKey, final byte[] encryptIv) {
+        if (encryptIv.length != AES_GCM_IV_LENGTH) {
+            throw new IllegalArgumentException("IV length must be " + AES_GCM_IV_LENGTH);
+        }
+        try {
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+            SecretKeySpec k = new SecretKeySpec(encryptKey, "AES");
+            c.init(Cipher.ENCRYPT_MODE, k, new IvParameterSpec(encryptIv));
+            byte[] cipherPlusDigest = c.doFinal(fileMeta);
+            // GCM digest + Iv + cipher text
+            byte[] encryptedData = new byte[cipherPlusDigest.length + encryptIv.length];
+            // digest
+            System.arraycopy(cipherPlusDigest,
+                    cipherPlusDigest.length - AES_GCM_DIGEST_LENGTH,
+                    encryptedData,
+                    0,
+                    AES_GCM_DIGEST_LENGTH);
+            // iv
+            System.arraycopy(encryptIv,
+                    0,
+                    encryptedData,
+                    AES_GCM_DIGEST_LENGTH,
+                    encryptIv.length);
+            // cipher text
+            System.arraycopy(cipherPlusDigest,
+                    0,
+                    encryptedData,
+                    AES_GCM_DIGEST_LENGTH + encryptIv.length,
+                    cipherPlusDigest.length - AES_GCM_DIGEST_LENGTH);
+            return Base64.toBase64String(encryptedData);
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+        return "";
+    }
+
+    public static byte[] decryptMeta(String base64Secret, final byte[] decryptKey) {
+        byte[] encryptedData = Base64.decode(base64Secret);
+        try {
+            // get IV
+            byte[] decryptIv = Arrays.copyOfRange(encryptedData, AES_GCM_DIGEST_LENGTH, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH);
+            // make cipher + Digest
+            byte[] cipherPlusDigest = new byte[encryptedData.length - AES_GCM_IV_LENGTH];
+            int cipherTextLen = encryptedData.length - AES_GCM_DIGEST_LENGTH - AES_GCM_IV_LENGTH;
+            // fill digest
+            System.arraycopy(encryptedData, 0, cipherPlusDigest, cipherTextLen, AES_GCM_DIGEST_LENGTH);
+            // fill cipher text
+            System.arraycopy(encryptedData, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH, cipherPlusDigest, 0, cipherTextLen);
+
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+            SecretKeySpec k = new SecretKeySpec(decryptKey, "AES");
+            c.init(Cipher.DECRYPT_MODE, k, new IvParameterSpec(decryptIv));
+            return c.doFinal(cipherPlusDigest);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+        return new byte[0];
+    }
 }
