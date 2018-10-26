@@ -19,7 +19,7 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-public final class cryptoUtil {
+public final class CryptoUtil {
 
     static {
         Security.addProvider(new BouncyCastleProvider());
