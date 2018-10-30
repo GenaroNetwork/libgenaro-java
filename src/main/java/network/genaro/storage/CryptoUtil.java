@@ -1,12 +1,24 @@
 package network.genaro.storage;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Arrays;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.bouncycastle.asn1.ASN1Integer;
+import org.bouncycastle.asn1.DERSequenceGenerator;
+import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.ec.CustomNamedCurves;
+import org.bouncycastle.crypto.params.ECDomainParameters;
+import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.signers.ECDSASigner;
+import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
@@ -28,6 +40,9 @@ public final class CryptoUtil {
     private static final int AES_GCM_DIGEST_LENGTH = 16;
     private static final int AES_GCM_IV_LENGTH = 32;
     static final String BUCKET_NAME_MAGIC = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
+    private static final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
+    private static final ECDomainParameters CURVE = new ECDomainParameters(
+            CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
 
     protected static byte[] string2Bytes(final String input) {
         return input.getBytes(StandardCharsets.UTF_8);
@@ -162,5 +177,36 @@ public final class CryptoUtil {
             System.exit(1);
         }
         return new byte[0];
+    }
+
+
+    public static String sha256EscdaSign(final BigInteger ecPrivateKey, final String message) {
+        return sha256EscdaSign(ecPrivateKey, string2Bytes(message));
+    }
+
+    public static String sha256EscdaSign(final BigInteger ecPrivateKey, final byte[] message) {
+        byte[] hash = sha256(message);
+        return escdaSign(ecPrivateKey, hash);
+    }
+
+    private static String escdaSign(final BigInteger ecPrivateKey,final byte[] hash) {
+        ECDSASigner signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
+
+        ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(ecPrivateKey, CURVE);
+        signer.init(true, privKey);
+        BigInteger[] components = signer.generateSignature(hash);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DERSequenceGenerator seq = null;
+        try {
+            seq = new DERSequenceGenerator(baos);
+            seq.addObject(new ASN1Integer(components[0]));
+            seq.addObject(new ASN1Integer((components[1])));
+            seq.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        byte[] sig = baos.toByteArray();
+        return Hex.toHexString(sig);
     }
 }

@@ -1,18 +1,44 @@
 package network.genaro.storage;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
+import org.bouncycastle.asn1.ASN1Integer;
+import org.bouncycastle.asn1.DERSequenceGenerator;
+import org.bouncycastle.asn1.x9.X9ECParameters;
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.ec.CustomNamedCurves;
+import org.bouncycastle.crypto.params.ECDomainParameters;
+import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.signers.ECDSASigner;
+import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
+import org.bouncycastle.jce.ECNamedCurveTable;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jce.spec.ECNamedCurveSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.bouncycastle.util.encoders.Hex;
-import org.web3j.crypto.CipherException;
-import org.web3j.crypto.MnemonicUtils;
-import org.web3j.crypto.WalletUtils;
+import org.web3j.crypto.*;
+import org.web3j.utils.Numeric;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.*;
+import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
+import java.security.spec.ECPrivateKeySpec;
 
+import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
+import static org.testng.Assert.fail;
 
 @Test()
 public class TestCryptoUtil {
-
+    static {
+        Security.addProvider(new BouncyCastleProvider());
+    }
     public void test() {
         byte[] byts = string2Bytes("123kkk");
         byte[] ripemded = CryptoUtil.ripemd160Sha256(byts);
@@ -81,4 +107,43 @@ public class TestCryptoUtil {
     public void testWallet() throws IOException, CipherException {
         WalletUtils.loadCredentials("", "");
     }
+
+    public void testSignature() throws Exception {
+
+        String v3json = "{ \"address\": \"5d14313c94f1b26d23f4ce3a49a2e136a88a584b\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"12d3a710778aa884d32140466ce6c3932629d922fa1cd6b64996dff9b368743a\", \"cipherparams\": { \"iv\": \"f0eface44a93bac55857d74740912d13\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"62dd6d60fb04429fc8cf32fd39ea5e886d7f84eae258866c14905fa202dbc43d\" }, \"mac\": \"632e92cb1de1a708b2d349b9ae558a4d655c691d3e793fca501a857c7f0c3b1c\" }, \"id\": \"b12b56a5-7eaa-4d90-87b5-cc616e6694d0\", \"version\": 3 }";
+        ObjectMapper objectMapper = new ObjectMapper();
+        WalletFile walletFile = objectMapper.readValue(v3json, WalletFile.class);
+        ECKeyPair ecKeyPair = Wallet.decrypt("123456", walletFile);
+        byte[] fakeHash = "message to signmessage to signmu".getBytes(StandardCharsets.UTF_8);
+
+        final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
+        final ECDomainParameters CURVE = new ECDomainParameters(
+                CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
+
+        ECDSASigner signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
+
+        ECPrivateKeyParameters privKey = new ECPrivateKeyParameters(ecKeyPair.getPrivateKey(), CURVE);
+        signer.init(true, privKey);
+        BigInteger[] components = signer.generateSignature(fakeHash);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DERSequenceGenerator seq = new DERSequenceGenerator(baos);
+        seq.addObject(new ASN1Integer(components[0]));
+        seq.addObject(new ASN1Integer((components[1])));
+        seq.close();
+        byte[] sigsig = baos.toByteArray();
+        String sigStr = Hex.toHexString(sigsig);
+        System.out.println(sigStr);
+    }
+    public void testSha256EscdaSign() throws Exception{
+        String message = "hello world";
+        String v3json = "{ \"address\": \"5d14313c94f1b26d23f4ce3a49a2e136a88a584b\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"12d3a710778aa884d32140466ce6c3932629d922fa1cd6b64996dff9b368743a\", \"cipherparams\": { \"iv\": \"f0eface44a93bac55857d74740912d13\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"62dd6d60fb04429fc8cf32fd39ea5e886d7f84eae258866c14905fa202dbc43d\" }, \"mac\": \"632e92cb1de1a708b2d349b9ae558a4d655c691d3e793fca501a857c7f0c3b1c\" }, \"id\": \"b12b56a5-7eaa-4d90-87b5-cc616e6694d0\", \"version\": 3 }";
+        ObjectMapper objectMapper = new ObjectMapper();
+        WalletFile walletFile = objectMapper.readValue(v3json, WalletFile.class);
+        ECKeyPair ecKeyPair = Wallet.decrypt("123456", walletFile);
+        String sig = sha256EscdaSign(ecKeyPair.getPrivateKey(), message);
+        System.out.println(sig);
+    }
+
+
 }
