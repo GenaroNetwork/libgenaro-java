@@ -197,9 +197,8 @@ public final class CryptoUtil {
         BigInteger[] components = signer.generateSignature(hash);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DERSequenceGenerator seq = null;
         try {
-            seq = new DERSequenceGenerator(baos);
+            DERSequenceGenerator seq = new DERSequenceGenerator(baos);
             seq.addObject(new ASN1Integer(components[0]));
             seq.addObject(new ASN1Integer((components[1])));
             seq.close();

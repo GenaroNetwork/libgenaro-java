@@ -1,6 +1,5 @@
 package network.genaro.storage;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.DERSequenceGenerator;
 import org.bouncycastle.asn1.x9.X9ECParameters;
@@ -10,29 +9,20 @@ import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
-import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jce.spec.ECNamedCurveSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.bouncycastle.util.encoders.Hex;
 import org.web3j.crypto.*;
-import org.web3j.utils.Numeric;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.security.spec.ECGenParameterSpec;
-import java.security.spec.ECParameterSpec;
-import java.security.spec.ECPrivateKeySpec;
 
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
-import static org.testng.Assert.fail;
 
 @Test()
 public class TestCryptoUtil {
