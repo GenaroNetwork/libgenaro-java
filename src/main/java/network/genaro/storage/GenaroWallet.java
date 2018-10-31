@@ -34,4 +34,8 @@ public class GenaroWallet {
     public String getPublicKeyHexString() {
         return "04" + ecKeyPair.getPublicKey().toString(16);
     }
+
+    public byte[] getPrivateKey() {
+        return ecKeyPair.getPrivateKey().toByteArray();
+    }
 }

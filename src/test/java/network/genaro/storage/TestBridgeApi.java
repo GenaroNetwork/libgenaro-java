@@ -25,6 +25,9 @@ public class TestBridgeApi {
         GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
         Bucket[] bs = api.listBuckets().get();
+        for(Bucket b : bs) {
+            System.out.println(b.getName());
+        }
         Assert.assertNotNull(bs);
     }
 }

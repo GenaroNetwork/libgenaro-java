@@ -4,9 +4,12 @@ import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.DERSequenceGenerator;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -21,6 +24,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
 
@@ -66,13 +70,48 @@ public class TestCryptoUtil {
 
     public void testMnemonic2Seed() {
         byte[] seed = MnemonicUtils.generateSeed("dsa", "");
+        byte[] seed2 = MnemonicUtils.generateSeed("29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6", "");
         String hresult = Hex.toHexString(seed);
+        String hresult2 = Hex.toHexString(seed2);
         Assert.assertEquals(hresult, "fd3fd4cca39658475de1e81ec24d05cecf7696bfaebeaabc29d36e552afac67ecc2649d1b83ae3f2ea169083f6ec90e5ce1e8cf7f5343188874745488fc811b7");
+    }
+
+
+    public static byte[] generateGenaroSeed(byte[] key) {
+        final int SEED_ITERATIONS = 2048;
+        final int SEED_KEY_SIZE = 512;
+
+        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
+        gen.init(key, "mnemonic".getBytes(UTF_8), SEED_ITERATIONS);
+
+        return ((KeyParameter) gen.generateDerivedParameters(SEED_KEY_SIZE)).getKey();
+    }
+
+    public void testMnemonic2Seed2() {
+        String kkk = "29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6";
+        byte[] buf = Hex.decode(kkk);
+        byte[] seed = MnemonicUtils.generateSeed(kkk, "");
+        byte[] seed2 = MnemonicUtils.generateSeed(new String(buf), "");
+        byte[] seed3 = generateGenaroSeed(buf);
+        String hresult = Hex.toHexString(seed);
+        String hresult2 = Hex.toHexString(seed2);
+        String hresult3 = Hex.toHexString(seed3);
+//        Assert.assertEquals(hresult, "fd3fd4cca39658475de1e81ec24d05cecf7696bfaebeaabc29d36e552afac67ecc2649d1b83ae3f2ea169083f6ec90e5ce1e8cf7f5343188874745488fc811b7");
+        //seed	char *	"575e61fff94f741ccd1c2e3445a28f099ea44b05da7ea4d2d377acb61c339aa0f0e56cd771a2426b353e81dee3976857efbc789efdc3433cd3c0b3887730b9f0"	0x00000001029010e0
     }
 
     public void testGenerateBucketKey() {
         byte[] key = CryptoUtil.generateBucketKey(string2Bytes("abandonabandonabandonabandonabandonabandonabandonabandonabandon"), Hex.decode("0123456789ab0123456789ab"));
         Assert.assertEquals(Hex.toHexString(key), "612a3531d6c2ce886bc9504c963cf4b7b309f443251afe9b432aadf1faa8e008");
+    }
+
+    public void testGenerateBucketKey2() {
+        byte[] pkpk = Hex.decode("29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6");
+        String magicBid = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
+        byte[] key = CryptoUtil.generateBucketKey(pkpk, string2Bytes(magicBid));
+        String kstr = Hex.toHexString(key);
+        Assert.assertEquals(kstr, "76afd3c76a52bd9a2fc7449c5701dbaaa2caa2e67e8bfcee3b108c06dacc576a");
+        // *bucket_key	char *	"76afd3c76a52bd9a2fc7449c5701dbaaa2caa2e67e8bfcee3b108c06dacc576a"	0x0000000102906a40
     }
 
     public void testGenerateFileKey() {
@@ -92,6 +131,12 @@ public class TestCryptoUtil {
         byte[] messageBytes = CryptoUtil.decryptMeta(base64Secret, key);
         Assert.assertEquals(base64Secret, "ODKPheXwS0J/eUd7eH/LdRI6vC8SOrwvEjq8LxI6vC8SOrwvEjq8LxI6vC8SOrzy4KwePJHJR6JDvg==");
         Assert.assertEquals(new String(messageBytes), message);
+    }
+
+    public void testDecryptMeta() {
+        byte[] realnameba = CryptoUtil.decryptMeta("0PkgasRWbaPHhAlRIPf/ZdhopoGRv4nQk8PeZQeyCizXv+DeNGbx48KobaTbRI9r9CTLBwOo", Hex.decode("727324ff68e45f183951f13d7fd70efd653cccf73ef8b60e3cbe7560aacecd8c"));
+        String name = new String(realnameba);
+        System.out.println(name);
     }
 
     public void testWallet() throws IOException, CipherException {

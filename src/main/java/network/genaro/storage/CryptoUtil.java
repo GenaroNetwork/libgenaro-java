@@ -14,9 +14,13 @@ import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -31,6 +35,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 public final class CryptoUtil {
 
     static {
@@ -39,7 +45,11 @@ public final class CryptoUtil {
     static final int RIPEMD160_DIGEST_SIZE = 20;
     private static final int AES_GCM_DIGEST_LENGTH = 16;
     private static final int AES_GCM_IV_LENGTH = 32;
-    static final String BUCKET_NAME_MAGIC = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
+
+    private static final int SEED_ITERATIONS = 2048;
+    private static final int SEED_KEY_SIZE = 512;
+    public static final String BUCKET_NAME_MAGIC = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
+    public static final byte[] BUCKET_META_MAGIC = Hex.decode("42964710327258a0a3239a41a2d5e2d7468a393d3413d2aa26a4a2c856c90251");
     private static final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
     private static final ECDomainParameters CURVE = new ECDomainParameters(
             CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
@@ -74,6 +84,17 @@ public final class CryptoUtil {
         return digest.digest();
     }
 
+    protected static byte[] hmacSha512(final byte[] key, final byte[] input) {
+        HMac hmac = new HMac(new SHA512Digest());
+        hmac.init(new KeyParameter(key));
+        byte[] result = new byte[hmac.getMacSize()];
+
+        hmac.update(input, 0, input.length);
+        hmac.doFinal(result, 0);
+
+        return result;
+    }
+
     protected static byte[] ripemd160(final byte[] input) {
         Digest ripemd160DG = new RIPEMD160Digest();
         ripemd160DG.update(input, 0, input.length);
@@ -105,9 +126,18 @@ public final class CryptoUtil {
         return bytess;
     }
 
+    public static byte[] generateGenaroSeed(byte[] key) {
+        PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA512Digest());
+        gen.init(key, "mnemonic".getBytes(UTF_8), SEED_ITERATIONS);
+        return ((KeyParameter) gen.generateDerivedParameters(SEED_KEY_SIZE)).getKey();
+    }
+
     public static byte[] generateBucketKey(final byte[] privKey, final byte[] bucketId) {
-        byte[] seed = MnemonicUtils.generateSeed(new String(privKey), "");
+        String ksr = Hex.toHexString(privKey);
+        byte[] seed = generateGenaroSeed(privKey);
+        String sstr = Hex.toHexString(seed);
         byte[] key = generateDeterministicKey(seed, bucketId);
+        String skstr = Hex.toHexString(key);
         return key;
     }
 
