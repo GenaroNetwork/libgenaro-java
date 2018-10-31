@@ -95,6 +95,11 @@ public final class CryptoUtil {
         return result;
     }
 
+    protected static byte[] hmacSha512Half(final byte[] key, final byte[] input) {
+        byte[] decryptKey = hmacSha512(key, input);
+        return Arrays.copyOfRange(decryptKey, 0, decryptKey.length / 2);
+    }
+
     protected static byte[] ripemd160(final byte[] input) {
         Digest ripemd160DG = new RIPEMD160Digest();
         ripemd160DG.update(input, 0, input.length);

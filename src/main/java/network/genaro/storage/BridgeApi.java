@@ -67,10 +67,9 @@ public class BridgeApi {
                     if (b.isNameIsEncrypted()) {
                         byte[] bk = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(BUCKET_NAME_MAGIC));
                         // String bkss = Hex.toHexString(bk);
-                        byte[] decryptKey = CryptoUtil.hmacSha512(bk, BUCKET_META_MAGIC);
-                        byte[] decryptKey2 = Arrays.copyOfRange(decryptKey, 0, 32);
+                        byte[] decryptKey = CryptoUtil.hmacSha512Half(bk, BUCKET_META_MAGIC);
                         // String sss512 = Hex.toHexString(decryptKey2);
-                        byte[] realnameba = CryptoUtil.decryptMeta(b.getName(), decryptKey2);
+                        byte[] realnameba = CryptoUtil.decryptMeta(b.getName(), decryptKey);
                         b.setName(new String(realnameba));
                         b.setNameIsEncrypted(false);
                     }
