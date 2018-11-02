@@ -59,4 +59,16 @@ public class Bucket {
     public void setUsedStorage(long usedStorage) {
         this.usedStorage = usedStorage;
     }
+
+    @Override
+    public String toString() {
+        return "Bucket{" +
+                "bucketId='" + bucketId + '\'' +
+                ", nameIsEncrypted=" + nameIsEncrypted +
+                ", encryptionKey='" + encryptionKey + '\'' +
+                ", created='" + created + '\'' +
+                ", name='" + name + '\'' +
+                ", usedStorage=" + usedStorage +
+                '}';
+    }
 }
