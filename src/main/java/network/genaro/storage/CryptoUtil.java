@@ -26,7 +26,6 @@ import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
-import org.web3j.crypto.MnemonicUtils;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -138,18 +137,13 @@ public final class CryptoUtil {
     }
 
     public static byte[] generateBucketKey(final byte[] privKey, final byte[] bucketId) {
-        String ksr = Hex.toHexString(privKey);
         byte[] seed = generateGenaroSeed(privKey);
-        String sstr = Hex.toHexString(seed);
-        byte[] key = generateDeterministicKey(seed, bucketId);
-        String skstr = Hex.toHexString(key);
-        return key;
+        return generateDeterministicKey(seed, bucketId);
     }
 
     public static byte[] generateFileKey(final byte[] privKey, final byte[] bucketId, final byte[] index) {
         byte[] bKey = generateBucketKey(privKey, bucketId);
-        byte[] fKey = generateDeterministicKey(bKey, index);
-        return fKey;
+        return generateDeterministicKey(bKey, index);
     }
 
     // 6390959111c0ebf1f35ea599f856ed66
@@ -235,7 +229,7 @@ public final class CryptoUtil {
         try {
             DERSequenceGenerator seq = new DERSequenceGenerator(baos);
             seq.addObject(new ASN1Integer(components[0]));
-            seq.addObject(new ASN1Integer((components[1])));
+            seq.addObject(new ASN1Integer(components[1]));
             seq.close();
         } catch (IOException e) {
             e.printStackTrace();
