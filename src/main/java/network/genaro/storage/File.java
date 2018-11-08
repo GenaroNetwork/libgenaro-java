@@ -4,6 +4,60 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class File {
+    public class Hmac {
+        String value;
+        String type;
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        @Override
+        public String toString() {
+            return "Hmac{" +
+                    "value='" + value + '\'' +
+                    ", type='" + type + '\'' +
+                    '}';
+        }
+    }
+    public class Erasure {
+        String type;
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        @Override
+        public String toString() {
+            return "Erasure{" +
+                    "type='" + type + '\'' +
+                    '}';
+        }
+    }
+
+    // get file info field
+    private String bucket;
+    private String frame;
+    private Hmac hmac;
+    private Erasure erasure;
+    private String index;
+
     private String filename;
     private String mimetype;
     private long size;
@@ -78,14 +132,61 @@ public class File {
         this.rsaCtr = rsaCtr;
     }
 
+    public String getBucket() {
+        return bucket;
+    }
+
+    public void setBucket(String bucket) {
+        this.bucket = bucket;
+    }
+
+    public String getFrame() {
+        return frame;
+    }
+
+    public void setFrame(String frame) {
+        this.frame = frame;
+    }
+
+    public Hmac getHmac() {
+        return hmac;
+    }
+
+    public void setHmac(Hmac hmac) {
+        this.hmac = hmac;
+    }
+
+    public Erasure getErasure() {
+        return erasure;
+    }
+
+    public void setErasure(Erasure erasure) {
+        this.erasure = erasure;
+    }
+
+    public String getIndex() {
+        return index;
+    }
+
+    public void setIndex(String index) {
+        this.index = index;
+    }
+
     @Override
     public String toString() {
         return "File{" +
-                "filename='" + filename + '\'' +
+                "bucket='" + bucket + '\'' +
+                ", frame='" + frame + '\'' +
+                ", hmac=" + hmac +
+                ", erasure=" + erasure +
+                ", index='" + index + '\'' +
+                ", filename='" + filename + '\'' +
                 ", mimetype='" + mimetype + '\'' +
                 ", size=" + size +
                 ", id='" + id + '\'' +
                 ", created='" + created + '\'' +
+                ", rsaKey='" + rsaKey + '\'' +
+                ", rsaCtr='" + rsaCtr + '\'' +
                 ", isShareFile=" + isShareFile +
                 '}';
     }

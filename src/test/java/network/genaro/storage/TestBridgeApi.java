@@ -5,6 +5,7 @@ import org.testng.annotations.Test;
 import org.web3j.crypto.CipherException;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -26,7 +27,7 @@ public class TestBridgeApi {
         api.logIn(ww);
         Bucket[] bs = api.listBuckets().get();
         for(Bucket b : bs) {
-            System.out.println(b.getName());
+            System.out.println(b);
         }
         Assert.assertNotNull(bs);
     }
@@ -56,7 +57,7 @@ public class TestBridgeApi {
         BridgeApi api = new BridgeApi();
         GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
-        File[] bs = api.listFiles("5ba1f145256c9f70c00eae7d").get();
+        File[] bs = api.listFiles("5b8caf912d9c51182068e73f").get();
         for (File b : bs) {
             System.out.println(b);
         }
@@ -73,9 +74,33 @@ public class TestBridgeApi {
         BridgeApi api = new BridgeApi();
         GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
-        File ff = api.getFileInfo("5ba1f145256c9f70c00eae7d", "d305dff151c58d1cc0730302").get();
+        File ff = api.getFileInfo("5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67").get();
         System.out.println(ff);
     }
 
+    public void testGetPointers() throws Exception{
+        BridgeApi api = new BridgeApi();
+        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        api.logIn(ww);
+//        List<Pointer> ps = api.getPointersRaw("5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67", 10, 0).get();
+//        for (Pointer p : ps) {
+//            System.out.println(p);
+//        }
+//        System.out.println();
+//        System.out.println();
+        List<Pointer> psa = api.getPointers("5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67").get();
+        for (Pointer p : psa) {
+            System.out.println(p);
+        }
+    }
+
+    public void testDownloadFile() throws Exception {
+        BridgeApi api = new BridgeApi();
+        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        api.logIn(ww);
+
+        Downloader d = new Downloader(api, "/Users/lishi/Desktop/book.pdf", "5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67");
+        d.start();
+    }
 
 }

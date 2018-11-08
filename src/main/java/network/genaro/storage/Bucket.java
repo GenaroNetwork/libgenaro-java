@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class Bucket {
 
+    private String id;
     private String bucketId;
     private boolean nameIsEncrypted;
     private String encryptionKey;
@@ -60,10 +61,19 @@ public class Bucket {
         this.usedStorage = usedStorage;
     }
 
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
     @Override
     public String toString() {
         return "Bucket{" +
-                "bucketId='" + bucketId + '\'' +
+                "id='" + id + '\'' +
+                ", bucketId='" + bucketId + '\'' +
                 ", nameIsEncrypted=" + nameIsEncrypted +
                 ", encryptionKey='" + encryptionKey + '\'' +
                 ", created='" + created + '\'' +

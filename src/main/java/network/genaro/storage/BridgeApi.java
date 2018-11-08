@@ -8,11 +8,11 @@ import okhttp3.*;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
@@ -27,6 +27,7 @@ public class BridgeApi {
             .build();
     private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
     private GenaroWallet wallet;
+    private static final int POINT_PAGE_COUNT = 5;
 
     public BridgeApi(String bridgeUrl) {
         this.bridgeUrl = bridgeUrl;
@@ -65,9 +66,7 @@ public class BridgeApi {
                 for (Bucket b : buckets) {
                     if (b.isNameIsEncrypted()) {
                         byte[] bk = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(BUCKET_NAME_MAGIC));
-                        // String bkss = Hex.toHexString(bk);
                         byte[] decryptKey = CryptoUtil.hmacSha512Half(bk, BUCKET_META_MAGIC);
-                        // String sss512 = Hex.toHexString(decryptKey2);
                         byte[] realName = CryptoUtil.decryptMeta(b.getName(), decryptKey);
                         b.setName(new String(realName));
                         b.setNameIsEncrypted(false);
@@ -300,11 +299,50 @@ public class BridgeApi {
         });
     }
 
-    public Future<?> downloadFile() {
-        return executor.submit(() -> {});
+
+    public Future<List<Pointer>> getPointers(final String bucketId, final String fileId) throws ExecutionException, InterruptedException {
+
+        return executor.submit(() -> {
+            List<Pointer> ps= new ArrayList<>();
+
+            int skipCount = 0;
+            while (true) {
+                List<Pointer> psr = this.getPointersRaw(bucketId, fileId, POINT_PAGE_COUNT, skipCount).get();
+                if(psr.size() == 0) break;
+                skipCount += psr.size();
+                ps.addAll(psr);
+            }
+
+
+            return ps;
+        });
     }
 
-    public Future<?> uploadFile() {
-        return executor.submit(() -> {});
+    private Future<List<Pointer>> getPointersRaw(final String bucketId, final String fileId, int limit, int skipCount) {
+        return executor.submit(() -> {
+
+            String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
+            String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
+            String path = String.format("%s?%s", url, queryArgs);
+            String signature = signRequest("GET", url, queryArgs);
+            String pubKey = this.wallet.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.code() != 200) {
+                    throw new IOException("file not found, id: " + fileId);
+                }
+
+                ObjectMapper om = new ObjectMapper();
+                String body = response.body().string();
+                List<Pointer> pointers = om.readValue(body, new TypeReference<List<Pointer>>(){});
+                return pointers;
+            }
+
+        });
     }
 }
