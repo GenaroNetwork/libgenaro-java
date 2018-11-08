@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 import static network.genaro.storage.CryptoUtil.*;
-import static network.genaro.storage.CryptoUtil.string2Bytes;
 
 public class BridgeApi {
 
@@ -36,6 +35,10 @@ public class BridgeApi {
 
     public void logIn(GenaroWallet wallet) {
         this.wallet = wallet;
+    }
+
+    public byte[] getPrivateKey() {
+        return this.wallet.getPrivateKey();
     }
 
     private String signRequest(String method, String path, String body) {

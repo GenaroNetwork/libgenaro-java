@@ -74,7 +74,7 @@ public class TestBridgeApi {
         BridgeApi api = new BridgeApi();
         GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
-        File ff = api.getFileInfo("5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67").get();
+        File ff = api.getFileInfo("5b8caf912d9c51182068e73f", "4b449ebb8c7970096a40f0ba").get();
         System.out.println(ff);
     }
 
@@ -88,7 +88,7 @@ public class TestBridgeApi {
 //        }
 //        System.out.println();
 //        System.out.println();
-        List<Pointer> psa = api.getPointers("5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67").get();
+        List<Pointer> psa = api.getPointers("5b8caf912d9c51182068e73f", "4b449ebb8c7970096a40f0ba").get();
         for (Pointer p : psa) {
             System.out.println(p);
         }
@@ -99,8 +99,10 @@ public class TestBridgeApi {
         GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
 
-        Downloader d = new Downloader(api, "/Users/lishi/Desktop/book.pdf", "5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67");
+        Downloader d = new Downloader(api, "/Users/lishi/Desktop/cc.jpg", "5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67");
         d.start();
     }
+
+
 
 }

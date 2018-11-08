@@ -126,8 +126,7 @@ public final class CryptoUtil {
 
     public static byte[] generateDeterministicKey(final byte[] key, final byte[] id ) {
         byte[] sha512input = ArrayUtils.addAll(key, id);
-        byte[] bytess = Arrays.copyOfRange(sha512(sha512input), 0, 32);
-        return bytess;
+        return Arrays.copyOfRange(sha512(sha512input), 0, 32);
     }
 
     public static byte[] generateGenaroSeed(byte[] key) {
@@ -237,4 +236,6 @@ public final class CryptoUtil {
         byte[] sig = baos.toByteArray();
         return Hex.toHexString(sig);
     }
+
+    // AES CTR
 }
