@@ -99,10 +99,26 @@ public class TestBridgeApi {
         GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
 
-        Downloader d = new Downloader(api, "/Users/lishi/Desktop/cc.jpg", "5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67");
+        Downloader d = new Downloader(api, "/Users/lishi/Desktop/cc.epub", "5b8caf912d9c51182068e73f", "368cd399a92d4b923e37dd67", new Progress(){
+            @Override
+            public void onBegin() {
+                System.out.println("onBegin");
+            }
+            @Override
+            public void onEnd() {
+                System.out.println("onEnd");
+            }
+            @Override
+            public void onError() {
+                System.out.println("onError");
+            }
+            @Override
+            public void onProgress(float progress, String message) {
+                System.out.println(message);
+                System.out.println("progress: " + progress);
+            }
+        });
+
         d.start();
     }
-
-
-
 }

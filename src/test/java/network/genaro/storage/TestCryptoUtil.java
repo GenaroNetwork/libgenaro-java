@@ -183,18 +183,18 @@ public class TestCryptoUtil {
     public void testAesCtr() throws Exception {
 
         // make Iv byte[]
-        byte[] iv  = Hex.decode("f123abc2f123abcf2123abc2f123abc2");
-        // make key
-        byte[] key = Hex.decode("123abc2fabc2f123abcf123abc2f1232123abc2fabc2f123abcf123abc2f1232");
-        AesCtr aesCtr = new AesCtr(key, iv);
-
-        String message = "I got you in my sight";
-        byte[] encMsg = aesCtr.encrypt(string2Bytes(message));
-        byte[] msg2 = aesCtr.decrypt(encMsg);
-        String deMessage = new String(msg2, StandardCharsets.UTF_8);
-
-
-        System.out.println(deMessage);
+//        byte[] iv  = Hex.decode("f123abc2f123abcf2123abc2f123abc2");
+//        // make key
+//        byte[] key = Hex.decode("123abc2fabc2f123abcf123abc2f1232123abc2fabc2f123abcf123abc2f1232");
+//        AesCtr aesCtr = new AesCtr(key, iv);
+//
+//        String message = "I got you in my sight";
+//        byte[] encMsg = aesCtr.encrypt(string2Bytes(message));
+//        byte[] msg2 = aesCtr.decrypt(encMsg);
+//        String deMessage = new String(msg2, StandardCharsets.UTF_8);
+//
+//
+//        System.out.println(deMessage);
     }
 
 }
