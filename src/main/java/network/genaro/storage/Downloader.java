@@ -115,7 +115,8 @@ public class Downloader {
                         }
                     });
                     return fu;
-                }).toArray(CompletableFuture[]::new);
+                })
+                .toArray(CompletableFuture[]::new);
         CompletableFuture futureAll = CompletableFuture.allOf(downFutures);
         futureAll.get(); // all done
         fileChannel.truncate(fileSize);
