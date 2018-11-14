@@ -8,6 +8,8 @@ import okhttp3.*;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -343,6 +345,66 @@ public class BridgeApi {
                 String body = response.body().string();
                 List<Pointer> pointers = om.readValue(body, new TypeReference<List<Pointer>>(){});
                 return pointers;
+            }
+
+        });
+    }
+
+
+    public Future<Boolean> isFileExist(final String bucketId, final String encryptedFileName) throws UnsupportedEncodingException {
+        byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
+        byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
+        String escapedName = URLEncoder.encode(encryptedFileName, "UTF-8");
+
+        return executor.submit(() -> {
+
+            String path = String.format("/buckets/%s/file-ids/%s", bucketId, escapedName);
+            String signature = signRequest("GET", path, "");
+            String pubKey = this.wallet.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.code() == 404) {
+                    return false;
+                } else if (response.code() == 200) {
+                    return true;
+                } else {
+                    throw new Exception("Request file-ids failed");
+                }
+            }
+
+        });
+    }
+
+    public Future<Frame> requestNewFrame() {
+
+        String jsonStrBody = "{}";
+
+        return executor.submit(() -> {
+
+            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+            RequestBody body = RequestBody.create(JSON, jsonStrBody);
+            String signature = signRequest("POST", "/frames", jsonStrBody);
+            String pubKey = this.wallet.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + "/frames")
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .post(body)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.code() != 200) {
+                    throw new IOException("Request frame id error");
+                } else {
+                    ObjectMapper om = new ObjectMapper();
+                    String responseBody = response.body().string();
+                    return om.readValue(responseBody, Frame.class);
+                }
             }
 
         });

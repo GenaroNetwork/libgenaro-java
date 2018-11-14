@@ -121,4 +121,11 @@ public class TestBridgeApi {
 
         d.start();
     }
+
+    public void testRequestFrameId() throws Exception {
+        BridgeApi api = new BridgeApi();
+        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        api.logIn(ww);
+        api.requestNewFrame().get();
+    }
 }

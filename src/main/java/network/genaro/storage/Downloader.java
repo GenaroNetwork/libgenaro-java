@@ -6,6 +6,7 @@ import okhttp3.Response;
 import org.bouncycastle.util.encoders.Hex;
 
 import javax.crypto.CipherInputStream;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
@@ -15,6 +16,9 @@ import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
@@ -83,7 +87,7 @@ public class Downloader {
         }, shardExecutor);
     }
 
-    public void start() throws Exception {
+    public void start() throws IOException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
         this.progress.onBegin();
         FileChannel fileChannel = FileChannel.open(Paths.get(tempPath), CREATE, WRITE, READ, DELETE_ON_CLOSE);
         // request info and pointers
