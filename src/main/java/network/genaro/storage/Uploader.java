@@ -2,10 +2,21 @@ package network.genaro.storage;
 
 import org.bouncycastle.util.encoders.Hex;
 
+import javax.crypto.CipherInputStream;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
-import java.io.UnsupportedEncodingException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
+import static javax.crypto.Cipher.DECRYPT_MODE;
 import static network.genaro.storage.CryptoUtil.BUCKET_META_MAGIC;
 import static network.genaro.storage.CryptoUtil.BUCKET_NAME_MAGIC;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
@@ -18,9 +29,11 @@ public class Uploader {
     private Progress progress;
     private File originFile;
 
+    private static Random random = new Random();
     private static long MAX_SHARD_SIZE = 4294967296L; // 4Gb
     private static long MIN_SHARD_SIZE = 2097152L; // 2Mb
     private static int SHARD_MULTIPLES_BACK = 4;
+    private static int GENARO_SHARD_CHALLENGES = 4;
 
     public Uploader(final BridgeApi bridge, String filePath, String bucketId, Progress progress) {
         this.bridge = bridge;
@@ -64,8 +77,18 @@ public class Uploader {
         return determinShardSize(fileSize, ++ accumulator);
     }
 
+    private static byte[] randomBuff(int len) {
+        byte[] buff = new byte[len];
+        random.nextBytes(buff);
+        return buff;
+    }
+
     public void start() throws Exception {
         long shardSize = determinShardSize(originFile.length(), 0);
+        long fileSize = originFile.length();
+        // total shard
+
+        int totalDataShards = (int) (fileSize / shardSize + (fileSize % shardSize == 0 ? 0 : 1));
 
         String name = originFile.getName();
         byte[] bucketKey = CryptoUtil.generateBucketKey(bridge.getPrivateKey(), Hex.decode(BUCKET_NAME_MAGIC));
@@ -91,8 +114,18 @@ public class Uploader {
             return;
         }
         // queue_request_frame_id
+        Frame frame = bridge.requestNewFrame().get();
+        String frameId = frame.getId();
 
-        // queue_prepare_frame s
+        for (int shardi = 0; shardi < totalDataShards; shardi ++) {
+            // queue_prepare_frame s
+            List<byte[]> challenges = new ArrayList<>(GENARO_SHARD_CHALLENGES);
+            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i ++) {
+                challenges.set(i, randomBuff(32));
+            }
+        }
+        // Calculate the merkle tree with challenges
+
 
         // upload frame and shards
 

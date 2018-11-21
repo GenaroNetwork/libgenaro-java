@@ -13,12 +13,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class Frame {
-    String user;
-    long storageSize;
-    long size;
-    boolean locked;
-    String created;
-    String id;
+    private String user;
+    private long storageSize;
+    private long size;
+    private boolean locked;
+    private String created;
+    private String id;
 
     public String getUser() {
         return user;

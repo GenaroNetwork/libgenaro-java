@@ -128,8 +128,8 @@ public class Downloader {
         // decryption:
         progress.onProgress(1f, "download complete");
         progress.onProgress(1f, "begin decryption");
-        byte[] fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(f.getBucket()), Hex.decode(f.getIndex()));
         byte[] index   = Hex.decode(f.getIndex());
+        byte[] fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(f.getBucket()), index);
         byte[] ivBytes = Arrays.copyOf(index, 16);
         SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
         IvParameterSpec iv = new IvParameterSpec(ivBytes);
