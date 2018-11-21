@@ -128,4 +128,31 @@ public class TestBridgeApi {
         api.logIn(ww);
         api.requestNewFrame().get();
     }
+
+    public void testUpload() throws Exception {
+        BridgeApi api = new BridgeApi();
+        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        api.logIn(ww);
+
+        Uploader up = new Uploader(api, "/Users/lishi/Desktop/TEDxlogos.zip", "5b8caf912d9c51182068e73f", new Progress() {
+            @Override
+            public void onBegin() {
+                System.out.println("onBegin");
+            }
+            @Override
+            public void onEnd() {
+                System.out.println("onEnd");
+            }
+            @Override
+            public void onError() {
+                System.out.println("onError");
+            }
+            @Override
+            public void onProgress(float progress, String message) {
+                System.out.println(message);
+                System.out.println("progress: " + progress);
+            }
+        });
+        up.start();
+    }
 }

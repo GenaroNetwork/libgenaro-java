@@ -6,6 +6,7 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.nio.file.Files;
@@ -17,6 +18,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import static javax.crypto.Cipher.DECRYPT_MODE;
+import static javax.crypto.Cipher.ENCRYPT_MODE;
 import static network.genaro.storage.CryptoUtil.BUCKET_META_MAGIC;
 import static network.genaro.storage.CryptoUtil.BUCKET_NAME_MAGIC;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
@@ -24,6 +26,7 @@ import static network.genaro.storage.CryptoUtil.string2Bytes;
 public class Uploader {
 
     private String path;
+    private String encryptedPath;
     private BridgeApi bridge;
     private String bucketId;
     private Progress progress;
@@ -38,6 +41,7 @@ public class Uploader {
     public Uploader(final BridgeApi bridge, String filePath, String bucketId, Progress progress) {
         this.bridge = bridge;
         this.path = filePath;
+        this.encryptedPath = filePath + ".encrypted";
         this.originFile = new File(filePath);
         this.bucketId = bucketId;
         this.progress = progress;
@@ -97,6 +101,21 @@ public class Uploader {
 
         String encryptedFileName = CryptoUtil.encryptMeta(string2Bytes(name), key, nameIv);
 
+
+        // aes
+        //generate IV
+        byte[] index   = randomBuff(32);
+        byte[] fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(bucketId), index);
+        byte[] ivBytes = Arrays.copyOf(index, 16);
+        SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
+        IvParameterSpec iv = new IvParameterSpec(ivBytes);
+        javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
+        cipher.init(ENCRYPT_MODE, keySpec, iv);
+
+        try (InputStream in = new FileInputStream(this.path);
+             InputStream cypherIn = new CipherInputStream(in, cipher)) {
+            Files.copy(cypherIn, Paths.get(this.encryptedPath));
+        }
 
         // queue_verify_bucket_id
         try {
