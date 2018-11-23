@@ -24,6 +24,7 @@ This library use Java Future/Execution framework, and following 3rd party libs.
 
 - [Bouncy Castle](https://www.bouncycastle.org/java.html) for crypto algorithms.
 - [web3j](https://github.com/web3j/web3j) for wallet managment, BIP39 and Interaction with blockchain.
+- [JavaReedSolomon](https://github.com/Backblaze/JavaReedSolomon) for reed solomon algorithm
 - [jackson](https://github.com/FasterXML/jackson) for JSON parse/compose.
 - [okhttp3](https://github.com/square/okhttp) as HTTP client.
 - [guava](https://github.com/google/guava) and [apache.commons](https://commons.apache.org/) as utility.
