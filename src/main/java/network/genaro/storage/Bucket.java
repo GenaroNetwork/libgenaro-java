@@ -11,7 +11,10 @@ public class Bucket {
     private String encryptionKey;
     private String created;
     private String name;
-    private long usedStorage;
+    private long  limitStorage;
+    private long  usedStorage;
+    private long  timeStart;
+    private long  timeEnd;
 
     public String getBucketId() {
         return bucketId;
@@ -21,9 +24,7 @@ public class Bucket {
         this.bucketId = bucketId;
     }
 
-    public boolean isNameIsEncrypted() {
-        return nameIsEncrypted;
-    }
+    public boolean getNameIsEncrypted() { return nameIsEncrypted; }
 
     public void setNameIsEncrypted(boolean nameIsEncrypted) {
         this.nameIsEncrypted = nameIsEncrypted;
@@ -53,13 +54,21 @@ public class Bucket {
         this.name = name;
     }
 
-    public long getUsedStorage() {
-        return usedStorage;
-    }
+    public long getLimitStorage() { return limitStorage; }
 
-    public void setUsedStorage(long usedStorage) {
-        this.usedStorage = usedStorage;
-    }
+    public void setLimitStorage(long limitStorage) { this.limitStorage = limitStorage; }
+
+    public long getUsedStorage() { return usedStorage; }
+
+    public void setUsedStorage(long usedStorage) { this.usedStorage = usedStorage; }
+
+    public long getTimeStart() { return timeStart; }
+
+    public void setTimeStart(long timeStart) { this.timeStart = timeStart; }
+
+    public long getTimeEnd() { return timeEnd; }
+
+    public void setTimeEnd(long timeEnd) { this.timeEnd = timeEnd; }
 
     public String getId() {
         return id;

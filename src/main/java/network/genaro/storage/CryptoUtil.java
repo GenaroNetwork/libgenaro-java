@@ -53,14 +53,15 @@ public final class CryptoUtil {
     private static final ECDomainParameters CURVE = new ECDomainParameters(
             CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
 
-    protected static byte[] string2Bytes(final String input) {
+    public static byte[] string2Bytes(final String input) {
         return input.getBytes(StandardCharsets.UTF_8);
     }
-    private static String bytes2String(final byte[] input) {
+
+    public static String bytes2String(final byte[] input) {
         return new String(input, StandardCharsets.UTF_8);
     }
 
-    protected static byte[] sha256(final byte[] input) {
+    public static byte[] sha256(final byte[] input) {
         MessageDigest digest = null;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -71,7 +72,7 @@ public final class CryptoUtil {
         return digest.digest(input);
     }
 
-    protected static byte[] sha512(final byte[] input) {
+    public static byte[] sha512(final byte[] input) {
         MessageDigest digest = null;
         try {
             digest = MessageDigest.getInstance("SHA-512");
@@ -83,7 +84,7 @@ public final class CryptoUtil {
         return digest.digest();
     }
 
-    protected static byte[] hmacSha512(final byte[] key, final byte[] input) {
+    public static byte[] hmacSha512(final byte[] key, final byte[] input) {
         HMac hmac = new HMac(new SHA512Digest());
         hmac.init(new KeyParameter(key));
         byte[] result = new byte[hmac.getMacSize()];
@@ -94,12 +95,12 @@ public final class CryptoUtil {
         return result;
     }
 
-    protected static byte[] hmacSha512Half(final byte[] key, final byte[] input) {
+    public static byte[] hmacSha512Half(final byte[] key, final byte[] input) {
         byte[] decryptKey = hmacSha512(key, input);
         return Arrays.copyOfRange(decryptKey, 0, decryptKey.length / 2);
     }
 
-    protected static byte[] ripemd160(final byte[] input) {
+    public static byte[] ripemd160(final byte[] input) {
         Digest ripemd160DG = new RIPEMD160Digest();
         ripemd160DG.update(input, 0, input.length);
         byte[] out = new byte[RIPEMD160_DIGEST_SIZE];
@@ -183,7 +184,7 @@ public final class CryptoUtil {
         return "";
     }
 
-    public static byte[] decryptMeta(String base64Secret, final byte[] decryptKey) {
+    public static byte[] decryptMeta(final String base64Secret, final byte[] decryptKey) {
         byte[] encryptedData = Base64.decode(base64Secret);
         try {
             // get IV
@@ -203,10 +204,9 @@ public final class CryptoUtil {
         } catch (NoSuchAlgorithmException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
             System.exit(1);
+            return new byte[0];
         }
-        return new byte[0];
     }
-
 
     public static String sha256EscdaSign(final BigInteger ecPrivateKey, final String message) {
         return sha256EscdaSign(ecPrivateKey, string2Bytes(message));
@@ -236,6 +236,4 @@ public final class CryptoUtil {
         byte[] sig = baos.toByteArray();
         return Hex.toHexString(sig);
     }
-
-    // AES CTR
 }

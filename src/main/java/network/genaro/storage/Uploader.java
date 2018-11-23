@@ -1,30 +1,28 @@
 package network.genaro.storage;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Hex;
 
-import javax.crypto.CipherInputStream;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
-import java.io.InputStream;
-import java.nio.channels.Channels;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-import static javax.crypto.Cipher.DECRYPT_MODE;
 import static network.genaro.storage.CryptoUtil.BUCKET_META_MAGIC;
 import static network.genaro.storage.CryptoUtil.BUCKET_NAME_MAGIC;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
 
+import static network.genaro.storage.Parameters.*;
+
 public class Uploader {
+    private static final Logger logger = LogManager.getLogger(Genaro.class);
 
     private String path;
-    private BridgeApi bridge;
+    private Genaro bridge;
     private String bucketId;
     private Progress progress;
     private File originFile;
@@ -35,7 +33,7 @@ public class Uploader {
     private static int SHARD_MULTIPLES_BACK = 4;
     private static int GENARO_SHARD_CHALLENGES = 4;
 
-    public Uploader(final BridgeApi bridge, String filePath, String bucketId, Progress progress) {
+    public Uploader(final Genaro bridge, String filePath, String bucketId, Progress progress) {
         this.bridge = bridge;
         this.path = filePath;
         this.originFile = new File(filePath);
@@ -97,11 +95,10 @@ public class Uploader {
 
         String encryptedFileName = CryptoUtil.encryptMeta(string2Bytes(name), key, nameIv);
 
-
         // queue_verify_bucket_id
         try {
-            bridge.getBucket(bucketId).get();
-        } catch (InterruptedException | ExecutionException e) {
+            bridge.getBucket(bucketId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        } catch (TimeoutException | InterruptedException | ExecutionException e) {
             e.printStackTrace();
             // throw new Exception("bucket not exist");
             return;
@@ -109,12 +106,12 @@ public class Uploader {
 
         // queue_verify_file_name
 
-        if (bridge.isFileExist(bucketId, encryptedFileName).get()) {
+        if (bridge.isFileExist(bucketId, encryptedFileName).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS)) {
             // throw new Exception("file exists");
             return;
         }
         // queue_request_frame_id
-        Frame frame = bridge.requestNewFrame().get();
+        Frame frame = bridge.requestNewFrame().get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         String frameId = frame.getId();
 
         for (int shardi = 0; shardi < totalDataShards; shardi ++) {

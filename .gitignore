@@ -1,0 +1,6 @@
+.idea
+logs
+target/classes/network
+target/generated-sources
+target/generated-test-sources
+target/test-classes

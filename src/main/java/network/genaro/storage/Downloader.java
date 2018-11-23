@@ -3,6 +3,8 @@ package network.genaro.storage;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Hex;
 
 import javax.crypto.CipherInputStream;
@@ -16,46 +18,56 @@ import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.*;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static java.nio.file.StandardOpenOption.*;
 import static javax.crypto.Cipher.DECRYPT_MODE;
 
+import static network.genaro.storage.Parameters.*;
+
 public class Downloader {
+    private static final Logger logger = LogManager.getLogger(Genaro.class);
 
     private String path;
     private String tempPath;
-    private BridgeApi bridge;
+    private Genaro bridge;
     private String bucketId;
     private String fileId;
     private Progress progress;
 
     private long shardSize;
     private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(100, TimeUnit.SECONDS)
-            .writeTimeout(100, TimeUnit.SECONDS)
-            .readTimeout(300, TimeUnit.SECONDS)
+            .connectTimeout(OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+            .writeTimeout(OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+            .readTimeout(OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
     private static final ExecutorService shardExecutor = Executors.newCachedThreadPool();
 
-    public Downloader(final BridgeApi bridge, final String path, final String bucketId, final String fileId, Progress progress) {
+    public Downloader(final Genaro bridge, final String path, final String bucketId, final String fileId, Progress progress) {
         this.path = path;
         this.tempPath = path + ".temp";
         this.bridge = bridge;
         this.fileId = fileId;
         this.bucketId = bucketId;
-        //
         this.progress = progress;
     }
 
-    public Downloader(final BridgeApi bridge, final String path, final String bucketId, final String fileId) {
+    public Downloader(final Genaro bridge, final String path, final String bucketId, final String fileId) {
         this(bridge, path, bucketId, fileId, new Progress(){
             @Override
             public void onBegin() { }
@@ -87,12 +99,13 @@ public class Downloader {
         }, shardExecutor);
     }
 
-    public void start() throws IOException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
+    public void start() throws IOException, TimeoutException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
         this.progress.onBegin();
-        FileChannel fileChannel = FileChannel.open(Paths.get(tempPath), CREATE, WRITE, READ, DELETE_ON_CLOSE);
+        FileChannel fileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+                StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
         // request info and pointers
-        File f = bridge.getFileInfo(bucketId, fileId).get();
-        List<Pointer> pointers = bridge.getPointers(bucketId, fileId).get();
+        File f = bridge.getFileInfo(bucketId, fileId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        List<Pointer> pointers = bridge.getPointers(bucketId, fileId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         // set shard size to the first shard
         if (pointers.size() > 0) {
             shardSize = pointers.get(0).getSize();
