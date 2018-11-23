@@ -2,12 +2,14 @@ package network.genaro.storage;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.web3j.crypto.CipherException;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.Future;
 
 import static network.genaro.storage.Parameters.*;
 
@@ -147,5 +149,32 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
         api.requestNewFrame().get();
+    }
+
+    public void testUpload() throws Exception {
+        Genaro api = new Genaro();
+        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        api.logIn(ww);
+
+        Uploader up = new Uploader(api, "/Users/lishi/Desktop/TEDxlogos.zip", "5b8caf912d9c51182068e73f", new Progress() {
+            @Override
+            public void onBegin() {
+                System.out.println("onBegin");
+            }
+            @Override
+            public void onEnd() {
+                System.out.println("onEnd");
+            }
+            @Override
+            public void onError() {
+                System.out.println("onError");
+            }
+            @Override
+            public void onProgress(float progress, String message) {
+                System.out.println(message);
+                System.out.println("progress: " + progress);
+            }
+        });
+        up.start();
     }
 }
