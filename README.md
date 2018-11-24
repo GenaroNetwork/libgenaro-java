@@ -1,4 +1,4 @@
-# libgenaro-java
+# libgenaro-java (SHIL)
 
 Asynchronous Java library and CLI for encrypted file transfer on the Genaro network. It's developed on Java 8, but should be able to run on latest android. Compatible with [libgenaro](https://github.com/GenaroNetwork/libgenaro).
 
