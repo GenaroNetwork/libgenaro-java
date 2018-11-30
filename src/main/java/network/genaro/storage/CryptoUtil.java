@@ -6,8 +6,10 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Arrays;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import org.apache.commons.lang3.ArrayUtils;
+
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.DERSequenceGenerator;
 import org.bouncycastle.asn1.x9.X9ECParameters;
@@ -34,21 +36,21 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 public final class CryptoUtil {
 
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
-    static final int RIPEMD160_DIGEST_SIZE = 20;
+    private static final int RIPEMD160_DIGEST_SIZE = 20;
     private static final int AES_GCM_DIGEST_LENGTH = 16;
     private static final int AES_GCM_IV_LENGTH = 32;
+    public static final int AES_BLOCK_SIZE = 16;
 
     private static final int SEED_ITERATIONS = 2048;
     private static final int SEED_KEY_SIZE = 512;
-    public static final String BUCKET_NAME_MAGIC = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
+    public static final byte[] BUCKET_NAME_MAGIC = Hex.decode("398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272");
     public static final byte[] BUCKET_META_MAGIC = Hex.decode("42964710327258a0a3239a41a2d5e2d7468a393d3413d2aa26a4a2c856c90251");
+
     private static final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
     private static final ECDomainParameters CURVE = new ECDomainParameters(
             CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
@@ -208,6 +210,21 @@ public final class CryptoUtil {
         }
     }
 
+    public static String encryptMetaHmacSha512(byte[] meta, byte[] privKey, byte[] bucketId) {
+        byte[] bucketKey = CryptoUtil.generateBucketKey(privKey, bucketId);
+        byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
+        byte[] nameIv = CryptoUtil.hmacSha512Half(bucketKey, meta);
+        return  CryptoUtil.encryptMeta(meta, key, nameIv);
+    }
+
+    public static String decryptMetaHmacSha512(String bufferBase64, byte[] privKey, byte[] bucketId) {
+        byte[] bk = CryptoUtil.generateBucketKey(privKey, bucketId);
+        byte[] decryptKey = CryptoUtil.hmacSha512Half(bk, BUCKET_META_MAGIC);
+        byte[] realName = CryptoUtil.decryptMeta(bufferBase64, decryptKey);
+
+        return bytes2String(realName);
+    }
+
     public static String sha256EscdaSign(final BigInteger ecPrivateKey, final String message) {
         return sha256EscdaSign(ecPrivateKey, string2Bytes(message));
     }
@@ -235,5 +252,24 @@ public final class CryptoUtil {
         }
         byte[] sig = baos.toByteArray();
         return Hex.toHexString(sig);
+    }
+
+    int increment_ctr_aes_iv(byte[] iv, long bytes_position)
+    {
+        if (bytes_position % AES_BLOCK_SIZE != 0) {
+            return 1;
+        }
+
+        long times = bytes_position / AES_BLOCK_SIZE;
+
+        while (times > 0) {
+            int i = AES_BLOCK_SIZE - 1;
+            if (++(iv)[i] == 0) {
+                while (i > 0 && ++(iv)[--i] == 0);
+            }
+            times--;
+        }
+
+        return 0;
     }
 }

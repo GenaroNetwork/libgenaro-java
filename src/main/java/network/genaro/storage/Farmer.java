@@ -12,7 +12,7 @@ package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties(ignoreUnknown=true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Farmer {
     private String userAgent;
     private String protocol;
@@ -53,9 +53,7 @@ public class Farmer {
         this.port = port;
     }
 
-    public String getNodeID() {
-        return nodeID;
-    }
+    public String getNodeID() { return nodeID; }
 
     public void setNodeID(String nodeID) {
         this.nodeID = nodeID;

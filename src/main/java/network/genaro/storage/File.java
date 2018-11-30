@@ -67,110 +67,59 @@ public class File {
     private String rsaCtr;
     private boolean isShareFile;
 
-    public boolean isShareFile() {
-        return isShareFile;
-    }
+    public boolean isShareFile() { return isShareFile; }
 
     public void setShareFile(boolean shareFile) {
         isShareFile = shareFile;
     }
 
+    public String getFilename() { return filename; }
 
-    public String getFilename() {
-        return filename;
-    }
+    public void setFilename(String filename) { this.filename = filename; }
 
-    public void setFilename(String filename) {
-        this.filename = filename;
-    }
+    public String getMimetype() { return mimetype; }
 
-    public String getMimetype() {
-        return mimetype;
-    }
+    public void setMimetype(String mimetype) { this.mimetype = mimetype; }
 
-    public void setMimetype(String mimetype) {
-        this.mimetype = mimetype;
-    }
+    public long getSize() { return size; }
 
-    public long getSize() {
-        return size;
-    }
+    public void setSize(long size) { this.size = size; }
 
-    public void setSize(long size) {
-        this.size = size;
-    }
+    public String getId() { return id; }
 
-    public String getId() {
-        return id;
-    }
+    public void setId(String id) { this.id = id; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public String getCreated() { return created; }
 
-    public String getCreated() {
-        return created;
-    }
+    public void setCreated(String created) { this.created = created; }
 
-    public void setCreated(String created) {
-        this.created = created;
-    }
+    public String getRsaKey() { return rsaKey; }
 
-    public String getRsaKey() {
-        return rsaKey;
-    }
+    public void setRsaKey(String rsaKey) { this.rsaKey = rsaKey; }
 
-    public void setRsaKey(String rsaKey) {
-        this.rsaKey = rsaKey;
-    }
+    public String getRsaCtr() { return rsaCtr; }
 
-    public String getRsaCtr() {
-        return rsaCtr;
-    }
+    public void setRsaCtr(String rsaCtr) { this.rsaCtr = rsaCtr; }
 
-    public void setRsaCtr(String rsaCtr) {
-        this.rsaCtr = rsaCtr;
-    }
+    public String getBucket() { return bucket; }
 
-    public String getBucket() {
-        return bucket;
-    }
+    public void setBucket(String bucket) { this.bucket = bucket; }
 
-    public void setBucket(String bucket) {
-        this.bucket = bucket;
-    }
+    public String getFrame() { return frame; }
 
-    public String getFrame() {
-        return frame;
-    }
+    public void setFrame(String frame) { this.frame = frame; }
 
-    public void setFrame(String frame) {
-        this.frame = frame;
-    }
+    public Hmac getHmac() { return hmac; }
 
-    public Hmac getHmac() {
-        return hmac;
-    }
+    public void setHmac(Hmac hmac) { this.hmac = hmac; }
 
-    public void setHmac(Hmac hmac) {
-        this.hmac = hmac;
-    }
+    public Erasure getErasure() { return erasure; }
 
-    public Erasure getErasure() {
-        return erasure;
-    }
+    public void setErasure(Erasure erasure) { this.erasure = erasure; }
 
-    public void setErasure(Erasure erasure) {
-        this.erasure = erasure;
-    }
+    public String getIndex() { return index; }
 
-    public String getIndex() {
-        return index;
-    }
-
-    public void setIndex(String index) {
-        this.index = index;
-    }
+    public void setIndex(String index) { this.index = index; }
 
     @Override
     public String toString() {

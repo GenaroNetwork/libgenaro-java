@@ -1,16 +1,15 @@
 package network.genaro.storage;
 
-import org.testng.Assert;
+import org.bouncycastle.util.encoders.Hex;
 import org.testng.annotations.Test;
 import org.web3j.crypto.CipherException;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Future;
 
+import static network.genaro.storage.CryptoUtil.string2Bytes;
 import static network.genaro.storage.Parameters.*;
 
 @Test()
@@ -46,14 +45,14 @@ public class TestGenaro {
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        api.deleteBucket("5ba1ba64256c9f70c00eae7d").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        api.deleteBucket("5ba1ba64256c9f70c00eae7g").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public void testRenameBucket() throws Exception{
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        api.renameBucket("5ba07a4da5156c7964240cbb", "哈哈").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        api.renameBucket("5ba341402e49103d8787e52d", "嗷嗷").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public void testGetBucket() throws Exception{
@@ -80,11 +79,30 @@ public class TestGenaro {
         }
     }
 
+    public void testIsFileExist() throws Exception{
+        Genaro api = new Genaro();
+//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        api.logIn(gw);
+
+        String bucketId = "5ba341402e49103d8787e52d";
+        String fileName = "2049k.data";
+
+        String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(string2Bytes(fileName), gw.getPrivateKey(), Hex.decode(bucketId));
+
+        boolean exist = api.isFileExist(bucketId, encryptedFileName).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        if(exist) {
+            System.out.println("File exists.");
+        } else {
+            System.out.println("File not exists.");
+        }
+    }
+
     public void testDeleteFile() throws Exception{
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        api.deleteFile("5b8c9da88f21182871068f53", "8a6fc6e509d305dea3a2a0bc")
+        api.deleteFile("5ba341402e49103d8787e52d", "5bf7c97d65390d21283c15de")
            .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
@@ -92,7 +110,7 @@ public class TestGenaro {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        File ff = api.getFileInfo("5b8c9da88f21182871068f53", "42f68c1a5a6efb3b915db64")
+        File ff = api.getFileInfo("5ba341402e49103d8787e52d", "5bdac5162bd005291e9c7a9d")
                      .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         System.out.println(ff);
     }
@@ -103,8 +121,7 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
 
-        List<Pointer> psa = null;
-        psa = api.getPointers("5ba341402e49103d8787e52d", "5bf7c98165390d21283c15f5")
+        List<Pointer> psa = api.getPointers("5ba341402e49103d8787e52d", "5bf7c98165390d21283c15f5")
                  .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
 
         if(psa.size() == 0) {
@@ -118,30 +135,41 @@ public class TestGenaro {
 
     public void testDownloadFile() throws Exception {
         Genaro api = new Genaro();
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        GenaroWallet gw;
+        try {
+            gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        } catch (CipherException | IOException e) {
+            System.out.println(e.getMessage());
+            throw e;
+        }
         api.logIn(gw);
 
-        Downloader d = new Downloader(api, "/Users/dingyi/Genaro/test/download/spam.txt", "5ba341402e49103d8787e52d", "5bf7c98165390d21283c15f5", new Progress() {
-            @Override
-            public void onBegin() {
-                System.out.println("onBegin");
-            }
-            @Override
-            public void onEnd() {
-                System.out.println("onEnd");
-            }
-            @Override
-            public void onError() {
-                System.out.println("onError");
-            }
-            @Override
-            public void onProgress(float progress, String message) {
-                System.out.println(message);
-                System.out.println("progress: " + progress);
-            }
-        });
+        try {
+            new Downloader(api, "5ba341402e49103d8787e52d", "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam.txt", new Progress() {
+                @Override
+                public void onBegin() {
+                    System.out.println("onBegin");
+                }
 
-        d.start();
+                @Override
+                public void onEnd(int status) {
+                    if(status != 0) {
+                        System.out.println("onEnd, error status: " + status);
+                    } else {
+                        System.out.println("onEnd");
+                    }
+                }
+
+                @Override
+                public void onProgress(float progress, String message) {
+                    System.out.println(message);
+                    System.out.println("progress: " + progress);
+                }
+            }).start();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw e;
+        }
     }
 
     public void testRequestFrameId() throws Exception {
@@ -153,28 +181,34 @@ public class TestGenaro {
 
     public void testUpload() throws Exception {
         Genaro api = new Genaro();
-        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(ww);
 
-        Uploader up = new Uploader(api, "/Users/lishi/Desktop/TEDxlogos.zip", "5b8caf912d9c51182068e73f", new Progress() {
-            @Override
-            public void onBegin() {
-                System.out.println("onBegin");
-            }
-            @Override
-            public void onEnd() {
-                System.out.println("onEnd");
-            }
-            @Override
-            public void onError() {
-                System.out.println("onError");
-            }
-            @Override
-            public void onProgress(float progress, String message) {
-                System.out.println(message);
-                System.out.println("progress: " + progress);
-            }
-        });
-        up.start();
+        try {
+//            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new Progress() {
+            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "2049m.data","5ba341402e49103d8787e52d", new Progress() {
+//            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "2049m.data","5bfcf4ea7991d267f4eb53b4", new Progress() {
+                @Override
+                public void onBegin() {
+                    System.out.println("onBegin");
+                }
+                @Override
+                public void onEnd(int status) {
+                    if(status != 0) {
+                        System.out.println("onEnd, error status: " + status);
+                    } else {
+                        System.out.println("onEnd");
+                    }
+                }
+                @Override
+                public void onProgress(float progress, String message) {
+                    System.out.println(message);
+                    System.out.println("progress: " + progress);
+                }
+            }).start();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw e;
+        }
     }
 }

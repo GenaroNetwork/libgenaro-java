@@ -1,5 +1,7 @@
 package network.genaro.storage;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.DERSequenceGenerator;
 import org.bouncycastle.asn1.x9.X9ECParameters;
@@ -13,23 +15,30 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
 import org.bouncycastle.util.encoders.Hex;
+
 import org.web3j.crypto.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
+
+import static network.genaro.storage.CryptoUtil.bytes2String;
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 import static network.genaro.storage.CryptoUtil.string2Bytes;
 
 @Test()
 public class TestCryptoUtil {
+    private static String V3JSON = "{ \"address\": \"fbad65391d2d2eafda9b27326d1e81d52a6a3dc8\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\", \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" }, \"mac\": \"cdb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" }, \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
+
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -76,7 +85,6 @@ public class TestCryptoUtil {
         Assert.assertEquals(hresult, "fd3fd4cca39658475de1e81ec24d05cecf7696bfaebeaabc29d36e552afac67ecc2649d1b83ae3f2ea169083f6ec90e5ce1e8cf7f5343188874745488fc811b7");
     }
 
-
     public static byte[] generateGenaroSeed(byte[] key) {
         final int SEED_ITERATIONS = 2048;
         final int SEED_KEY_SIZE = 512;
@@ -87,12 +95,14 @@ public class TestCryptoUtil {
         return ((KeyParameter) gen.generateDerivedParameters(SEED_KEY_SIZE)).getKey();
     }
 
-    public void testMnemonic2Seed2() {
+    public void testMnemonic2Seed2() throws UnsupportedEncodingException {
         String kkk = "29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6";
         byte[] buf = Hex.decode(kkk);
+        System.out.println(bytes2String(buf));
+        byte[] buf2 = kkk.getBytes(UTF_8);
         byte[] seed = MnemonicUtils.generateSeed(kkk, "");
         byte[] seed2 = MnemonicUtils.generateSeed(new String(buf), "");
-        byte[] seed3 = generateGenaroSeed(buf);
+        byte[] seed3 = generateGenaroSeed(buf2);
         String hresult = Hex.toHexString(seed);
         String hresult2 = Hex.toHexString(seed2);
         String hresult3 = Hex.toHexString(seed3);
@@ -101,26 +111,37 @@ public class TestCryptoUtil {
     }
 
     public void testGenerateBucketKey() {
-        byte[] key = CryptoUtil.generateBucketKey(string2Bytes("abandonabandonabandonabandonabandonabandonabandonabandonabandon"), Hex.decode("0123456789ab0123456789ab"));
-        Assert.assertEquals(Hex.toHexString(key), "612a3531d6c2ce886bc9504c963cf4b7b309f443251afe9b432aadf1faa8e008");
+        byte[] key = CryptoUtil.generateBucketKey(string2Bytes("abcde abcde abcde abcde abcde abcde abcde abcde abcde abcde abcd"), Hex.decode("0123456789ab0123456789ab"));
+        Assert.assertEquals(Hex.toHexString(key), "b17403c5130847731abd1c233e74002aa666c71497a19c90b7c305479ccd5844");
     }
 
     public void testGenerateBucketKey2() {
         byte[] pkpk = Hex.decode("29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6");
         String magicBid = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
-        byte[] key = CryptoUtil.generateBucketKey(pkpk, string2Bytes(magicBid));
+        byte[] key = CryptoUtil.generateBucketKey(pkpk, Hex.decode(magicBid));
         String kstr = Hex.toHexString(key);
         Assert.assertEquals(kstr, "76afd3c76a52bd9a2fc7449c5701dbaaa2caa2e67e8bfcee3b108c06dacc576a");
-        // *bucket_key	char *	"76afd3c76a52bd9a2fc7449c5701dbaaa2caa2e67e8bfcee3b108c06dacc576a"	0x0000000102906a40
     }
 
     public void testGenerateFileKey() {
-        String mnemonic = "abandon";
+//        String mnemonic = "abandon";
+        String mnemonic = "abcde abcde abcde abcde abcde abcde abcde abcde abcde abcde abcd";
         String bucket_id = "0123456789ab0123456789ab";
         String index = "150589c9593bbebc0e795d8c4fa97304b42c110d9f0095abfac644763beca66e";
         byte[] key = CryptoUtil.generateFileKey(string2Bytes(mnemonic), Hex.decode(bucket_id), Hex.decode(index));
-        Assert.assertEquals(Hex.toHexString(key), "3a70a3bd85f064598513dcfb77693885f64fa3ce63ba64456877ef9d4aaa2062");
+        Assert.assertEquals(Hex.toHexString(key), "eccd01f6a87991ff0b504718df1da40cb2bcda48099375f5124358771c9ebe2c");
     }
+
+//    public void testAES() {
+//        String message = "1234567890"; // e105e1aaf8da 6019753b58409d356e5c1cfc5a053ea8
+//        //String message = "ewqew"; //    e105e1aaf8   fe6356a870b6db693a30a152d8e594b8
+//        byte[] key = Hex.decode("123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f");
+//        byte[] iv  = Hex.decode("123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abcf2");
+//        String base64Secret = CryptoUtil.encryptMeta(string2Bytes(message), key, iv);
+//        byte[] messageBytes = CryptoUtil.decryptMeta(base64Secret, key);
+//        Assert.assertEquals(base64Secret, "ODKPheXwS0J/eUd7eH/LdRI6vC8SOrwvEjq8LxI6vC8SOrwvEjq8LxI6vC8SOrzy4KwePJHJR6JDvg==");
+//        Assert.assertEquals(new String(messageBytes), message);
+//    }
 
     public void testAES() {
         String message = "1234567890"; // e105e1aaf8da 6019753b58409d356e5c1cfc5a053ea8
@@ -197,4 +218,13 @@ public class TestCryptoUtil {
 //        System.out.println(deMessage);
     }
 
+    public void testGetPrivateKey() throws Exception {
+        Genaro api = new Genaro();
+        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
+        api.logIn(ww);
+
+        byte[] key = api.getPrivateKey();
+        String keyStr = Hex.toHexString(key);
+        Assert.assertEquals(keyStr, "61968cf440e7735e28bac3a431a81b49c3298d37910d54f62f1e5a32c518e556");
+    }
 }

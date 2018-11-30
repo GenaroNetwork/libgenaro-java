@@ -91,7 +91,7 @@ public class Pointer {
         this.index = index;
     }
 
-    public boolean isParity() {
+    public boolean getParity() {
         return parity;
     }
 

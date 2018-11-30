@@ -12,7 +12,6 @@ import okhttp3.RequestBody;
 
 import org.bouncycastle.util.encoders.Hex;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
 import java.net.URLEncoder;
@@ -34,10 +33,11 @@ public class Genaro {
 
     private static final ExecutorService executor = Executors.newCachedThreadPool();
     private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
+
 //    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
 //    private String bridgeUrl = "http://192.168.50.206:8080";
     private String bridgeUrl = "http://120.77.247.10:8080";
@@ -49,6 +49,14 @@ public class Genaro {
     }
 
     public Genaro() { }
+
+    public String getBridgeUrl() {
+        return bridgeUrl;
+    }
+
+    public void setBridgeUrl(String bridgeUrl) {
+        this.bridgeUrl = bridgeUrl;
+    }
 
     public static String GenaroStrError(int error_code)
     {
@@ -146,11 +154,13 @@ public class Genaro {
         this.wallet = wallet;
     }
 
-    public byte[] getPrivateKey() {
-        return this.wallet.getPrivateKey();
+    public byte[] getPrivateKey() { return this.wallet.getPrivateKey(); }
+
+    public String getPublicKeyHexString() {
+        return this.wallet.getPublicKeyHexString();
     }
 
-    private String signRequest(final String method, final String path, final String body) {
+    public String signRequest(final String method, final String path, final String body) {
         String msg = method + "\n" + path + "\n" + body;
         return wallet.signMessage(msg);
     }
@@ -160,7 +170,7 @@ public class Genaro {
         return executor.submit(() -> {
 
             String signature = signRequest("GET", "/buckets", "");
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + "/buckets")
                     .header("x-signature", signature)
@@ -172,22 +182,19 @@ public class Genaro {
                 int code = response.code();
 
                 if (code == 401) {
-                    throw new GenaroException("Invalid user credentials.");
+                    throw new GenaroRuntimeException("Invalid user credentials.");
                 } else if (code != 200 && code != 304) {
-                    throw new GenaroException("Request failed with status code: " + code);
+                    throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                String body = response.body().string();
-                Bucket[] buckets = om.readValue(body, Bucket[].class);
+                String responseBody = response.body().string();
+                Bucket[] buckets = om.readValue(responseBody, Bucket[].class);
 
                 // decrypt
                 for (Bucket b : buckets) {
                     if (b.getNameIsEncrypted()) {
-                        byte[] bk = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(BUCKET_NAME_MAGIC));
-                        byte[] decryptKey = CryptoUtil.hmacSha512Half(bk, BUCKET_META_MAGIC);
-                        byte[] realName = CryptoUtil.decryptMeta(b.getName(), decryptKey);
-                        b.setName(CryptoUtil.bytes2String(realName));
+                        b.setName(CryptoUtil.decryptMetaHmacSha512(b.getName(), wallet.getPrivateKey(), BUCKET_NAME_MAGIC));
                         b.setNameIsEncrypted(false);
                     }
                 }
@@ -201,15 +208,16 @@ public class Genaro {
         return executor.submit(() -> {
             Request request = new Request.Builder()
                     .url(bridgeUrl)
+                    .get()
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful()) throw new GenaroException("Unexpected code " + response);
+                if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
 
                 ObjectMapper om = new ObjectMapper();
-                String body = response.body().string();
+                String responseBody = response.body().string();
 
-                JsonNode bodyNode = om.readTree(body);
+                JsonNode bodyNode = om.readTree(responseBody);
                 JsonNode infoNode = bodyNode.get("info");
 
                 String title = infoNode.get("title").asText();
@@ -230,7 +238,7 @@ public class Genaro {
     public Future<Boolean> addBucket(final String name) {
         return executor.submit(() -> {
 
-            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(BUCKET_NAME_MAGIC));
+            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
             byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
             byte[] nameIv = CryptoUtil.hmacSha512Half(bucketKey, string2Bytes(name));
             String encryptedName = encryptMeta(string2Bytes(name), key, nameIv);
@@ -240,7 +248,7 @@ public class Genaro {
             RequestBody body = RequestBody.create(JSON, jsonStrBody);
 
             String signature = signRequest("POST", "/buckets", jsonStrBody);
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
 
             Request request = new Request.Builder()
                     .header("x-signature", signature)
@@ -265,7 +273,7 @@ public class Genaro {
         return executor.submit(() -> {
 
             String signature = signRequest("DELETE", "/buckets/" + bucketId, "");
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + "/buckets/" + bucketId)
                     .header("x-signature", signature)
@@ -276,12 +284,19 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+                JsonNode bodyNode = om.readTree(responseBody);
+                String error = bodyNode.get("error").asText();
+
                 if (code == 200 || code == 204) {
                     return true;
                 } else if (code == 401) {
-                    throw new GenaroException("Invalid user credentials.");
+                    logger.error(error);
+                    throw new GenaroRuntimeException("Invalid user credentials.");
                 } else {
-                    throw new GenaroException("Failed to destroy bucket. (" + code + ")");
+                    logger.error(error);
+                    throw new GenaroRuntimeException("Failed to destroy bucket. (" + code + ")");
                 }
             }
 
@@ -291,16 +306,14 @@ public class Genaro {
     public Future<Boolean> renameBucket(final String bucketId, final String name) {
         return executor.submit(() -> {
 
-            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(BUCKET_NAME_MAGIC));
-            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
-            byte[] nameIv = CryptoUtil.hmacSha512Half(bucketKey, string2Bytes(name));
-            String encryptedName = encryptMeta(string2Bytes(name), key, nameIv);
+            String encryptedName = CryptoUtil.encryptMetaHmacSha512(string2Bytes(name), wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
+
             String jsonStrBody = String.format("{\"name\": \"%s\", \"nameIsEncrypted\": true}", encryptedName);
 
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
             RequestBody body = RequestBody.create(JSON, jsonStrBody);
             String signature = signRequest("POST", "/buckets/" + bucketId, jsonStrBody);
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + "/buckets/" + bucketId)
                     .header("x-signature", signature)
@@ -312,7 +325,7 @@ public class Genaro {
                 int code = response.code();
 
                 if (code != 200) {
-                    throw new GenaroException("Request failed with status code: " + code);
+                    throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
 
                 return true;
@@ -325,7 +338,7 @@ public class Genaro {
         return executor.submit(() -> {
 
             String signature = signRequest("GET", "/buckets/" + bucketId, "");
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + "/buckets/" + bucketId)
                     .header("x-signature", signature)
@@ -337,12 +350,12 @@ public class Genaro {
                 int code = response.code();
 
                 if (code != 200) {
-                    throw new GenaroException("Request failed with status code: " + code);
+                    throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                String body = response.body().string();
-                Bucket b = om.readValue(body, Bucket.class);
+                String responseBody = response.body().string();
+                Bucket b = om.readValue(responseBody, Bucket.class);
                 return b;
             }
 
@@ -352,14 +365,14 @@ public class Genaro {
     public Future<File[]> listFiles(final String bucketId) {
         return executor.submit(() -> {
 
-            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
-            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
+//            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
+//            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
 
             String path = String.format("/buckets/%s/files", bucketId);
 
             String signature = signRequest("GET", path, "");
 
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
@@ -370,24 +383,25 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+
                 if (code == 404) {
-                    throw new GenaroException("Bucket id [" + bucketId + "] does not exist");
+                    throw new GenaroRuntimeException("Bucket id [" + bucketId + "] does not exist");
                 } else if (code == 400) {
-                    throw new GenaroException("Bucket id [" + bucketId + "] is invalid");
+                    throw new GenaroRuntimeException("Bucket id [" + bucketId + "] is invalid");
                 } else if (code == 401) {
-                    throw new GenaroException("Invalid user credentials.");
+                    throw new GenaroRuntimeException("Invalid user credentials.");
                 } else if (code != 200) {
-                    throw new GenaroException("Request failed with status code: " + code);
+                    throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
 
-                ObjectMapper om = new ObjectMapper();
-                String body = response.body().string();
-                File[] files = om.readValue(body, File[].class);
+                File[] files = om.readValue(responseBody, File[].class);
 
                 // decrypt
                 for (File f : files) {
-                    byte[] realName = CryptoUtil.decryptMeta(f.getFilename(), key);
-                    f.setFilename(new String(realName));
+                    String realName = CryptoUtil.decryptMetaHmacSha512(f.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+                    f.setFilename(realName);
                 }
 
                 return files;
@@ -400,7 +414,7 @@ public class Genaro {
 
             String path = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String signature = signRequest("DELETE", path, "");
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
@@ -411,12 +425,19 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+                JsonNode bodyNode = om.readTree(responseBody);
+                String error = bodyNode.get("error").asText();
+
                 if (code == 200 || code == 204) {
                     return true;
                 } else if (code == 401) {
-                    throw new GenaroException("Invalid user credentials.");
+                    logger.error(error);
+                    throw new GenaroRuntimeException("Invalid user credentials.");
                 } else {
-                    throw new GenaroException("Failed to remove file from bucket. (" + code + ")");
+                    logger.error(error);
+                    throw new GenaroRuntimeException("Failed to remove file from bucket. (" + code + ")");
                 }
             }
 
@@ -426,12 +447,9 @@ public class Genaro {
     Future<File> getFileInfo(final String bucketId, final String fileId) {
         return executor.submit(() -> {
 
-            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
-            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
-
             String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
             String signature = signRequest("GET", path, "");
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
@@ -443,17 +461,17 @@ public class Genaro {
                 int code = response.code();
 
                 if (code == 404) {
-                    throw new GenaroException("Bucket id [" + fileId + "] does not exist");
+                    throw new GenaroRuntimeException("Bucket id [" + fileId + "] does not exist");
                 } else if (code != 200){
-                    throw new GenaroException("Request failed with status code: " + code);
+                    throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                String body = response.body().string();
-                File f = om.readValue(body, File.class);
-                byte[] realName = CryptoUtil.decryptMeta(f.getFilename(), key);
-                f.setFilename(new String(realName));
-                return f;
+                String responseBody = response.body().string();
+                File file = om.readValue(responseBody, File.class);
+                String realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+                file.setFilename(realName);
+                return file;
             }
 
         });
@@ -485,7 +503,7 @@ public class Genaro {
             String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String path = String.format("%s?%s", url, queryArgs);
             String signature = signRequest("GET", url, queryArgs);
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
@@ -496,19 +514,16 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
-                ObjectMapper om = new ObjectMapper();
-                String body = response.body().string();
-
                 if (code == 429 || code == 420) {
-                    throw new GenaroException(Genaro.GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
                 } else if (code != 200){
-                    JsonNode bodyNode = om.readTree(body);
-
-                    logger.error(bodyNode.get("error").asText());
-                    throw new GenaroException(Genaro.GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
                 }
 
-                List<Pointer> pointers = om.readValue(body, new TypeReference<List<Pointer>>(){});
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+
+                List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
                 return pointers;
             }
 
@@ -524,7 +539,7 @@ public class Genaro {
 
             String path = String.format("/buckets/%s/file-ids/%s", bucketId, escapedName);
             String signature = signRequest("GET", path, "");
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
@@ -533,12 +548,14 @@ public class Genaro {
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
-                if (response.code() == 404) {
+                int code = response.code();
+
+                if (code == 404) {
                     return false;
-                } else if (response.code() == 200) {
+                } else if (code == 200) {
                     return true;
                 } else {
-                    throw new Exception("Request file-ids failed");
+                    throw new GenaroRuntimeException("Request file-ids failed");
                 }
             }
 
@@ -554,7 +571,7 @@ public class Genaro {
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
             RequestBody body = RequestBody.create(JSON, jsonStrBody);
             String signature = signRequest("POST", "/frames", jsonStrBody);
-            String pubKey = this.wallet.getPublicKeyHexString();
+            String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
                     .url(bridgeUrl + "/frames")
                     .header("x-signature", signature)
@@ -563,15 +580,17 @@ public class Genaro {
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
-                if (response.code() != 200) {
-                    throw new GenaroException("Request frame id error");
+                int code = response.code();
+
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+
+                if (code != 200) {
+                    throw new GenaroRuntimeException("Request frame id error");
                 } else {
-                    ObjectMapper om = new ObjectMapper();
-                    String responseBody = response.body().string();
                     return om.readValue(responseBody, Frame.class);
                 }
             }
-
         });
     }
 }
