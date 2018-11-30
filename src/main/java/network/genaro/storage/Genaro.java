@@ -38,9 +38,9 @@ public class Genaro {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-//    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
+    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
 //    private String bridgeUrl = "http://192.168.50.206:8080";
-    private String bridgeUrl = "http://120.77.247.10:8080";
+//    private String bridgeUrl = "http://120.77.247.10:8080";
     private GenaroWallet wallet;
     private static final int POINT_PAGE_COUNT = 3;
 
@@ -233,42 +233,6 @@ public class Genaro {
         });
     }
 
-    /*
-    buy bucket through transaction
-    public Future<Boolean> addBucket(final String name) {
-        return executor.submit(() -> {
-
-            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
-            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
-            byte[] nameIv = CryptoUtil.hmacSha512Half(bucketKey, string2Bytes(name));
-            String encryptedName = encryptMeta(string2Bytes(name), key, nameIv);
-            String jsonStrBody = String.format("{\"name\": \"%s\"}", encryptedName);
-
-            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-            RequestBody body = RequestBody.create(JSON, jsonStrBody);
-
-            String signature = signRequest("POST", "/buckets", jsonStrBody);
-            String pubKey = getPublicKeyHexString();
-
-            Request request = new Request.Builder()
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .url(bridgeUrl + "/buckets")
-                    //.url("https://postman-echo.com/post")
-                    .post(body)
-                    .build();
-
-            System.out.println(request.toString());
-            try (Response response = client.newCall(request).execute()) {
-                String networkResp = response.body().string();
-                System.out.println(networkResp);
-
-                return true;
-            }
-
-        });
-    }
-    */
     public Future<Boolean> deleteBucket(final String bucketId) {
         return executor.submit(() -> {
 
@@ -287,15 +251,14 @@ public class Genaro {
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
                 JsonNode bodyNode = om.readTree(responseBody);
-                String error = bodyNode.get("error").asText();
 
                 if (code == 200 || code == 204) {
                     return true;
                 } else if (code == 401) {
-                    logger.error(error);
+                    logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Invalid user credentials.");
                 } else {
-                    logger.error(error);
+                    logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Failed to destroy bucket. (" + code + ")");
                 }
             }
@@ -306,7 +269,7 @@ public class Genaro {
     public Future<Boolean> renameBucket(final String bucketId, final String name) {
         return executor.submit(() -> {
 
-            String encryptedName = CryptoUtil.encryptMetaHmacSha512(string2Bytes(name), wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
+            String encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
 
             String jsonStrBody = String.format("{\"name\": \"%s\", \"nameIsEncrypted\": true}", encryptedName);
 
@@ -428,15 +391,14 @@ public class Genaro {
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
                 JsonNode bodyNode = om.readTree(responseBody);
-                String error = bodyNode.get("error").asText();
 
                 if (code == 200 || code == 204) {
                     return true;
                 } else if (code == 401) {
-                    logger.error(error);
+                    logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Invalid user credentials.");
                 } else {
-                    logger.error(error);
+                    logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Failed to remove file from bucket. (" + code + ")");
                 }
             }
@@ -461,7 +423,7 @@ public class Genaro {
                 int code = response.code();
 
                 if (code == 404) {
-                    throw new GenaroRuntimeException("Bucket id [" + fileId + "] does not exist");
+                    throw new GenaroRuntimeException("File id [" + fileId + "] does not exist");
                 } else if (code != 200){
                     throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
@@ -514,14 +476,17 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
-                if (code == 429 || code == 420) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
-                } else if (code != 200){
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
-                }
-
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
+                JsonNode bodyNode = om.readTree(responseBody);
+
+                if (code == 429 || code == 420) {
+                    logger.error(bodyNode.get("error").asText());
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
+                } else if (code != 200){
+                    logger.error(bodyNode.get("error").asText());
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
+                }
 
                 List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
                 return pointers;

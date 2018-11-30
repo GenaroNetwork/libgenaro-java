@@ -55,14 +55,6 @@ public final class CryptoUtil {
     private static final ECDomainParameters CURVE = new ECDomainParameters(
             CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
 
-    public static byte[] string2Bytes(final String input) {
-        return input.getBytes(StandardCharsets.UTF_8);
-    }
-
-    public static String bytes2String(final byte[] input) {
-        return new String(input, StandardCharsets.UTF_8);
-    }
-
     public static byte[] sha256(final byte[] input) {
         MessageDigest digest = null;
         try {
@@ -222,11 +214,11 @@ public final class CryptoUtil {
         byte[] decryptKey = CryptoUtil.hmacSha512Half(bk, BUCKET_META_MAGIC);
         byte[] realName = CryptoUtil.decryptMeta(bufferBase64, decryptKey);
 
-        return bytes2String(realName);
+        return BasicUtil.bytes2String(realName);
     }
 
     public static String sha256EscdaSign(final BigInteger ecPrivateKey, final String message) {
-        return sha256EscdaSign(ecPrivateKey, string2Bytes(message));
+        return sha256EscdaSign(ecPrivateKey, BasicUtil.string2Bytes(message));
     }
 
     public static String sha256EscdaSign(final BigInteger ecPrivateKey, final byte[] message) {

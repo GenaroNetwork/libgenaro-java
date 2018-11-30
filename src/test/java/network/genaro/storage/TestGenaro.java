@@ -9,13 +9,14 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Future;
 
-import static network.genaro.storage.CryptoUtil.string2Bytes;
 import static network.genaro.storage.Parameters.*;
 
 @Test()
 public class TestGenaro {
-//    private static String V3JSON = "{ \"address\": \"5d14313c94f1b26d23f4ce3a49a2e136a88a584b\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"12d3a710778aa884d32140466ce6c3932629d922fa1cd6b64996dff9b368743a\", \"cipherparams\": { \"iv\": \"f0eface44a93bac55857d74740912d13\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"62dd6d60fb04429fc8cf32fd39ea5e886d7f84eae258866c14905fa202dbc43d\" }, \"mac\": \"632e92cb1de1a708b2d349b9ae558a4d655c691d3e793fca501a857c7f0c3b1c\" }, \"id\": \"b12b56a5-7eaa-4d90-87b5-cc616e6694d0\", \"version\": 3 }";
-    private static String V3JSON = "{ \"address\": \"fbad65391d2d2eafda9b27326d1e81d52a6a3dc8\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\", \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" }, \"mac\": \"cdb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" }, \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
+//    private static final String V3JSON = "{ \"address\": \"5d14313c94f1b26d23f4ce3a49a2e136a88a584b\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"12d3a710778aa884d32140466ce6c3932629d922fa1cd6b64996dff9b368743a\", \"cipherparams\": { \"iv\": \"f0eface44a93bac55857d74740912d13\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"62dd6d60fb04429fc8cf32fd39ea5e886d7f84eae258866c14905fa202dbc43d\" }, \"mac\": \"632e92cb1de1a708b2d349b9ae558a4d655c691d3e793fca501a857c7f0c3b1c\" }, \"id\": \"b12b56a5-7eaa-4d90-87b5-cc616e6694d0\", \"version\": 3 }";
+    private static final String V3JSON = "{ \"address\": \"fbad65391d2d2eafda9b27326d1e81d52a6a3dc8\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\", \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" }, \"mac\": \"cdb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" }, \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
+    private static final String bucketId = "5bfcf4ea7991d267f4eb53b4";
+//    private static final String bucketId = "5bfbb3597991d267f4eb53b1";
 
     public void testGetInfo() throws Exception {
         Genaro api = new Genaro();
@@ -26,8 +27,8 @@ public class TestGenaro {
 
     public void testListBuckets() throws Exception {
         Genaro api = new Genaro();
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
+//        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
         Bucket[] bs = api.listBuckets().get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         if(bs.length == 0) {
@@ -52,7 +53,7 @@ public class TestGenaro {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        api.renameBucket("5ba341402e49103d8787e52d", "嗷嗷").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        api.renameBucket(bucketId, "嗷嗷").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public void testGetBucket() throws Exception{
@@ -60,7 +61,7 @@ public class TestGenaro {
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        Bucket b = api.getBucket("5ba3397e152f07179cbe1f81").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        Bucket b = api.getBucket(bucketId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         System.out.println(b);
     }
 
@@ -69,7 +70,7 @@ public class TestGenaro {
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        File[] bs = api.listFiles("5ba341402e49103d8787e52d").get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        File[] bs = api.listFiles(bucketId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         if(bs.length == 0) {
             System.out.println("No files.");
         } else {
@@ -85,10 +86,8 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
 
-        String bucketId = "5ba341402e49103d8787e52d";
         String fileName = "2049k.data";
-
-        String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(string2Bytes(fileName), gw.getPrivateKey(), Hex.decode(bucketId));
+        String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), gw.getPrivateKey(), Hex.decode(bucketId));
 
         boolean exist = api.isFileExist(bucketId, encryptedFileName).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         if(exist) {
@@ -102,7 +101,7 @@ public class TestGenaro {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        api.deleteFile("5ba341402e49103d8787e52d", "5bf7c97d65390d21283c15de")
+        api.deleteFile(bucketId, "5bf7c97d65390d21283c15de")
            .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
@@ -110,7 +109,7 @@ public class TestGenaro {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        File ff = api.getFileInfo("5ba341402e49103d8787e52d", "5bdac5162bd005291e9c7a9d")
+        File ff = api.getFileInfo(bucketId, "5bdac5162bd005291e9c7a9d")
                      .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         System.out.println(ff);
     }
@@ -121,7 +120,7 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
 
-        List<Pointer> psa = api.getPointers("5ba341402e49103d8787e52d", "5bf7c98165390d21283c15f5")
+        List<Pointer> psa = api.getPointers(bucketId, "5bf7c98165390d21283c15f5")
                  .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
 
         if(psa.size() == 0) {
@@ -133,7 +132,14 @@ public class TestGenaro {
         }
     }
 
-    public void testDownloadFile() throws Exception {
+    public void testRequestFrameId() throws Exception {
+        Genaro api = new Genaro();
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        api.logIn(gw);
+        api.requestNewFrame().get();
+    }
+
+    public void testDownload() throws Exception {
         Genaro api = new Genaro();
         GenaroWallet gw;
         try {
@@ -145,7 +151,8 @@ public class TestGenaro {
         api.logIn(gw);
 
         try {
-            new Downloader(api, "5ba341402e49103d8787e52d", "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam.txt", new Progress() {
+//            new Downloader(api, bucketId, "5c00ef805a158a5612e66cde", "/Users/dingyi/Genaro/test/download/1.txt", new Progress() {
+            new Downloader(api, bucketId, "5c0103fd5a158a5612e67461", "/Users/dingyi/Genaro/test/download/aaa.zip", new Progress() {
                 @Override
                 public void onBegin() {
                     System.out.println("onBegin");
@@ -172,22 +179,17 @@ public class TestGenaro {
         }
     }
 
-    public void testRequestFrameId() throws Exception {
-        Genaro api = new Genaro();
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
-        api.requestNewFrame().get();
-    }
-
     public void testUpload() throws Exception {
         Genaro api = new Genaro();
         GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
+//        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
 
         try {
 //            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new Progress() {
-            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "2049m.data","5ba341402e49103d8787e52d", new Progress() {
-//            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "2049m.data","5bfcf4ea7991d267f4eb53b4", new Progress() {
+//            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "2049p.data",bucketId, new Progress() {
+            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "e.zip",bucketId, new Progress() {
+//            new Uploader(api, false, "/Users/dingyi/test/1.txt", "2.txt", bucketId, new Progress() {
                 @Override
                 public void onBegin() {
                     System.out.println("onBegin");

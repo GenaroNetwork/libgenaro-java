@@ -1,6 +1,7 @@
 package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import okhttp3.*;
@@ -19,6 +20,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -28,7 +30,6 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static javax.crypto.Cipher.ENCRYPT_MODE;
 
@@ -36,6 +37,8 @@ import org.xbill.DNS.utils.base16;
 
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
+
+import javax.crypto.Mac;
 
 class ShardMeta {
     private String hash;
@@ -129,8 +132,6 @@ class FarmerPointer {
 
 class ShardTracker {
 //    int progress;
-//    int push_frame_request_count;
-//    int push_shard_request_count;
     private int index;
     private FarmerPointer pointer;
     private ShardMeta meta;
@@ -251,9 +252,23 @@ public class Uploader {
 
     private String createTmpName(String encryptedFileName, String extension) {
         String tmpFolder = System.getProperty("java.io.tmpdir");
-        byte[] bytesEncoded = sha256((string2Bytes(encryptedFileName)));
+        byte[] bytesEncoded = sha256((BasicUtil.string2Bytes(encryptedFileName)));
 
         return String.format("%s/%s%s", tmpFolder, base16.toString(bytesEncoded).toLowerCase(), extension);
+    }
+
+    private String getBucketEntryHmac(byte[] fileKey, List<ShardTracker> shards) throws NoSuchAlgorithmException, InvalidKeyException {
+        SecretKeySpec secretKeySpec = new SecretKeySpec(fileKey, "HmacSHA512");
+        Mac mac = Mac.getInstance("HmacSHA512");
+        mac.init(secretKeySpec);
+
+        for(ShardTracker shard: shards) {
+            byte[] hash = base16.fromString(shard.getMeta().getHash());
+            mac.update(hash);
+        }
+
+        byte[] digestRaw = mac.doFinal();
+        return base16.toString(digestRaw).toLowerCase();
     }
 
     public void start() /*throws Exception*/ {
@@ -286,7 +301,7 @@ public class Uploader {
         }
 
         // queue_verify_file_name
-        encryptedFileName = CryptoUtil.encryptMetaHmacSha512(string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
+        encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
         try {
             if (bridge.isFileExist(bucketId, encryptedFileName).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS)) {
                 System.out.println("file already exists!");
@@ -335,21 +350,27 @@ public class Uploader {
         }
 
         // queue_request_frame_id
+        logger.info("Request frame id");
         Frame frame;
         try {
             frame = bridge.requestNewFrame().get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             System.out.println("connect to bridge time out!");
+            logger.error("Request frame id error!");
             return;
         } catch (InterruptedException e) {
             System.out.println("InterruptedException!");
+            logger.error("Request frame id error!");
             return;
         } catch (ExecutionException e) {
             System.out.println(e.getCause().getMessage());
+            logger.error("Request frame id error!");
             return;
         }
 
         String frameId = frame.getId();
+
+        logger.info(String.format("Request frame id success, frame id: %s", frameId));
 
         List<ShardTracker> shards = new ArrayList<>(totalShards);
         for (int i = 0; i < totalShards; i++) {
@@ -362,23 +383,24 @@ public class Uploader {
             shards.add(shardTracker);
         }
 
-        shards.parallelStream()
+//        shards.parallelStream()
+        shards.stream()
               .map(shard -> {
-                    // prepare_frame
+                    // prepare frame
                     ShardMeta shardMeta = shard.getMeta();
                     shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
                     shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
                     for (int i = 0; i < GENARO_SHARD_CHALLENGES; i ++) {
-//                        byte[] challenge = randomBuff(32);
-                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                                99, 99};
+                        byte[] challenge = randomBuff(32);
+//                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+//                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+//                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+//                                99, 99};
                         shardMeta.getChallenges()[i] = challenge;
                         shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
                     }
 
-                    logger.info("Creating frame for shard index %d", shardMeta.getIndex());
+                    logger.info(String.format("Creating frame for shard index %d...", shardMeta.getIndex()));
 
                     // Initialize context for sha256 of encrypted data
                     MessageDigest shardHashMd = null;
@@ -454,10 +476,10 @@ public class Uploader {
                         System.exit(1);
                     }
 
-                    byte[] prehash_sha256 = shardHashMd.digest();
-                    byte[] prehash_ripemd160 = CryptoUtil.ripemd160(prehash_sha256);
+                    byte[] prehashSha256 = shardHashMd.digest();
+                    byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
 
-                    shardMeta.setHash(base16.toString(prehash_ripemd160).toLowerCase());
+                    shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
                     byte[] preleafSha256;
                     byte[] preleafRipemd160;
 
@@ -473,6 +495,8 @@ public class Uploader {
                         shardMeta.getTree()[i] = CryptoUtil.ripemd160Sha256HexString(preleafRipemd160);
                     }
 
+                    logger.info(String.format("Finished create frame for shard index %d", shardMeta.getIndex()));
+
                     return shard;
               })
               // push frame
@@ -483,9 +507,6 @@ public class Uploader {
 //                  }
 
                   ShardMeta shardMeta = shard.getMeta();
-
-                  // TODO: the shard's index is a bit different with shardMeta's index, need check.
-                  logger.info("Pushing frame for shard index %d", shardMeta.getIndex());
 
                   boolean parityShard;
 
@@ -499,7 +520,7 @@ public class Uploader {
                   // TODO: the shard's index is a bit different with shardMeta's index, need check.
                   // TODO: when number of challenges is not 4, it doesn't work! need to modify
                   String jsonStrBody = String.format("{\"hash\": \"%s\", \"size\": %d, \"index\": %d, \"parity\": %b, " +
-                                  "\"challenges\": [\"%s\", \"%s\", \"%s\", \"%s\"], \"tree\": [\"%s\", \"%s\", \"%s\", \"%s\"], \"exclude\": \"\"}",
+                                  "\"challenges\": [\"%s\", \"%s\", \"%s\", \"%s\"], \"tree\": [\"%s\", \"%s\", \"%s\", \"%s\"], \"exclude\": []}",
                           shardMeta.getHash(), shardMeta.getSize(), shardMeta.getIndex(), parityShard,
                           challengesAsStr[0], challengesAsStr[1] ,challengesAsStr[2] ,challengesAsStr[3],
                           tree[0], tree[1], tree[2], tree[3]);
@@ -513,17 +534,25 @@ public class Uploader {
 
                   MediaType JSON = MediaType.parse("application/json; charset=utf-8");
                   RequestBody body = RequestBody.create(JSON, jsonStrBody);
-                  String signature = bridge.signRequest("PUT", "/frames/" + frameId, jsonStrBody);
+                  String path = "/frames/" + frameId;
+                  String signature = bridge.signRequest("PUT", path, jsonStrBody);
                   String pubKey = bridge.getPublicKeyHexString();
                   Request request = new Request.Builder()
-                          .url(bridge.getBridgeUrl() + "/frames/" + frameId)
+                          .url(bridge.getBridgeUrl() + path)
                           .header("x-signature", signature)
                           .header("x-pubkey", pubKey)
                           .put(body)
                           .build();
 
-                  logger.info("fn[push_frame] - JSON body: %s", jsonStrBody);
+                  // TODO: the shard's index is a bit different with shardMeta's index, need check.
+                  logger.info(String.format("Pushing frame for shard index %s - JSON body: %s", shardMeta.getIndex(), jsonStrBody));
                   try (Response response = client.newCall(request).execute()) {
+                      ObjectMapper om = new ObjectMapper();
+                      String responseBody = response.body().string();
+
+                      // TODO: the shard's index is a bit different with shardMeta's index, need check.
+                      logger.info(String.format("Push frame finished for shard index %s - JSON Response: %s", shardMeta.getIndex(), responseBody));
+
                       int code = response.code();
 
                       if (code == 429 || code == 420) {
@@ -532,11 +561,8 @@ public class Uploader {
                           throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_OFFER_ERROR));
                       }
 
-                      ObjectMapper om = new ObjectMapper();
-                      String responseBody = response.body().string();
                       FarmerPointer fp = om.readValue(responseBody, FarmerPointer.class);
                       shard.setPointer(fp);
-
                   } catch (Exception e) {
                       logger.error(e.getMessage());
                       System.exit(1);
@@ -544,8 +570,8 @@ public class Uploader {
 
                   return shard;
               })
-              // push_shard
-              .map(shard -> {
+              // push shard
+              .forEach(shard -> {
 //                  // Reset shard index when using parity shards
 //                  req->shard_index = (index + 1 > state->total_data_shards) ? index - state->total_data_shards: index;
 //
@@ -566,7 +592,7 @@ public class Uploader {
 
 
                   // TODO: the shard's index is a bit different with shardMeta's index, need check.
-                  logger.info("Transferring Shard index %d...", shardMeta.getIndex());
+                  logger.info(String.format("Transferring Shard index %d...", shardMeta.getIndex()));
 
                   Farmer farmer = shard.getPointer().getFarmer();
                   String farmerNodeId = farmer.getNodeID();
@@ -598,7 +624,6 @@ public class Uploader {
 //                          .post(builder.build())
 //                          .build();
 
-
                   File shardFile = new File(shardFileStr);
                   final byte[] mBlock;
                   try {
@@ -624,23 +649,87 @@ public class Uploader {
                       int code = response.code();
 
                       if (code == 200 || code == 201 || code == 304) {
-                          logger.info("Successfully transferred shard index %d", shardMeta.getIndex());
+                          logger.info(String.format("Successfully transferred shard index %d", shardMeta.getIndex()));
                       } else {
                           // TODO: the shard's index is a bit different with shardMeta's index, need check.
-                          logger.error("Failed to push shard %d", shardMeta.getIndex());
+                          logger.error(String.format("Failed to push shard %d", shardMeta.getIndex()));
                           throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
                       }
                   } catch (Exception e) {
                       logger.error(e.getMessage());
                       System.exit(1);
                   }
+              });
 
-                  return shard;
-              })
-              .collect(Collectors.toList());
+//              .sequential()
+              // create_bucket_entry
 
-        // queue_create_bucket_entry
+              String hmacId;
+              try {
+                  hmacId = getBucketEntryHmac(fileKey, shards);
+              } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+                  throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FILE_GENERATE_HMAC_ERROR));
+              }
 
-        // send report
+              logger.info(String.format("[%s] Creating bucket entry... ", fileName));
+
+              String jsonStrBody;
+              if(!rs)
+              {
+                  jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}}",
+                          frameId, encryptedFileName, Hex.toHexString(index), hmacId);
+              } else {
+                  // TODO: ReedSolomn is not completed.
+                  jsonStrBody = "";
+//                  if (state->rs) {
+//                      struct json_object *erasure = json_object_new_object();
+//                      json_object *erasure_type = json_object_new_string("reedsolomon");
+//                      json_object_object_add(erasure, "type", erasure_type);
+//                      json_object_object_add(body, "erasure", erasure);
+//                  }
+              }
+
+              MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+              RequestBody body = RequestBody.create(JSON, jsonStrBody);
+              String path = "/buckets/" + bucketId + "/files";
+              String signature = bridge.signRequest("POST", path, jsonStrBody);
+              String pubKey = bridge.getPublicKeyHexString();
+              Request request = new Request.Builder()
+                      .url(bridge.getBridgeUrl() + path)
+                      .header("x-signature", signature)
+                      .header("x-pubkey", pubKey)
+                      .post(body)
+                      .build();
+
+              logger.info(String.format("Create bucket entry - JSON body: %s", jsonStrBody));
+              try (Response response = client.newCall(request).execute()) {
+                  ObjectMapper om = new ObjectMapper();
+                  String responseBody = response.body().string();
+                  JsonNode bodyNode = om.readTree(responseBody);
+
+                  // TODO: the shard's index is a bit different with shardMeta's index, need check.
+                  logger.info(String.format("Create bucket entry - JSON Response: %s", responseBody));
+
+                  int code = response.code();
+
+                  if (code != 200 && code != 201) {
+                      String error = bodyNode.get("error").asText();
+                      logger.error(error);
+                      throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                  }
+
+                  logger.info("Successfully Added bucket entry");
+
+                  String fileIdValue = bodyNode.get("id").asText();
+                  String message = String.format("Upload success, file id: %s", fileIdValue);
+                  logger.info(message);
+                  System.out.println(message);
+              } catch (Exception e) {
+                  logger.error(e.getMessage());
+                  System.exit(1);
+              }
+
+              // send_exchange_report
+              //
     }
 }
