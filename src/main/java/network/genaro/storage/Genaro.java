@@ -12,14 +12,9 @@ import okhttp3.RequestBody;
 
 import org.bouncycastle.util.encoders.Hex;
 
-import java.io.UnsupportedEncodingException;
-
 import java.net.URLEncoder;
-
-import java.sql.Time;
 import java.util.List;
 import java.util.ArrayList;
-
 import java.util.concurrent.*;
 
 import static network.genaro.storage.CryptoUtil.*;
@@ -190,16 +185,16 @@ public class Genaro {
                 String host = bodyNode.get("host").asText();
 
                 return "Title:       " + title + "\n" +
-                        "Description: " + description + "\n" +
-                        "Version:     " + version + "\n" +
-                        "Host:        " + host + "\n";
+                       "Description: " + description + "\n" +
+                       "Version:     " + version + "\n" +
+                       "Host:        " + host + "\n";
             }
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public String getInfo() {
+    public String getInfo() throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<String> fu = getInfoFuture();
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<Bucket> getBucketFuture(final String bucketId) {
@@ -227,12 +222,12 @@ public class Genaro {
                 return bucket;
             }
 
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public Bucket getBucket(final String bucketId) {
+    public Bucket getBucket(final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Bucket> fu = getBucketFuture(bucketId);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<Bucket[]> getBucketsFuture() {
@@ -270,12 +265,12 @@ public class Genaro {
 
                 return buckets;
             }
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public Bucket[] getBuckets() {
+    public Bucket[] getBuckets() throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Bucket[]> fu = getBucketsFuture();
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<Boolean> deleteBucketFuture(final String bucketId) {
@@ -308,12 +303,12 @@ public class Genaro {
                 }
             }
 
-        }).exceptionally(ex -> false);
+        });
     }
 
-    public boolean deleteBucket(final String bucketId) {
+    public boolean deleteBucket(final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Boolean> fu = deleteBucketFuture(bucketId);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<Boolean> renameBucketFuture(final String bucketId, final String name) {
@@ -344,12 +339,12 @@ public class Genaro {
                 return true;
             }
 
-        }).exceptionally(ex -> false);
+        });
     }
 
-    public boolean renameBucket(final String bucketId, final String name) {
+    public boolean renameBucket(final String bucketId, final String name) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Boolean> fu = renameBucketFuture(bucketId, name);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     CompletableFuture<File> getFileInfoFuture(final String bucketId, final String fileId) {
@@ -388,12 +383,12 @@ public class Genaro {
 
                 return file;
             }
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public File getFileInfo(final String bucketId, final String fileId) {
+    public File getFileInfo(final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<File> fu = getFileInfoFuture(bucketId, fileId);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<File[]> listFilesFuture(final String bucketId) {
@@ -440,12 +435,12 @@ public class Genaro {
 
                 return files;
             }
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public File[] listFiles(final String bucketId) {
+    public File[] listFiles(final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<File[]> fu = listFilesFuture(bucketId);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<Boolean> deleteFileFuture(final String bucketId, final String fileId) {
@@ -479,12 +474,12 @@ public class Genaro {
                 }
             }
 
-        }).exceptionally(ex -> false);
+        });
     }
 
-    public boolean deleteFile(final String bucketId, final String fileId) {
+    public boolean deleteFile(final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Boolean> fu = deleteFileFuture(bucketId, fileId);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     CompletableFuture<List<Pointer>> getPointersFuture(final String bucketId, final String fileId) {
@@ -507,12 +502,12 @@ public class Genaro {
             }
 
             return ps;
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public List<Pointer> getPointers(final String bucketId, final String fileId) {
+    public List<Pointer> getPointers(final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<List<Pointer>> fu = getPointersFuture(bucketId, fileId);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     private CompletableFuture<List<Pointer>> getPointersRawFuture(final String bucketId, final String fileId, final int limit, final int skipCount) {
@@ -554,12 +549,12 @@ public class Genaro {
                 return pointers;
             }
 
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public List<Pointer> getPointersRaw(final String bucketId, final String fileId, final int limit, final int skipCount) {
+    public List<Pointer> getPointersRaw(final String bucketId, final String fileId, final int limit, final int skipCount) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<List<Pointer>> fu = getPointersRawFuture(bucketId, fileId, limit, skipCount);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     CompletableFuture<Boolean> isFileExistFuture(final String bucketId, final String encryptedFileName) {
@@ -591,12 +586,12 @@ public class Genaro {
                 }
             }
 
-        }).exceptionally(ex -> false);
+        });
     }
 
-    public boolean isFileExist(final String bucketId, final String encryptedFileName) {
+    public boolean isFileExist(final String bucketId, final String encryptedFileName) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Boolean> fu = isFileExistFuture(bucketId, encryptedFileName);
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     CompletableFuture<Frame> requestNewFrameFuture() {
@@ -627,11 +622,11 @@ public class Genaro {
                     return om.readValue(responseBody, Frame.class);
                 }
             }
-        }).exceptionally(ex -> null);
+        });
     }
 
-    public Frame requestNewFrame() {
+    public Frame requestNewFrame() throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Frame> fu = requestNewFrameFuture();
-        return fu.join();
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 }

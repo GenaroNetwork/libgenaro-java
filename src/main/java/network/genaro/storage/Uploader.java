@@ -287,15 +287,25 @@ public class Uploader {
         int totalShards = totalDataShards + totalParityShards;
 
         // queue_verify_bucket_id
-        Bucket bucket = bridge.getBucket(bucketId);
-        if(bucket == null) {
-            System.out.println("bucket not found!");
+        Bucket bucket = null;
+        try {
+            bucket = bridge.getBucket(bucketId);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
             return;
         }
 
         // queue_verify_file_name
         encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
-        if (bridge.isFileExist(bucketId, encryptedFileName)) {
+        boolean exist;
+        try {
+            exist = bridge.isFileExist(bucketId, encryptedFileName);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
+        }
+
+        if (exist) {
             System.out.println("file already exists!");
             return;
         }
@@ -330,9 +340,11 @@ public class Uploader {
 
         // queue_request_frame_id
         logger.info("Request frame id");
-        Frame frame = bridge.requestNewFrame();
-        if(frame == null) {
-            System.out.println("Request frame id error!");
+        Frame frame;
+        try {
+            frame = bridge.requestNewFrame();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
             return;
         }
 

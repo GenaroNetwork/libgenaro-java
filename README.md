@@ -51,35 +51,56 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
 String passwd = "xxxxxx";
 Genaro api = new Genaro("http://192.168.50.206:8080");
-GenaroWallet gw = new GenaroWallet(V3JSON, passwd);
+GenaroWallet gw;
+try {
+    gw = new GenaroWallet(V3JSON, passwd);
+} catch (Exception e) {
+    return;
+}
 api.logIn(gw);
 ```
 
 List buckets:
 
 ```java
-Bucket[] bs = api.getBuckets();
+try {
+    Bucket[] bs = api.getBuckets();
+} catch (Exception e) {
+    return;
+}
 ```
 
 Delete bucket:
 
 ```java
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
-boolean success = api.deleteBucket(bucketId);
+try {
+    boolean success = api.deleteBucket(bucketId);
+} catch (Exception e) {
+    return;
+}
 ```
 
 Rename bucket:
 
 ```java
 String newName = "abc";
-boolean success = api.renameBucket(bucketId, newName);
+try {
+    boolean success = api.renameBucket(bucketId, newName);
+} catch (Exception e) {
+    return;
+}
 ```
 
 List files:
 
 ```java
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
-File[] bs = api.listFiles(bucketId);
+try {
+    File[] bs = api.listFiles(bucketId);
+} catch (Exception e) {
+    return;
+}
 ```
 
 Delete file:
@@ -87,7 +108,11 @@ Delete file:
 ```java
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String fileId = "2c5b84e3d682afdce73dcdfd";
-boolean success = api.deleteFile(bucketId, fileId);
+try {
+    boolean success = api.deleteFile(bucketId, fileId);
+} catch (Exception e) {
+    return;
+}
 ```
 
 Upload file:
@@ -112,21 +137,6 @@ new Uploader(api, false, filePath, fileName, bucketId, new Progress() {
 Download file:
 
 ```java
-String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
-        \"crypto\": { \"cipher\": \"aes-128-ctr\",
-        \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\",
-        \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\",
-        \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\":
-        \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" },
-        \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
-        \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
-
-String passwd = "xxxxxx";
-
-Genaro api = new Genaro("http://192.168.50.206:8080");
-GenaroWallet gw = new GenaroWallet(V3JSON, passwd);
-api.logIn(gw);
-
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String fileId = "5c0103fd5a158a5612e67461";
 String filePath = "xxxxxxxxx";

@@ -14,7 +14,7 @@ public class TestGenaro {
 //    private static final String bucketId = "5bfcf4ea7991d267f4eb53b4";
     private static final String bucketId = "b5e9bd5fd6f571beee9b035f";
 
-    public void testGetInfo() {
+    public void testGetInfo() throws Exception {
         Genaro api = new Genaro();
         String info = api.getInfo();
         System.out.println(info);
@@ -51,7 +51,7 @@ public class TestGenaro {
         }
     }
 
-    public void testRenameBucket() throws Exception{
+    public void testRenameBucket() throws Exception {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
@@ -64,7 +64,7 @@ public class TestGenaro {
         }
     }
 
-    public void testGetBucket() throws Exception{
+    public void testGetBucket() throws Exception {
         Genaro api = new Genaro();
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
@@ -78,7 +78,7 @@ public class TestGenaro {
         }
     }
 
-    public void testListFiles() throws Exception{
+    public void testListFiles() throws Exception {
         Genaro api = new Genaro();
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
@@ -96,7 +96,7 @@ public class TestGenaro {
         }
     }
 
-    public void testIsFileExist() throws Exception{
+    public void testIsFileExist() throws Exception {
         Genaro api = new Genaro();
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
@@ -113,7 +113,7 @@ public class TestGenaro {
         }
     }
 
-    public void testDeleteFile() throws Exception{
+    public void testDeleteFile() throws Exception {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
@@ -126,7 +126,7 @@ public class TestGenaro {
         }
     }
 
-    public void testGetFileInfo() throws Exception{
+    public void testGetFileInfo() throws Exception {
         Genaro api = new Genaro();
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
@@ -139,7 +139,7 @@ public class TestGenaro {
         }
     }
 
-    public void testGetPointers() throws Exception{
+    public void testGetPointers() throws Exception {
         Genaro api = new Genaro();
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
