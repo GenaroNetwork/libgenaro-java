@@ -112,7 +112,7 @@ public class Downloader {
     }
 
     public void start() throws GenaroRuntimeException, IOException, TimeoutException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
-        this.progress.onBegin();
+        progress.onBegin();
         isDownloadError = false;
         FileChannel fileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE, StandardOpenOption.WRITE,
                 StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
@@ -122,18 +122,39 @@ public class Downloader {
 
         List<Pointer> pointers = bridge.getPointers(bucketId, fileId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
 
-        // set shard size to the first shard
-        if (pointers.size() > 0) {
-            shardSize = pointers.get(0).getSize();
+        boolean hasMissingShard = pointers.stream().anyMatch(pointer -> pointer.isMissing());
+
+//         TODO: isRs() is not the
+//        boolean canRecoverShards = file.isRs();
+        boolean canRecoverShards = false;
+
+        if(file.isRs()) {
+            int missingPointers = (int) pointers.stream().filter(pointer -> pointer.isMissing()).count();
+
+            // TODO:
+//        if(missingPointers <= total_parity_pointers) {
+//            canRecoverShards = true;
+//        }
         }
-        long fileSize = pointers.stream().filter(p -> !p.getParity()).mapToLong(Pointer::getSize).sum();
+
+        if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
+            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+        }
+
+        if(hasMissingShard) {
+            //TODO: queue_recover_shards
+        }
+
+        // set shard size to the first shard
+        shardSize = pointers.get(0).getSize();
+        long fileSize = pointers.stream().filter(p -> !p.isParity()).mapToLong(Pointer::getSize).sum();
         // TODO: check for replace pointer
 
         // downloading
         AtomicLong downloadedBytes = new AtomicLong();
         CompletableFuture[] downFutures = pointers
                 .stream()
-                .filter(p -> !p.getParity())
+                .filter(p -> !p.isParity())
                 .map(p -> {
                     CompletableFuture<ByteBuffer> fu = downloadShardByPointer(p);
                     progress.onProgress(0f, "begin downloading " + p);
@@ -162,16 +183,17 @@ public class Downloader {
                     return fu;
                 })
                 .toArray(CompletableFuture[]::new);
-        CompletableFuture<Void> futureAll = CompletableFuture.allOf(downFutures);
 
-        futureAll.get(); // all done
-
-        // TODO: need better
+        // TODO: need better error processing
         if(isDownloadError) {
             fileChannel.close();
             this.progress.onEnd(1);
             return;
         }
+
+        CompletableFuture<Void> futureAll = CompletableFuture.allOf(downFutures);
+        futureAll.get(); // all done
+
         fileChannel.truncate(fileSize);
 
         // decryption:

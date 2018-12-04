@@ -38,8 +38,8 @@ public class Genaro {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
-//    private String bridgeUrl = "http://192.168.50.206:8080";
+//    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
+    private String bridgeUrl = "http://192.168.50.206:8080";
 //    private String bridgeUrl = "http://120.77.247.10:8080";
     private GenaroWallet wallet;
     private static final int POINT_PAGE_COUNT = 3;
@@ -422,10 +422,14 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
-                if (code == 404) {
-                    throw new GenaroRuntimeException("File id [" + fileId + "] does not exist");
-                } else if (code != 200){
-                    throw new GenaroRuntimeException("Request failed with status code: " + code);
+                if(code == 403 || code == 401) {
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                } else if (code == 404 || code == 400) {
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                } else if(code == 500) {
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
+                } else if (code != 200 && code != 304){
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                 }
 
                 ObjectMapper om = new ObjectMapper();
@@ -433,6 +437,9 @@ public class Genaro {
                 File file = om.readValue(responseBody, File.class);
                 String realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
                 file.setFilename(realName);
+
+                file.setRs("reedsolomon".equals(file.getErasure().getType()));
+
                 return file;
             }
 
@@ -447,9 +454,14 @@ public class Genaro {
             int skipCount = 0;
             while (true) {
                 logger.info("Requesting next set of pointers, total pointers: " + skipCount);
-                List<Pointer> psr = this.getPointersRaw(bucketId, fileId, POINT_PAGE_COUNT, skipCount).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+                List<Pointer> psr = this.getPointersRaw(bucketId, fileId, POINT_PAGE_COUNT, skipCount)
+                                        .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
 
-                if(psr.size() == 0) break;
+                if(psr.size() == 0) {
+                    logger.info("Finished requesting pointers");
+                    break;
+                }
+
                 skipCount += psr.size();
                 ps.addAll(psr);
             }
@@ -458,7 +470,7 @@ public class Genaro {
         });
     }
 
-    private Future<List<Pointer>> getPointersRaw(final String bucketId, final String fileId, int limit, int skipCount) {
+    private Future<List<Pointer>> getPointersRaw(final String bucketId, final String fileId, final int limit, final int skipCount) {
         return executor.submit(() -> {
 
             String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
@@ -478,6 +490,9 @@ public class Genaro {
 
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
+
+                logger.info(String.format("Finished request pointers - JSON Response %s", responseBody));
+
                 JsonNode bodyNode = om.readTree(responseBody);
 
                 if (code == 429 || code == 420) {
@@ -489,6 +504,8 @@ public class Genaro {
                 }
 
                 List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
+                pointers.stream().forEach(pointer -> pointer.setMissing(pointer.getToken() == null || pointer.getFarmer() == null));
+
                 return pointers;
             }
 

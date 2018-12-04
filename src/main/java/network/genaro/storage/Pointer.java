@@ -32,6 +32,8 @@ public class Pointer {
     private String operation;
     private Farmer farmer;
 
+    private boolean isMissing;
+
     // extra
     private PointerStatus status;
 
@@ -91,7 +93,7 @@ public class Pointer {
         this.index = index;
     }
 
-    public boolean getParity() {
+    public boolean isParity() {
         return parity;
     }
 
@@ -114,6 +116,14 @@ public class Pointer {
     //
     public boolean isPointCreated() {
         return token != null && farmer != null;
+    }
+
+    public boolean isMissing() {
+        return isMissing;
+    }
+
+    public void setMissing(boolean missing) {
+        isMissing = missing;
     }
 
     public enum PointerStatus

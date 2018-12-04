@@ -1,10 +1,10 @@
 package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.fasterxml.jackson.databind.SerializationConfig;
 import okhttp3.*;
 
 import org.apache.logging.log4j.LogManager;
@@ -323,8 +323,8 @@ public class Uploader {
         }
 
         // queue_create_encrypted_file
-//        byte[] index = randomBuff(32);
-        byte[] index = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
+        byte[] index = randomBuff(32);
+//        byte[] index = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
         byte[] fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(bucketId), index);
 
         byte[] ivBytes = Arrays.copyOf(index, 16);
@@ -384,8 +384,8 @@ public class Uploader {
             shards.add(shardTracker);
         }
 
-//        shards.parallelStream()
-        shards.stream()
+        shards.parallelStream()
+//        shards.stream()
               .map(shard -> {
                     // prepare frame
                     ShardMeta shardMeta = shard.getMeta();
@@ -519,19 +519,18 @@ public class Uploader {
 
                   // TODO: exclude is empty for now
                   // TODO: the shard's index is a bit different with shardMeta's index, need check.
-                  // TODO: when number of challenges is not 4, it doesn't work! need to modify
-                  String jsonStrBody = String.format("{\"hash\": \"%s\", \"size\": %d, \"index\": %d, \"parity\": %b, " +
-                                  "\"challenges\": [\"%s\", \"%s\", \"%s\", \"%s\"], \"tree\": [\"%s\", \"%s\", \"%s\", \"%s\"], \"exclude\": []}",
-                          shardMeta.getHash(), shardMeta.getSize(), shardMeta.getIndex(), parityShard,
-                          challengesAsStr[0], challengesAsStr[1] ,challengesAsStr[2] ,challengesAsStr[3],
-                          tree[0], tree[1], tree[2], tree[3]);
-
-//                  String jsonStrBody;
-//                  if(shardMeta.getIndex() == 1) {
-//                      jsonStrBody = "{\"hash\": \"d68a98f5b9fef76e5c33c2baab04fc41a20f21c7\", \"size\": 1024, \"index\": 1, \"parity\": false, \"challenges\": [\"6363636363636363636363636363636363636363636363636363636363636363\",\"6363636363636363636363636363636363636363636363636363636363636363\",\"6363636363636363636363636363636363636363636363636363636363636363\",\"6363636363636363636363636363636363636363636363636363636363636363\"], \"tree\": [\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\",\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\",\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\",\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\"], \"exclude\": \"\"}";
-//                  } else {
-//                      jsonStrBody = "{\"hash\": \"d68a98f5b9fef76e5c33c2baab04fc41a20f21c7\", \"size\": 1024, \"index\": 0, \"parity\": false, \"challenges\": [\"6363636363636363636363636363636363636363636363636363636363636363\",\"6363636363636363636363636363636363636363636363636363636363636363\",\"6363636363636363636363636363636363636363636363636363636363636363\",\"6363636363636363636363636363636363636363636363636363636363636363\"], \"tree\": [\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\",\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\",\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\",\"ab109cdd6243496fc9c77ab69037f1e6c054ad19\"], \"exclude\": \"\"}";
-//                  }
+                  ObjectMapper om = new ObjectMapper();
+                  String challengesJsonStr = null, treeJsonStr = null;
+                  try {
+                      challengesJsonStr = om.writeValueAsString(challengesAsStr);
+                      treeJsonStr = om.writeValueAsString(tree);
+                  } catch (JsonProcessingException e) {
+                      logger.error(e.getMessage());
+                      System.exit(1);
+                  }
+                  String jsonStrBody = String.format("{\"hash\":\"%s\",\"size\":%d,\"index\":%d,\"parity\":%b," +
+                                  "\"challenges\":%s,\"tree\":%s,\"exclude\":[]}",
+                          shardMeta.getHash(), shardMeta.getSize(), shardMeta.getIndex(), parityShard, challengesJsonStr, treeJsonStr);
 
                   MediaType JSON = MediaType.parse("application/json; charset=utf-8");
                   RequestBody body = RequestBody.create(JSON, jsonStrBody);
@@ -548,7 +547,6 @@ public class Uploader {
                   // TODO: the shard's index is a bit different with shardMeta's index, need check.
                   logger.info(String.format("Pushing frame for shard index %s - JSON body: %s", shardMeta.getIndex(), jsonStrBody));
                   try (Response response = client.newCall(request).execute()) {
-                      ObjectMapper om = new ObjectMapper();
                       String responseBody = response.body().string();
 
                       // TODO: the shard's index is a bit different with shardMeta's index, need check.
@@ -606,24 +604,6 @@ public class Uploader {
                   // TODO: shard.getIndex() or shard.getMeta().getIndex()
                   long filePosition = shard.getIndex() * shardSize;
                   String token = shard.getPointer().getToken();
-
-//                  MultipartBody.Builder builder = new MultipartBody.Builder()
-//                          .setType(MultipartBody.FORM);
-//
-//                  File shardFile = new File(shardFileStr);
-//                  final byte[] mBlock = FileUtils.getBlock(filePosition, shardFile, (int)metaSize);
-////                  RequestBody requestBody = RequestBody.create(MediaType.parse("application/octet-stream; charset=utf-8"), mBlock);
-//                  RequestBody requestBody = RequestBody.create(MediaType.parse("multipart/form-data; charset=utf-8"), mBlock);
-//
-//                  // TODO: what's the meaning of name, filename?
-//                  builder.addFormDataPart("abc", "def", requestBody);
-
-//                  String url = String.format("http://%s:%s/shards/%s?token=%s", farmerAddress, farmerPort, metaHash, token);
-//                  Request request = new Request.Builder()
-//                          .url(url)
-//                          .header("x-storj-node-id", farmerNodeId)
-//                          .post(builder.build())
-//                          .build();
 
                   File shardFile = new File(shardFileStr);
                   final byte[] mBlock;

@@ -38,7 +38,7 @@ This library use Java Future/Execution framework, and the following 3rd party li
 
 ## Example Usage
 
-Upload file:
+Initialize:
 
 ```java
 String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
@@ -49,13 +49,15 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" },
         \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
         \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
-
 String passwd = "xxxxxx";
-
-Genaro api = new Genaro();
+Genaro api = new Genaro("http://192.168.50.206:8080");
 GenaroWallet gw = new GenaroWallet(V3JSON, passwd);
 api.logIn(gw);
+```
 
+Upload file:
+
+```java
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String filePath = "xxxxxxxxx";
 String fileName = "xxx";
@@ -86,7 +88,7 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
 
 String passwd = "xxxxxx";
 
-Genaro api = new Genaro();
+Genaro api = new Genaro("http://192.168.50.206:8080");
 GenaroWallet gw = new GenaroWallet(V3JSON, passwd);
 api.logIn(gw);
 

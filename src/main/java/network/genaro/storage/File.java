@@ -2,8 +2,9 @@ package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties(ignoreUnknown=true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class File {
+
     public class Hmac {
         String value;
         String type;
@@ -32,6 +33,7 @@ public class File {
                     '}';
         }
     }
+
     public class Erasure {
         String type;
 
@@ -66,6 +68,9 @@ public class File {
     private String rsaKey;
     private String rsaCtr;
     private boolean isShareFile;
+
+    // Reed-Solomon
+    private boolean rs;
 
     public boolean isShareFile() { return isShareFile; }
 
@@ -120,6 +125,10 @@ public class File {
     public String getIndex() { return index; }
 
     public void setIndex(String index) { this.index = index; }
+
+    public boolean isRs() { return rs; }
+
+    public void setRs(boolean rs) { this.rs = rs; }
 
     @Override
     public String toString() {
