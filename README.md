@@ -55,6 +55,41 @@ GenaroWallet gw = new GenaroWallet(V3JSON, passwd);
 api.logIn(gw);
 ```
 
+List buckets:
+
+```java
+Bucket[] bs = api.getBuckets();
+```
+
+Delete bucket:
+
+```java
+String bucketId = "5bfcf4ea7991d267f4eb53b4";
+boolean success = api.deleteBucket(bucketId);
+```
+
+Rename bucket:
+
+```java
+String newName = "abc";
+boolean success = api.renameBucket(bucketId, newName);
+```
+
+List files:
+
+```java
+String bucketId = "5bfcf4ea7991d267f4eb53b4";
+File[] bs = api.listFiles(bucketId);
+```
+
+Delete file:
+
+```java
+String bucketId = "5bfcf4ea7991d267f4eb53b4";
+String fileId = "2c5b84e3d682afdce73dcdfd";
+boolean success = api.deleteFile(bucketId, fileId);
+```
+
 Upload file:
 
 ```java

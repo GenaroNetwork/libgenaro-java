@@ -287,38 +287,16 @@ public class Uploader {
         int totalShards = totalDataShards + totalParityShards;
 
         // queue_verify_bucket_id
-        try {
-            bridge.getBucket(bucketId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            System.out.println("connect to bridge time out!");
-            return;
-        } catch (InterruptedException e) {
-            System.out.println("InterruptedException!");
-            return;
-        } catch (ExecutionException e) {
-//            System.out.println(e.getCause().getMessage());
-            System.out.println("bucket not exists!");
+        Bucket bucket = bridge.getBucket(bucketId);
+        if(bucket == null) {
+            System.out.println("bucket not found!");
             return;
         }
 
         // queue_verify_file_name
         encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
-        try {
-            if (bridge.isFileExist(bucketId, encryptedFileName).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS)) {
-                System.out.println("file already exists!");
-                return;
-            }
-        } catch (UnsupportedEncodingException e) {
-            System.out.println("Unsupported Encoding Exception!");
-            return;
-        } catch (TimeoutException e) {
-            System.out.println("connect to bridge time out!");
-            return;
-        } catch (InterruptedException e) {
-            System.out.println("InterruptedException!");
-            return;
-        } catch (ExecutionException e) {
-            System.out.println(e.getCause().getMessage());
+        if (bridge.isFileExist(bucketId, encryptedFileName)) {
+            System.out.println("file already exists!");
             return;
         }
 
@@ -352,20 +330,9 @@ public class Uploader {
 
         // queue_request_frame_id
         logger.info("Request frame id");
-        Frame frame;
-        try {
-            frame = bridge.requestNewFrame().get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            System.out.println("connect to bridge time out!");
-            logger.error("Request frame id error!");
-            return;
-        } catch (InterruptedException e) {
-            System.out.println("InterruptedException!");
-            logger.error("Request frame id error!");
-            return;
-        } catch (ExecutionException e) {
-            System.out.println(e.getCause().getMessage());
-            logger.error("Request frame id error!");
+        Frame frame = bridge.requestNewFrame();
+        if(frame == null) {
+            System.out.println("Request frame id error!");
             return;
         }
 

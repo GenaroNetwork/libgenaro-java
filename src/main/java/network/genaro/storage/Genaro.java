@@ -16,6 +16,7 @@ import java.io.UnsupportedEncodingException;
 
 import java.net.URLEncoder;
 
+import java.sql.Time;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -165,9 +166,77 @@ public class Genaro {
         return wallet.signMessage(msg);
     }
 
-    public Future<Bucket[]> listBuckets() {
+    public CompletableFuture<String> getInfoFuture() {
 //        Preconditions.checkNotNull(this.wallet, "Please login first");
-        return executor.submit(() -> {
+        return BasicUtil.supplyAsync(() -> {
+
+            Request request = new Request.Builder()
+                    .url(bridgeUrl)
+                    .get()
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
+
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+
+                JsonNode bodyNode = om.readTree(responseBody);
+                JsonNode infoNode = bodyNode.get("info");
+
+                String title = infoNode.get("title").asText();
+                String description = infoNode.get("description").asText();
+                String version = infoNode.get("version").asText();
+                String host = bodyNode.get("host").asText();
+
+                return "Title:       " + title + "\n" +
+                        "Description: " + description + "\n" +
+                        "Version:     " + version + "\n" +
+                        "Host:        " + host + "\n";
+            }
+        }).exceptionally(ex -> null);
+    }
+
+    public String getInfo() {
+        CompletableFuture<String> fu = getInfoFuture();
+        return fu.join();
+    }
+
+    public CompletableFuture<Bucket> getBucketFuture(final String bucketId) {
+        return BasicUtil.supplyAsync(() -> {
+
+            String signature = signRequest("GET", "/buckets/" + bucketId, "");
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + "/buckets/" + bucketId)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                int code = response.code();
+
+                if (code != 200) {
+                    throw new GenaroRuntimeException("Request failed with status code: " + code);
+                }
+
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+                Bucket bucket = om.readValue(responseBody, Bucket.class);
+                return bucket;
+            }
+
+        }).exceptionally(ex -> null);
+    }
+
+    public Bucket getBucket(final String bucketId) {
+        CompletableFuture<Bucket> fu = getBucketFuture(bucketId);
+        return fu.join();
+    }
+
+    public CompletableFuture<Bucket[]> getBucketsFuture() {
+        return BasicUtil.supplyAsync(() -> {
 
             String signature = signRequest("GET", "/buckets", "");
             String pubKey = getPublicKeyHexString();
@@ -192,7 +261,7 @@ public class Genaro {
                 Bucket[] buckets = om.readValue(responseBody, Bucket[].class);
 
                 // decrypt
-                for (Bucket b : buckets) {
+                for (Bucket b: buckets) {
                     if (b.getNameIsEncrypted()) {
                         b.setName(CryptoUtil.decryptMetaHmacSha512(b.getName(), wallet.getPrivateKey(), BUCKET_NAME_MAGIC));
                         b.setNameIsEncrypted(false);
@@ -201,40 +270,16 @@ public class Genaro {
 
                 return buckets;
             }
-        });
+        }).exceptionally(ex -> null);
     }
 
-    public Future<String> getInfo() {
-        return executor.submit(() -> {
-            Request request = new Request.Builder()
-                    .url(bridgeUrl)
-                    .get()
-                    .build();
-
-            try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
-
-                ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
-
-                JsonNode bodyNode = om.readTree(responseBody);
-                JsonNode infoNode = bodyNode.get("info");
-
-                String title = infoNode.get("title").asText();
-                String description = infoNode.get("description").asText();
-                String version = infoNode.get("version").asText();
-                String host = bodyNode.get("host").asText();
-
-                return "Title:       " + title + "\n" +
-                       "Description: " + description + "\n" +
-                       "Version:     " + version + "\n" +
-                       "Host:        " + host + "\n";
-            }
-        });
+    public Bucket[] getBuckets() {
+        CompletableFuture<Bucket[]> fu = getBucketsFuture();
+        return fu.join();
     }
 
-    public Future<Boolean> deleteBucket(final String bucketId) {
-        return executor.submit(() -> {
+    public CompletableFuture<Boolean> deleteBucketFuture(final String bucketId) {
+        return BasicUtil.supplyAsync(() -> {
 
             String signature = signRequest("DELETE", "/buckets/" + bucketId, "");
             String pubKey = getPublicKeyHexString();
@@ -263,11 +308,16 @@ public class Genaro {
                 }
             }
 
-        });
+        }).exceptionally(ex -> false);
     }
 
-    public Future<Boolean> renameBucket(final String bucketId, final String name) {
-        return executor.submit(() -> {
+    public boolean deleteBucket(final String bucketId) {
+        CompletableFuture<Boolean> fu = deleteBucketFuture(bucketId);
+        return fu.join();
+    }
+
+    public CompletableFuture<Boolean> renameBucketFuture(final String bucketId, final String name) {
+        return BasicUtil.supplyAsync(() -> {
 
             String encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
 
@@ -294,16 +344,22 @@ public class Genaro {
                 return true;
             }
 
-        });
+        }).exceptionally(ex -> false);
     }
 
-    public Future<Bucket> getBucket(final String bucketId) {
-        return executor.submit(() -> {
+    public boolean renameBucket(final String bucketId, final String name) {
+        CompletableFuture<Boolean> fu = renameBucketFuture(bucketId, name);
+        return fu.join();
+    }
 
-            String signature = signRequest("GET", "/buckets/" + bucketId, "");
+    CompletableFuture<File> getFileInfoFuture(final String bucketId, final String fileId) {
+         return BasicUtil.supplyAsync(() -> {
+
+            String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
+            String signature = signRequest("GET", path, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
-                    .url(bridgeUrl + "/buckets/" + bucketId)
+                    .url(bridgeUrl + path)
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
                     .get()
@@ -312,21 +368,36 @@ public class Genaro {
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
 
-                if (code != 200) {
-                    throw new GenaroRuntimeException("Request failed with status code: " + code);
+                if(code == 403 || code == 401) {
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                } else if (code == 404 || code == 400) {
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                } else if(code == 500) {
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
+                } else if (code != 200 && code != 304){
+                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                 }
 
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
-                Bucket b = om.readValue(responseBody, Bucket.class);
-                return b;
-            }
+                File file = om.readValue(responseBody, File.class);
+                String realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+                file.setFilename(realName);
 
-        });
+                file.setRs("reedsolomon".equals(file.getErasure().getType()));
+
+                return file;
+            }
+        }).exceptionally(ex -> null);
     }
 
-    public Future<File[]> listFiles(final String bucketId) {
-        return executor.submit(() -> {
+    public File getFileInfo(final String bucketId, final String fileId) {
+        CompletableFuture<File> fu = getFileInfoFuture(bucketId, fileId);
+        return fu.join();
+    }
+
+    public CompletableFuture<File[]> listFilesFuture(final String bucketId) {
+        return BasicUtil.supplyAsync(() -> {
 
 //            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
 //            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
@@ -369,11 +440,16 @@ public class Genaro {
 
                 return files;
             }
-        });
+        }).exceptionally(ex -> null);
     }
 
-    public Future<Boolean> deleteFile(final String bucketId, final String fileId) {
-        return executor.submit(() -> {
+    public File[] listFiles(final String bucketId) {
+        CompletableFuture<File[]> fu = listFilesFuture(bucketId);
+        return fu.join();
+    }
+
+    public CompletableFuture<Boolean> deleteFileFuture(final String bucketId, final String fileId) {
+        return BasicUtil.supplyAsync(() -> {
 
             String path = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String signature = signRequest("DELETE", path, "");
@@ -403,59 +479,23 @@ public class Genaro {
                 }
             }
 
-        });
+        }).exceptionally(ex -> false);
     }
 
-    Future<File> getFileInfo(final String bucketId, final String fileId) {
-        return executor.submit(() -> {
-
-            String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
-            String signature = signRequest("GET", path, "");
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + path)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .get()
-                    .build();
-
-            try (Response response = client.newCall(request).execute()) {
-                int code = response.code();
-
-                if(code == 403 || code == 401) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                } else if (code == 404 || code == 400) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
-                } else if(code == 500) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
-                } else if (code != 200 && code != 304){
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                }
-
-                ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
-                File file = om.readValue(responseBody, File.class);
-                String realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
-                file.setFilename(realName);
-
-                file.setRs("reedsolomon".equals(file.getErasure().getType()));
-
-                return file;
-            }
-
-        });
+    public boolean deleteFile(final String bucketId, final String fileId) {
+        CompletableFuture<Boolean> fu = deleteFileFuture(bucketId, fileId);
+        return fu.join();
     }
 
-    Future<List<Pointer>> getPointers(final String bucketId, final String fileId) {
-        return executor.submit(() -> {
+    CompletableFuture<List<Pointer>> getPointersFuture(final String bucketId, final String fileId) {
+        return BasicUtil.supplyAsync(() -> {
 
             List<Pointer> ps= new ArrayList<>();
 
             int skipCount = 0;
             while (true) {
                 logger.info("Requesting next set of pointers, total pointers: " + skipCount);
-                List<Pointer> psr = this.getPointersRaw(bucketId, fileId, POINT_PAGE_COUNT, skipCount)
-                                        .get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+                List<Pointer> psr = this.getPointersRaw(bucketId, fileId, POINT_PAGE_COUNT, skipCount);
 
                 if(psr.size() == 0) {
                     logger.info("Finished requesting pointers");
@@ -467,11 +507,16 @@ public class Genaro {
             }
 
             return ps;
-        });
+        }).exceptionally(ex -> null);
     }
 
-    private Future<List<Pointer>> getPointersRaw(final String bucketId, final String fileId, final int limit, final int skipCount) {
-        return executor.submit(() -> {
+    public List<Pointer> getPointers(final String bucketId, final String fileId) {
+        CompletableFuture<List<Pointer>> fu = getPointersFuture(bucketId, fileId);
+        return fu.join();
+    }
+
+    private CompletableFuture<List<Pointer>> getPointersRawFuture(final String bucketId, final String fileId, final int limit, final int skipCount) {
+        return BasicUtil.supplyAsync(() -> {
 
             String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
             String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
@@ -509,15 +554,20 @@ public class Genaro {
                 return pointers;
             }
 
-        });
+        }).exceptionally(ex -> null);
     }
 
-    Future<Boolean> isFileExist(final String bucketId, final String encryptedFileName) throws UnsupportedEncodingException {
-        byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
-        byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
-        String escapedName = URLEncoder.encode(encryptedFileName, "UTF-8");
+    public List<Pointer> getPointersRaw(final String bucketId, final String fileId, final int limit, final int skipCount) {
+        CompletableFuture<List<Pointer>> fu = getPointersRawFuture(bucketId, fileId, limit, skipCount);
+        return fu.join();
+    }
 
-        return executor.submit(() -> {
+    CompletableFuture<Boolean> isFileExistFuture(final String bucketId, final String encryptedFileName) {
+        return BasicUtil.supplyAsync(() -> {
+
+            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
+            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
+            String escapedName = URLEncoder.encode(encryptedFileName, "UTF-8");
 
             String path = String.format("/buckets/%s/file-ids/%s", bucketId, escapedName);
             String signature = signRequest("GET", path, "");
@@ -541,14 +591,18 @@ public class Genaro {
                 }
             }
 
-        });
+        }).exceptionally(ex -> false);
     }
 
-    Future<Frame> requestNewFrame() {
+    public boolean isFileExist(final String bucketId, final String encryptedFileName) {
+        CompletableFuture<Boolean> fu = isFileExistFuture(bucketId, encryptedFileName);
+        return fu.join();
+    }
 
-        String jsonStrBody = "{}";
+    CompletableFuture<Frame> requestNewFrameFuture() {
+        return BasicUtil.supplyAsync(() -> {
 
-        return executor.submit(() -> {
+            String jsonStrBody = "{}";
 
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
             RequestBody body = RequestBody.create(JSON, jsonStrBody);
@@ -573,6 +627,11 @@ public class Genaro {
                     return om.readValue(responseBody, Frame.class);
                 }
             }
-        });
+        }).exceptionally(ex -> null);
+    }
+
+    public Frame requestNewFrame() {
+        CompletableFuture<Frame> fu = requestNewFrameFuture();
+        return fu.join();
     }
 }

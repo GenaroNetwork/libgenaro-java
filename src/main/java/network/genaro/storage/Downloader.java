@@ -98,7 +98,7 @@ public class Downloader {
                     switch(code) {
                         case 401:
                         case 403:
-                             throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_AUTH_ERROR));
+                            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_AUTH_ERROR));
                         case 504:
                             throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
                         default:
@@ -118,9 +118,9 @@ public class Downloader {
                 StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
 
         // request info and pointers
-        File file = bridge.getFileInfo(bucketId, fileId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        File file = bridge.getFileInfo(bucketId, fileId);
 
-        List<Pointer> pointers = bridge.getPointers(bucketId, fileId).get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        List<Pointer> pointers = bridge.getPointers(bucketId, fileId);
 
         boolean hasMissingShard = pointers.stream().anyMatch(pointer -> pointer.isMissing());
 
