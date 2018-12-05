@@ -37,6 +37,23 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static network.genaro.storage.Parameters.*;
 
+interface DownloadProgress {
+    default void onBegin() { System.out.println("Download start"); }
+    default void onEnd(String error) {
+        if(error != null) {
+            System.out.println("Download failed: " + error);
+        } else {
+            System.out.println("Download success");
+        }
+    }
+
+    /**
+     * called when progress update
+     * @param progress range from 0 to 1
+     */
+    default void onProgress(float progress, String message) { }
+}
+
 public class Downloader {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
@@ -45,7 +62,7 @@ public class Downloader {
     private Genaro bridge;
     private String bucketId;
     private String fileId;
-    private Progress progress;
+    private DownloadProgress progress;
 
     private long shardSize;
     private final OkHttpClient client = new OkHttpClient.Builder()
@@ -55,6 +72,7 @@ public class Downloader {
             .build();
 
     private boolean isDownloadError = false;
+    private String errorMsg;
 
     // 使用 CachedThreadPool 比较耗内存，并发 200+的时候 会造成内存溢出
     // private static final ExecutorService shardExecutor = Executors.newCachedThreadPool();
@@ -62,7 +80,7 @@ public class Downloader {
     // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1
     private static final ExecutorService shardExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final Progress progress) {
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
         this.bridge = bridge;
         this.fileId = fileId;
         this.bucketId = bucketId;
@@ -72,14 +90,7 @@ public class Downloader {
     }
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path) {
-        this(bridge, bucketId, fileId, path, new Progress(){
-            @Override
-            public void onBegin() { }
-            @Override
-            public void onEnd(int status) { }
-            @Override
-            public void onProgress(float progress, String message) { }
-        });
+        this(bridge, bucketId, fileId, path, new DownloadProgress() {});
     }
 
     private CompletableFuture<ByteBuffer> downloadShardByPointer(final Pointer p) {
@@ -176,6 +187,7 @@ public class Downloader {
                         // TODO: how to process
 
                         isDownloadError = true;
+                        errorMsg = ex.getMessage();
 
                         return null;
                     });
@@ -187,7 +199,7 @@ public class Downloader {
         // TODO: need better error processing
         if(isDownloadError) {
             fileChannel.close();
-            this.progress.onEnd(1);
+            progress.onEnd(errorMsg);
             return;
         }
 
@@ -210,9 +222,9 @@ public class Downloader {
 
         try (InputStream in = Channels.newInputStream(fileChannel);
              InputStream cypherIn = new CipherInputStream(in, cipher)) {
-            Files.copy(cypherIn, Paths.get(this.path));
+            Files.copy(cypherIn, Paths.get(path));
         }
         fileChannel.close();
-        this.progress.onEnd(0);
+        progress.onEnd(null);
     }
 }
