@@ -730,14 +730,14 @@ public class Uploader {
                   .map(this::pushFrame)
                   .forEach(this::pushShard);
         } catch (Exception e) {
-            progress.onFinish(e.getMessage(), null);
+            progress.onFinish(e.getCause().getMessage(), null);
             return;
         }
 
         try {
             createBucketEntry(shards);
         } catch (Exception e) {
-            progress.onFinish(e.getMessage(), null);
+            progress.onFinish(e.getCause().getMessage(), null);
             return;
         }
 
