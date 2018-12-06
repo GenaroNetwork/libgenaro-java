@@ -296,7 +296,12 @@ public class Uploader {
 
     private String createTmpName(String encryptedFileName, String extension) {
         String tmpFolder = System.getProperty("java.io.tmpdir");
-        byte[] bytesEncoded = sha256((BasicUtil.string2Bytes(encryptedFileName)));
+        byte[] bytesEncoded;
+        try {
+            bytesEncoded = sha256((BasicUtil.string2Bytes(encryptedFileName)));
+        } catch (NoSuchAlgorithmException e) {
+            return null;
+        }
 
         return String.format("%s/%s%s", tmpFolder, base16.toString(bytesEncoded).toLowerCase(), extension);
     }
@@ -318,7 +323,11 @@ public class Uploader {
     private boolean createEncryptedFile() {
         index = randomBuff(32);
 //        byte[] index = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
-        fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(bucketId), index);
+        try {
+            fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(bucketId), index);
+        } catch (NoSuchAlgorithmException e) {
+            return false;
+        }
 
         byte[] ivBytes = Arrays.copyOf(index, 16);
         SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
@@ -329,16 +338,17 @@ public class Uploader {
             cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
             cipher.init(ENCRYPT_MODE, keySpec, iv);
         } catch (Exception e) {
-            System.out.println("AES init Error!");
             return false;
         }
 
         try (InputStream in = new FileInputStream(originPath);
              InputStream cypherIn = new CipherInputStream(in, cipher)) {
             cryptFilePath = createTmpName(encryptedFileName, ".crypt");
+            if(cryptFilePath == null) {
+                return false;
+            }
             Files.copy(cypherIn, Paths.get(cryptFilePath), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            System.out.println("file read error or create encrypted file error!");
             return false;
         }
 
@@ -376,8 +386,7 @@ public class Uploader {
                 try {
                     firstSha256ForLeaf[i] = MessageDigest.getInstance("SHA-256");
                 } catch (NoSuchAlgorithmException e) {
-                    progress.onFinish(e.getMessage(), null);
-                    System.exit(1);
+                    throw new GenaroRuntimeException(e.getMessage());
                 }
                 firstSha256ForLeaf[i].update(shardMeta.getChallenges()[i]);
             }
@@ -451,7 +460,7 @@ public class Uploader {
                 shardMeta.getTree()[i] = CryptoUtil.ripemd160Sha256HexString(preleafRipemd160);
             }
 
-            logger.info(String.format("Finished create frame for shard index %d", shardMeta.getIndex()));
+            logger.info(String.format("Create frame finished for shard index %d", shardMeta.getIndex()));
 
             return shard;
         }, uploaderExecutor);
@@ -590,7 +599,7 @@ public class Uploader {
                 logger.error(String.format("Failed to push shard %d", shardMeta.getIndex()));
                 throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new GenaroRuntimeException(e.getMessage());
         }
 
@@ -658,9 +667,9 @@ public class Uploader {
         }
     }
 
-    public void start() throws InterruptedException, ExecutionException {
+    public void start() {
         if(!Files.exists(Paths.get(originPath))) {
-            progress.onFinish("File not found!", null);
+            progress.onFinish("Invalid file path!", null);
             return;
         }
 
@@ -689,7 +698,13 @@ public class Uploader {
         }
 
         // verify file name
-        encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
+        try {
+            encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
+        } catch (Exception e) {
+            progress.onFinish("Encrypt error!", null);
+            return;
+        }
+
         boolean exist;
         try {
             exist = bridge.isFileExist(bucketId, encryptedFileName);
@@ -698,12 +713,12 @@ public class Uploader {
             return;
         }
         if (exist) {
-            progress.onFinish("file already exists!", null);
+            progress.onFinish("File already exists!", null);
             return;
         }
 
         if(!createEncryptedFile()) {
-            progress.onFinish("create encrypted file error!", null);
+            progress.onFinish("Create encrypted file error!", null);
             return;
         }
 
@@ -734,20 +749,6 @@ public class Uploader {
 
         // TODO: not here
         progress.onProgress(0.0f);
-
-//        CompletableFuture[] upFutures = shards
-//            .stream()
-//            .map(shard -> {
-//                CompletableFuture<ShardTracker> fu = prepareFrame(shard);
-//                fu.thenApply(this::pushFrame)
-//                  .thenAccept(this::pushShard)
-//                  .exceptionally(ex -> {
-//                      fu.completeExceptionally(ex.getCause());
-//                      return null;
-//                  });
-//                return fu;
-//            })
-//            .toArray(CompletableFuture[]::new);
 
         CompletableFuture[] upFutures = shards
                 .stream()

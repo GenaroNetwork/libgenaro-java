@@ -34,10 +34,10 @@ public class Genaro {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
+//    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
 //    private String bridgeUrl = "http://192.168.50.206:8080";
 //    private String bridgeUrl = "http://127.0.0.1:8080";
-//    private String bridgeUrl = "http://120.77.247.10:8080";
+    private String bridgeUrl = "http://120.77.247.10:8080";
     private GenaroWallet wallet;
     private static final int POINT_PAGE_COUNT = 3;
 
@@ -216,7 +216,7 @@ public class Genaro {
                 String responseBody = response.body().string();
 
                 if (code == 404 || code == 400) {
-                    throw new GenaroRuntimeException("Bucket not exist");
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
                 } else if (code != 200) {
                     throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
@@ -251,7 +251,7 @@ public class Genaro {
                 String responseBody = response.body().string();
 
                 if (code == 401) {
-                    throw new GenaroRuntimeException("Invalid user credentials.");
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else if (code != 200 && code != 304) {
                     throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
@@ -300,7 +300,7 @@ public class Genaro {
                     return true;
                 } else if (code == 401) {
                     logger.error(bodyNode.get("error").asText());
-                    throw new GenaroRuntimeException("Invalid user credentials.");
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else {
                     logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Failed to destroy bucket. (" + code + ")");
@@ -421,11 +421,11 @@ public class Genaro {
                 ObjectMapper om = new ObjectMapper();
 
                 if (code == 404) {
-                    throw new GenaroRuntimeException("Bucket id [" + bucketId + "] does not exist");
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
                 } else if (code == 400) {
                     throw new GenaroRuntimeException("Bucket id [" + bucketId + "] is invalid");
                 } else if (code == 401) {
-                    throw new GenaroRuntimeException("Invalid user credentials.");
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else if (code != 200) {
                     throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
@@ -472,7 +472,7 @@ public class Genaro {
                     return true;
                 } else if (code == 401) {
                     logger.error(bodyNode.get("error").asText());
-                    throw new GenaroRuntimeException("Invalid user credentials.");
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else {
                     logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Failed to remove file from bucket. (" + code + ")");
@@ -620,12 +620,10 @@ public class Genaro {
                 int code = response.code();
                 String responseBody = response.body().string();
 
-                ObjectMapper om = new ObjectMapper();
-
                 if (code != 200) {
                     throw new GenaroRuntimeException("Request frame id error");
                 } else {
-                    return om.readValue(responseBody, Frame.class);
+                    return new ObjectMapper().readValue(responseBody, Frame.class);
                 }
             }
         });
