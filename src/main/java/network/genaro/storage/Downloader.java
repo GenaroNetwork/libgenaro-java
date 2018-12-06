@@ -37,13 +37,16 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static network.genaro.storage.Parameters.*;
 
+import static network.genaro.storage.Genaro.GenaroStrError;
+
 interface DownloadProgress {
-    default void onBegin() { System.out.println("Download start"); }
-    default void onEnd(String error) {
+    default void onBegin() { System.out.println("Download started"); }
+
+    default void onFinish(String error) {
         if(error != null) {
             System.out.println("Download failed: " + error);
         } else {
-            System.out.println("Download success");
+            System.out.println("Download finished");
         }
     }
 
@@ -51,7 +54,7 @@ interface DownloadProgress {
      * called when progress update
      * @param progress range from 0 to 1
      */
-    default void onProgress(float progress, String message) { }
+    default void onProgress(float progress) { }
 }
 
 public class Downloader {
@@ -109,11 +112,11 @@ public class Downloader {
                     switch(code) {
                         case 401:
                         case 403:
-                            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_AUTH_ERROR));
+                            throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_AUTH_ERROR));
                         case 504:
-                            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+                            throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
                         default:
-                            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                            throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
                     }
                 }
                 byte[] body = response.body().bytes();
@@ -149,7 +152,7 @@ public class Downloader {
         }
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
-            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
         }
 
         if(hasMissingShard) {
@@ -168,16 +171,16 @@ public class Downloader {
                 .filter(p -> !p.isParity())
                 .map(p -> {
                     CompletableFuture<ByteBuffer> fu = downloadShardByPointer(p);
-                    progress.onProgress(0f, "begin downloading " + p);
+                    progress.onBegin();
                     fu.thenAcceptAsync(bf -> {
                         long thisSize = p.getSize();
                         downloadedBytes.addAndGet(thisSize);
                         try {
                             fileChannel.write(bf, shardSize * p.getIndex());
                         } catch (IOException e) {
-                            throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_FILE_WRITE_ERROR));
+                            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR));
                         }
-                        progress.onProgress(downloadedBytes.floatValue() / fileSize, "done: " + p);
+                        progress.onProgress(downloadedBytes.floatValue() / fileSize);
                     }).exceptionally(ex -> {
 //                        fu.completeExceptionally(ex.getCause());
 //                        System.err.println("Error! " + e.getMessage());
@@ -199,7 +202,7 @@ public class Downloader {
         // TODO: need better error processing
         if(isDownloadError) {
             fileChannel.close();
-            progress.onEnd(errorMsg);
+            progress.onFinish(errorMsg);
             return;
         }
 
@@ -209,7 +212,7 @@ public class Downloader {
         fileChannel.truncate(fileSize);
 
         // decryption:
-        progress.onProgress(1f, "download complete");
+        progress.onProgress(1.0f);
         logger.info("download complete, begin decryption");
         byte[] bucketId = Hex.decode(file.getBucket());
         byte[] index   = Hex.decode(file.getIndex());
@@ -225,6 +228,6 @@ public class Downloader {
             Files.copy(cypherIn, Paths.get(path));
         }
         fileChannel.close();
-        progress.onEnd(null);
+        progress.onFinish(null);
     }
 }

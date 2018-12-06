@@ -34,8 +34,9 @@ public class Genaro {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-//    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
-    private String bridgeUrl = "http://192.168.50.206:8080";
+    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
+//    private String bridgeUrl = "http://192.168.50.206:8080";
+//    private String bridgeUrl = "http://127.0.0.1:8080";
 //    private String bridgeUrl = "http://120.77.247.10:8080";
     private GenaroWallet wallet;
     private static final int POINT_PAGE_COUNT = 3;
@@ -171,10 +172,11 @@ public class Genaro {
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
+                String responseBody = response.body().string();
+
                 if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
 
                 JsonNode bodyNode = om.readTree(responseBody);
                 JsonNode infoNode = bodyNode.get("info");
@@ -211,13 +213,15 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
-                if (code != 200) {
+                if (code == 404 || code == 400) {
+                    throw new GenaroRuntimeException("Bucket not exist");
+                } else if (code != 200) {
                     throw new GenaroRuntimeException("Request failed with status code: " + code);
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
                 Bucket bucket = om.readValue(responseBody, Bucket.class);
                 return bucket;
             }
@@ -244,6 +248,7 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 if (code == 401) {
                     throw new GenaroRuntimeException("Invalid user credentials.");
@@ -252,7 +257,6 @@ public class Genaro {
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
                 Bucket[] buckets = om.readValue(responseBody, Bucket[].class);
 
                 // decrypt
@@ -287,9 +291,9 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
                 JsonNode bodyNode = om.readTree(responseBody);
 
                 if (code == 200 || code == 204) {
@@ -331,6 +335,7 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                response.close();
 
                 if (code != 200) {
                     throw new GenaroRuntimeException("Request failed with status code: " + code);
@@ -362,19 +367,19 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 if(code == 403 || code == 401) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else if (code == 404 || code == 400) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
                 } else if(code == 500) {
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
                 } else if (code != 200 && code != 304){
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
                 File file = om.readValue(responseBody, File.class);
                 String realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
                 file.setFilename(realName);
@@ -411,9 +416,9 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
 
                 if (code == 404) {
                     throw new GenaroRuntimeException("Bucket id [" + bucketId + "] does not exist");
@@ -458,9 +463,9 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
                 JsonNode bodyNode = om.readTree(responseBody);
 
                 if (code == 200 || code == 204) {
@@ -527,9 +532,9 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
 
                 logger.info(String.format("Finished request pointers - JSON Response %s", responseBody));
 
@@ -537,10 +542,10 @@ public class Genaro {
 
                 if (code == 429 || code == 420) {
                     logger.error(bodyNode.get("error").asText());
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
                 } else if (code != 200){
                     logger.error(bodyNode.get("error").asText());
-                    throw new GenaroRuntimeException(Genaro.GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
                 }
 
                 List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
@@ -576,6 +581,7 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                response.close();
 
                 if (code == 404) {
                     return false;
@@ -612,9 +618,9 @@ public class Genaro {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
+                String responseBody = response.body().string();
 
                 ObjectMapper om = new ObjectMapper();
-                String responseBody = response.body().string();
 
                 if (code != 200) {
                     throw new GenaroRuntimeException("Request frame id error");

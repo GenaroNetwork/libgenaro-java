@@ -1,5 +1,6 @@
 package network.genaro.storage;
 
+import com.sun.tools.javac.code.Symtab;
 import org.bouncycastle.util.encoders.Hex;
 import org.testng.annotations.Test;
 import org.web3j.crypto.CipherException;
@@ -183,28 +184,13 @@ public class TestGenaro {
         api.logIn(gw);
 
         try {
-//            new Downloader(api, bucketId, "5c00ef805a158a5612e66cde", "/Users/dingyi/Genaro/test/download/1.txt", new Progress() {
-//            new Downloader(api, bucketId, "5c0103fd5a158a5612e67461", "/Users/dingyi/Genaro/test/download/aaa.zip", new Progress() {
-//            new Downloader(api, bucketId, "e396ebc515d4a91452ea1765", "/Users/dingyi/Genaro/test/download/aam.data", new Progress() {
+//            new Downloader(api, bucketId, "5c00ef805a158a5612e66cde", "/Users/dingyi/Genaro/test/download/1.txt", new DownloadProgress() {
+//            new Downloader(api, bucketId, "5c0103fd5a158a5612e67461", "/Users/dingyi/Genaro/test/download/aaa.zip", new DownloadProgress() {
+//            new Downloader(api, bucketId, "e396ebc515d4a91452ea1765", "/Users/dingyi/Genaro/test/download/aam.data", new DownloadProgress() {
             new Downloader(api, bucketId, "bd96a4fde75f2dc7747eaa5d", "/Users/dingyi/Genaro/test/download/下载器苹果电脑Mac版.zip", new DownloadProgress() {
                 @Override
-                public void onBegin() {
-                    System.out.println("Download start");
-                }
-
-                @Override
-                public void onEnd(String error) {
-                    if(error != null) {
-                        System.out.println("Download failed: " + error);
-                    } else {
-                        System.out.println("Download success");
-                    }
-                }
-
-                @Override
-                public void onProgress(float progress, String message) {
-                    System.out.println(message);
-                    System.out.println("progress: " + progress);
+                public void onProgress(float progress) {
+                    System.out.println("Progress: " + progress);
                 }
             }).start();
         } catch (Exception e) {
@@ -220,15 +206,15 @@ public class TestGenaro {
         api.logIn(ww);
 
         try {
-//            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new Progress() {
-//            new Uploader(api, false, "/Users/dingyi/test/2048k.data", "2048k.data", bucketId, new Progress() {
-//            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "2049o.data", bucketId, new Progress() {
-//            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "g.zip",bucketId, new Progress() {
-            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "11.zip",bucketId, new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/test/1.txt", "2.txt", bucketId, new Progress() {
+//            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new UploadProgress() {
+            new Uploader(api, false, "/Users/dingyi/test/2048k.data", "2048m.data", bucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/test/2049.data", "2049p.data", bucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "g.zip",bucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "11.zip", bucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/test/1.txt", "2.txt", bucketId, new UploadProgress() {
                 @Override
-                public void onProgress(float progress, long fileSize) {
-                    System.out.println("progress: " + progress);
+                public void onProgress(float progress) {
+                    System.out.println("Progress: " + progress);
                 }
             }).start();
         } catch (Exception e) {

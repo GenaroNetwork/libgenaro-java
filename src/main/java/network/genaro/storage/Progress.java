@@ -3,7 +3,7 @@ package network.genaro.storage;
 public interface Progress {
 
     void onBegin();
-    void onEnd(String error);
+    void onFinish(String error);
 
     /**
      * called when progress update

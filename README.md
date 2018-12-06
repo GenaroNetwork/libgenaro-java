@@ -126,7 +126,7 @@ new Uploader(api, false, filePath, fileName, bucketId, new Progress() {
     public void onBegin() {
     }
     @Override
-    public void onEnd(int status) {
+    public void onFinish(int status) {
     }
     @Override
     public void onProgress(float progress, String message) {
@@ -146,7 +146,7 @@ new Downloader(api, bucketId, fileId, filePath, new Progress() {
     }
 
     @Override
-    public void onEnd(int status) {
+    public void onFinish(int status) {
     }
 
     @Override
