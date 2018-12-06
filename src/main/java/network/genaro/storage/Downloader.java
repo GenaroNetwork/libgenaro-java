@@ -77,11 +77,11 @@ public class Downloader {
     private boolean isDownloadError = false;
     private String errorMsg;
 
-    // 使用 CachedThreadPool 比较耗内存，并发 200+的时候 会造成内存溢出
-    // private static final ExecutorService shardExecutor = Executors.newCachedThreadPool();
+    // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
+    // private static final ExecutorService downloaderExecutor = Executors.newCachedThreadPool();
 
-    // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1
-    private static final ExecutorService shardExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+    // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
+    private static final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
         this.bridge = bridge;
@@ -122,7 +122,7 @@ public class Downloader {
                 byte[] body = response.body().bytes();
                 return ByteBuffer.wrap(body);
             }
-        }, shardExecutor);
+        }, downloaderExecutor);
     }
 
     public void start() throws GenaroRuntimeException, IOException, TimeoutException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
@@ -168,6 +168,7 @@ public class Downloader {
         AtomicLong downloadedBytes = new AtomicLong();
         CompletableFuture[] downFutures = pointers
                 .stream()
+                // TODO:
                 .filter(p -> !p.isParity())
                 .map(p -> {
                     CompletableFuture<ByteBuffer> fu = downloadShardByPointer(p);

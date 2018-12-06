@@ -18,6 +18,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import java.io.*;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -28,7 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static javax.crypto.Cipher.ENCRYPT_MODE;
 
@@ -239,6 +240,12 @@ public class Uploader {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
+    // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
+    // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
+
+    // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
+    private static final ExecutorService uploaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+
     public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final UploadProgress progress) {
         this.bridge = bridge;
         this.originPath = filePath;
@@ -338,121 +345,123 @@ public class Uploader {
         return true;
     }
 
-    private ShardTracker prepareFrame(ShardTracker shard) {
-        ShardMeta shardMeta = shard.getMeta();
-        shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
-        shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
-        for (int i = 0; i < GENARO_SHARD_CHALLENGES; i ++) {
-            byte[] challenge = randomBuff(32);
-//                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-//                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-//                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-//                                99, 99};
-            shardMeta.getChallenges()[i] = challenge;
-            shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
-        }
-
-        logger.info(String.format("Creating frame for shard index %d...", shardMeta.getIndex()));
-
-        // Initialize context for sha256 of encrypted data
-        MessageDigest shardHashMd;
-        try {
-            shardHashMd = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new GenaroRuntimeException(e.getMessage());
-        }
-
-        // Calculate the merkle tree with challenges
-        MessageDigest[] firstSha256ForLeaf = new MessageDigest[GENARO_SHARD_CHALLENGES];
-        for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++ ) {
-            try {
-                firstSha256ForLeaf[i] = MessageDigest.getInstance("SHA-256");
-            } catch (NoSuchAlgorithmException e) {
-                progress.onFinish(e.getMessage(), null);
-                System.exit(1);
+    private CompletableFuture<ShardTracker> prepareFrame(ShardTracker shard) {
+        return BasicUtil.supplyAsync(() -> {
+            ShardMeta shardMeta = shard.getMeta();
+            shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
+            shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
+            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+                byte[] challenge = randomBuff(32);
+                //                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+                //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+                //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+                //                                99, 99};
+                shardMeta.getChallenges()[i] = challenge;
+                shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
             }
-            firstSha256ForLeaf[i].update(shardMeta.getChallenges()[i]);
-        }
 
-        // TODO: the shard's index is a bit different with shardMeta's index, need check.
-        if (shard.getIndex() + 1 > totalDataShards) {
-            // TODO: Reed-solomn is not implemented yet
-            shard.setShardFile("xxxxxx");
-        } else {
-            shard.setShardFile(cryptFilePath);
-        }
+            logger.info(String.format("Creating frame for shard index %d...", shardMeta.getIndex()));
 
-        // TODO: the shard's index is a bit different with shardMeta's index, need check.
-        // Reset shard index when using parity shards
-        int shardMetaIndex = shardMeta.getIndex();
-        shardMetaIndex = (shardMetaIndex + 1 > totalDataShards) ? shardMetaIndex - totalDataShards: shardMetaIndex;
-        shardMeta.setIndex(shardMetaIndex);
+            // Initialize context for sha256 of encrypted data
+            MessageDigest shardHashMd;
+            try {
+                shardHashMd = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new GenaroRuntimeException(e.getMessage());
+            }
 
-        try (FileInputStream fin = new FileInputStream(cryptFilePath)) {
-            int readBytes;
-            final int BYTES = AES_BLOCK_SIZE * 256;
-
-            long totalRead = 0;
+            // Calculate the merkle tree with challenges
+            MessageDigest[] firstSha256ForLeaf = new MessageDigest[GENARO_SHARD_CHALLENGES];
+            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+                try {
+                    firstSha256ForLeaf[i] = MessageDigest.getInstance("SHA-256");
+                } catch (NoSuchAlgorithmException e) {
+                    progress.onFinish(e.getMessage(), null);
+                    System.exit(1);
+                }
+                firstSha256ForLeaf[i].update(shardMeta.getChallenges()[i]);
+            }
 
             // TODO: the shard's index is a bit different with shardMeta's index, need check.
-            long position = shardMeta.getIndex() * shardSize;
+            if (shard.getIndex() + 1 > totalDataShards) {
+                // TODO: Reed-solomn is not implemented yet
+                shard.setShardFile("xxxxxx");
+            } else {
+                shard.setShardFile(cryptFilePath);
+            }
 
-            byte[] readData = new byte[BYTES];
-            do {
-                // set file position
-                fin.getChannel().position(position);
+            // TODO: the shard's index is a bit different with shardMeta's index, need check.
+            // Reset shard index when using parity shards
+            int shardMetaIndex = shardMeta.getIndex();
+            shardMetaIndex = (shardMetaIndex + 1 > totalDataShards) ? shardMetaIndex - totalDataShards : shardMetaIndex;
+            shardMeta.setIndex(shardMetaIndex);
 
-                readBytes = fin.read(readData, 0, BYTES);
+            try (FileInputStream fin = new FileInputStream(cryptFilePath)) {
+                int readBytes;
+                final int BYTES = AES_BLOCK_SIZE * 256;
 
-                // end of file
-                if(readBytes == -1) {
-                    break;
-                }
+                long totalRead = 0;
 
-                totalRead += readBytes;
-                position += readBytes;
+                // TODO: the shard's index is a bit different with shardMeta's index, need check.
+                long position = shardMeta.getIndex() * shardSize;
 
-                shardHashMd.update(readData, 0, readBytes);
+                byte[] readData = new byte[BYTES];
+                do {
+                    // set file position
+                    fin.getChannel().position(position);
 
-                for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++ ) {
-                    firstSha256ForLeaf[i].update(readData, 0, readBytes);
-                }
-            } while (totalRead < shardSize);
+                    readBytes = fin.read(readData, 0, BYTES);
 
-            shardMeta.setSize(totalRead);
-        } catch (IOException e) {
-            throw new GenaroRuntimeException(e.getMessage());
-        }
+                    // end of file
+                    if (readBytes == -1) {
+                        break;
+                    }
 
-        byte[] prehashSha256 = shardHashMd.digest();
-        byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
+                    totalRead += readBytes;
+                    position += readBytes;
 
-        shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
-        byte[] preleafSha256;
-        byte[] preleafRipemd160;
+                    shardHashMd.update(readData, 0, readBytes);
 
-        shardMeta.setTree(new String[GENARO_SHARD_CHALLENGES]);
-        for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
-            // finish first sha256 for leaf
-            preleafSha256 = firstSha256ForLeaf[i].digest();
+                    for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+                        firstSha256ForLeaf[i].update(readData, 0, readBytes);
+                    }
+                } while (totalRead < shardSize);
 
-            // ripemd160 result of sha256
-            preleafRipemd160 = CryptoUtil.ripemd160(preleafSha256);
+                shardMeta.setSize(totalRead);
+            } catch (IOException e) {
+                throw new GenaroRuntimeException(e.getMessage());
+            }
 
-            // sha256 and ripemd160 again
-            shardMeta.getTree()[i] = CryptoUtil.ripemd160Sha256HexString(preleafRipemd160);
-        }
+            byte[] prehashSha256 = shardHashMd.digest();
+            byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
 
-        logger.info(String.format("Finished create frame for shard index %d", shardMeta.getIndex()));
+            shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
+            byte[] preleafSha256;
+            byte[] preleafRipemd160;
 
-        return shard;
+            shardMeta.setTree(new String[GENARO_SHARD_CHALLENGES]);
+            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+                // finish first sha256 for leaf
+                preleafSha256 = firstSha256ForLeaf[i].digest();
+
+                // ripemd160 result of sha256
+                preleafRipemd160 = CryptoUtil.ripemd160(preleafSha256);
+
+                // sha256 and ripemd160 again
+                shardMeta.getTree()[i] = CryptoUtil.ripemd160Sha256HexString(preleafRipemd160);
+            }
+
+            logger.info(String.format("Finished create frame for shard index %d", shardMeta.getIndex()));
+
+            return shard;
+        }, uploaderExecutor);
     }
 
     private ShardTracker pushFrame(ShardTracker shard) {
-        //                  if(shard.getPointer().getToken() == null) {
-//                      logger.error("Token error");
-//                      System.exit(1);
-//                  }
+        //        if(shard.getPointer().getToken() == null) {
+        //          logger.error("Token error");
+        //          System.exit(1);
+        //        }
 
         ShardMeta shardMeta = shard.getMeta();
 
@@ -515,7 +524,7 @@ public class Uploader {
         return shard;
     }
 
-    private void pushShard(ShardTracker shard) {
+    private ShardTracker pushShard(ShardTracker shard) {
         //                  // Reset shard index when using parity shards
 //                  req->shard_index = (index + 1 > state->total_data_shards) ? index - state->total_data_shards: index;
 //
@@ -584,6 +593,8 @@ public class Uploader {
         } catch (Exception e) {
             throw new GenaroRuntimeException(e.getMessage());
         }
+
+        return shard;
     }
 
     private void createBucketEntry(List<ShardTracker> shards) {
@@ -647,7 +658,7 @@ public class Uploader {
         }
     }
 
-    public void start() /*throws Exception*/ {
+    public void start() throws InterruptedException, ExecutionException {
         if(!Files.exists(Paths.get(originPath))) {
             progress.onFinish("File not found!", null);
             return;
@@ -724,15 +735,45 @@ public class Uploader {
         // TODO: not here
         progress.onProgress(0.0f);
 
+//        CompletableFuture[] upFutures = shards
+//            .stream()
+//            .map(shard -> {
+//                CompletableFuture<ShardTracker> fu = prepareFrame(shard);
+//                fu.thenApply(this::pushFrame)
+//                  .thenAccept(this::pushShard)
+//                  .exceptionally(ex -> {
+//                      fu.completeExceptionally(ex.getCause());
+//                      return null;
+//                  });
+//                return fu;
+//            })
+//            .toArray(CompletableFuture[]::new);
+
+        CompletableFuture[] upFutures = shards
+                .stream()
+                .map(this::prepareFrame)
+                .map(future -> future.thenApply(this::pushFrame))
+                .map(future -> future.thenApply(this::pushShard))
+                .toArray(CompletableFuture[]::new);
+
+        CompletableFuture<Void> futureAll = CompletableFuture.allOf(upFutures);
+
         try {
-            shards.parallelStream()
-                  .map(this::prepareFrame)
-                  .map(this::pushFrame)
-                  .forEach(this::pushShard);
+            futureAll.get();
         } catch (Exception e) {
-            progress.onFinish(e.getMessage(), null);
+            progress.onFinish(e.getCause().getMessage(), null);
             return;
         }
+
+//        try {
+//            shards.parallelStream()
+//                  .map(this::prepareFrame)
+//                  .map(this::pushFrame)
+//                  .forEach(this::pushShard);
+//        } catch (Exception e) {
+//            progress.onFinish(e.getMessage(), null);
+//            return;
+//        }
 
         try {
             createBucketEntry(shards);
