@@ -18,7 +18,6 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 
 - Erasure encoding with reed solomon for data reliability
 - Retry when fail
-- Better exception handling
 - Exchange reports with bridge
 - Cli interface
 
@@ -123,14 +122,17 @@ String filePath = "xxxxxxxxx";
 String fileName = "xxx";
 new Uploader(api, false, filePath, fileName, bucketId, new Progress() {
     @Override
-    public void onBegin() {
-    }
+    public void onBegin(long fileSize) { }
     @Override
     public void onFinish(int status) {
+        if(error != null) {
+            System.out.println("Upload failed: " + error);
+        } else {
+            System.out.println("Upload finished, fileId: " + fileId);
+        }
     }
     @Override
-    public void onProgress(float progress, String message) {
-    }
+    public void onProgress(float progress) { }
 }).start();
 ```
 
@@ -142,15 +144,16 @@ String fileId = "5c0103fd5a158a5612e67461";
 String filePath = "xxxxxxxxx";
 new Downloader(api, bucketId, fileId, filePath, new Progress() {
     @Override
-    public void onBegin() {
-    }
-
+    public void onBegin() { }
     @Override
     public void onFinish(int status) {
+        if(error != null) {
+            System.out.println("Download failed: " + error);
+        } else {
+            System.out.println("Download finished");
+        }
     }
-
     @Override
-    public void onProgress(float progress, String message) {
-    }
+    public void onProgress(float progress) { }
 }).start();
 ```
