@@ -192,8 +192,8 @@ public class TestGenaro {
 //            new Downloader(api, TestbucketId, "5c00ef805a158a5612e66cde", "/Users/dingyi/Genaro/test/download/1.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0103fd5a158a5612e67461", "/Users/dingyi/Genaro/test/download/aaa.zip", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "e396ebc515d4a91452ea1765", "/Users/dingyi/Genaro/test/download/aam.data", new DownloadProgress() {
-//            new Downloader(api, TestbucketId, "5c08f5dc963d402a1f3edeeb", "/Users/dingyi/Genaro/test/download/a.txt", new DownloadProgress() {
-            new Downloader(api, TestbucketId, "5c09e145963d402a1f3ee0fc", "/Users/dingyi/Genaro/test/download/11.zip", new DownloadProgress() {
+            new Downloader(api, TestbucketId, "5c08f5dc963d402a1f3edeeb", "/Users/dingyi/Genaro/test/download/a.txt", new DownloadProgress() {
+//            new Downloader(api, TestbucketId, "5c09e145963d402a1f3ee0fc", "/Users/dingyi/Genaro/test/download/12.zip", new DownloadProgress() {
                 @Override
                 public void onProgress(float progress) {
                     System.out.println("Progress: " + progress);
@@ -213,14 +213,35 @@ public class TestGenaro {
 
         try {
 //            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/test/2047k.data", "2047x.data", TestbucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/test/2047k.data", "2047b.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "14.data", TestbucketId, new UploadProgress() {
-            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "o.zip", TestbucketId, new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "14.zip", TestbucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "p.zip", TestbucketId, new UploadProgress() {
+            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "15.zip", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/1.txt", "4.txt", TestbucketId, new UploadProgress() {
                 @Override
                 public void onProgress(float progress) {
-                    System.out.printf("Upload progress: %.1f%%", progress * 100);
+//                    System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                }
+
+                @Override
+                public void onFinish(String error, String fileId) {
+                    if(error != null) {
+                        System.out.println("Upload failed: " + error);
+                    } else {
+                        System.out.println("Upload finished, fileId: " + fileId);
+                        boolean success = false;
+                        try {
+                            success = api.deleteFile(TestbucketId, fileId);
+                        } catch (Exception e) {
+                            System.out.println("Delete failed.");
+                        }
+
+                        if(success) {
+                            System.out.println("Delete success.");
+                        } else {
+                            System.out.println("Delete failed.");
+                        }
+                    }
                 }
             }).start();
         } catch (Exception e) {

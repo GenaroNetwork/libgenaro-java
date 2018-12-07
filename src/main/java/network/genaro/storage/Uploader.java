@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static javax.crypto.Cipher.ENCRYPT_MODE;
 
@@ -227,11 +228,11 @@ public class Uploader {
 
     private String fileId;
 
-    private long uploadedBytes;
+    private AtomicLong uploadedBytes = new AtomicLong();
     private long totalBytes;
 
     // increased uploaded bytes since last onProgress Call
-    private long deltaUploaded;
+    private AtomicLong deltaUploaded = new AtomicLong();
 
     private static Random random = new Random();
     private static long MAX_SHARD_SIZE = 4294967296L; // 4Gb
@@ -584,12 +585,12 @@ public class Uploader {
         UploadRequestBody uploadRequestBody = new UploadRequestBody(new ByteArrayInputStream(mBlock),
             "application/octet-stream; charset=utf-8", delta -> {
             shard.setUploadedSize(shard.getUploadedSize() + delta);
-            uploadedBytes += delta;
-            deltaUploaded += delta;
+            uploadedBytes.addAndGet(delta);
+            deltaUploaded.addAndGet(delta);
 
-            if (deltaUploaded * 1.0 / totalBytes >= 0.001) {  // call onProgress every 0.1%
-                progress.onProgress(uploadedBytes * 1.0f / totalBytes);
-                deltaUploaded = 0;
+            if (deltaUploaded.get() * 1.0 / totalBytes >= 0.001) {  // call onProgress every 0.1%
+                progress.onProgress(uploadedBytes.get() * 1.0f / totalBytes);
+                deltaUploaded.set(0);
             }
         });
 
@@ -613,13 +614,11 @@ public class Uploader {
                 }
                 logger.info(String.format("Successfully transferred shard index %d", shard.getIndex()));
             } else {
-                uploadedBytes -= shard.getUploadedSize();
-                shard.setUploadedSize(0);
-
-                logger.error(String.format("Failed to push shard %d", shard.getIndex()));
                 throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
+            uploadedBytes.addAndGet(-shard.getUploadedSize());
+            shard.setUploadedSize(0);
             throw new GenaroRuntimeException(e.getMessage());
         }
 
@@ -793,10 +792,10 @@ public class Uploader {
             return;
         }
 
-        if (uploadedBytes != totalBytes) {
-//            System.out.println("uploadedBytes: " + uploadedBytes + ", totalBytes: " + totalBytes);
-//            progress.onFinish("Shards transferred error!", null);
-//            return;
+        if (uploadedBytes.get() != totalBytes) {
+            logger.error("uploadedBytes: " + uploadedBytes + ", totalBytes: " + totalBytes);
+            progress.onFinish(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR), null);
+            return;
         }
 
         try {
@@ -809,7 +808,7 @@ public class Uploader {
         progress.onProgress(1.0f);
         progress.onFinish(null, fileId);
 
-        // send exchange report
+        // TODO: send exchange report
         //
     }
 }

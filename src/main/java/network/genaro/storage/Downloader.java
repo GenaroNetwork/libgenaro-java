@@ -124,17 +124,29 @@ public class Downloader {
             }
         }, downloaderExecutor);
     }
-
-    public void start() throws GenaroRuntimeException, IOException, TimeoutException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
+    public void start() {
+//    public void start() throws GenaroRuntimeException, IOException, TimeoutException, ExecutionException, InterruptedException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
         progress.onBegin();
+
         isDownloadError = false;
-        FileChannel fileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE, StandardOpenOption.WRITE,
-                StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
 
-        // request info and pointers
-        File file = bridge.getFileInfo(bucketId, fileId);
+        // request info
+        File file;
+        try {
+            file = bridge.getFileInfo(bucketId, fileId);
+        } catch (Exception e) {
+            progress.onFinish(e.getMessage());
+            return;
+        }
 
-        List<Pointer> pointers = bridge.getPointers(bucketId, fileId);
+        // request pointers
+        List<Pointer> pointers;
+        try {
+            pointers = bridge.getPointers(bucketId, fileId);
+        } catch (Exception e) {
+            progress.onFinish(e.getMessage());
+            return;
+        }
 
         boolean hasMissingShard = pointers.stream().anyMatch(pointer -> pointer.isMissing());
 
@@ -152,7 +164,8 @@ public class Downloader {
         }
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
-            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            progress.onFinish(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            return;
         }
 
         if(hasMissingShard) {
@@ -162,73 +175,124 @@ public class Downloader {
         // set shard size to the first shard
         shardSize = pointers.get(0).getSize();
         long fileSize = pointers.stream().filter(p -> !p.isParity()).mapToLong(Pointer::getSize).sum();
+
         // TODO: check for replace pointer
+
+        FileChannel fileChannel;
+        try {
+            fileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
+        } catch (IOException e) {
+            progress.onFinish("Create temp file error!");
+            return;
+        }
 
         // downloading
         AtomicLong downloadedBytes = new AtomicLong();
         CompletableFuture[] downFutures = pointers
-                .stream()
-                // TODO:
-                .filter(p -> !p.isParity())
-                .map(p -> {
-                    CompletableFuture<ByteBuffer> fu = downloadShardByPointer(p);
-                    progress.onBegin();
-                    fu.thenAcceptAsync(bf -> {
-                        long thisSize = p.getSize();
-                        downloadedBytes.addAndGet(thisSize);
-                        try {
-                            fileChannel.write(bf, shardSize * p.getIndex());
-                        } catch (IOException e) {
-                            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR));
-                        }
-                        progress.onProgress(downloadedBytes.floatValue() / fileSize);
-                    }).exceptionally(ex -> {
+            .stream()
+            // TODO:
+            .filter(p -> !p.isParity())
+            .map(p -> {
+                CompletableFuture<ByteBuffer> fu = downloadShardByPointer(p);
+                fu.thenAcceptAsync(bf -> {
+                    long thisSize = p.getSize();
+                    downloadedBytes.addAndGet(thisSize);
+                    try {
+                        fileChannel.write(bf, shardSize * p.getIndex());
+                    } catch (IOException e) {
+                        throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR));
+                    }
+                    progress.onProgress(downloadedBytes.floatValue() / fileSize);
+                }).exceptionally(ex -> {
 //                        fu.completeExceptionally(ex.getCause());
 //                        System.err.println("Error! " + e.getMessage());
 //                        throw new GenaroRuntimeException(ex.getMessage());
-                        logger.error(ex.getMessage());
+                    logger.error(ex.getMessage());
 
-                        // TODO: how to process
+                    // TODO: how to process
 
-                        isDownloadError = true;
-                        errorMsg = ex.getMessage();
+                    isDownloadError = true;
+                    errorMsg = ex.getMessage();
 
-                        return null;
-                    });
+                    return null;
+                });
 
-                    return fu;
-                })
-                .toArray(CompletableFuture[]::new);
+                return fu;
+            })
+            .toArray(CompletableFuture[]::new);
 
         // TODO: need better error processing
         if(isDownloadError) {
-            fileChannel.close();
+            try { fileChannel.close(); } catch(IOException e) { }
             progress.onFinish(errorMsg);
             return;
         }
 
         CompletableFuture<Void> futureAll = CompletableFuture.allOf(downFutures);
-        futureAll.get(); // all done
 
-        fileChannel.truncate(fileSize);
+        try {
+            futureAll.get();
+        } catch (Exception e) {
+            progress.onFinish(e.getCause().getMessage());
+            return;
+        }
+
+        try {
+            fileChannel.truncate(fileSize);
+        } catch (IOException e) {
+            progress.onFinish(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
+            return;
+        }
 
         // decryption:
         progress.onProgress(1.0f);
-        logger.info("download complete, begin decryption");
+        logger.info("Download complete, begin to decrypt...");
         byte[] bucketId = Hex.decode(file.getBucket());
         byte[] index   = Hex.decode(file.getIndex());
-        byte[] fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
+
+        byte[] fileKey;
+        try {
+            fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
+        } catch (Exception e) {
+            progress.onFinish("Generate file key error!");
+            return;
+        }
+
         byte[] ivBytes = Arrays.copyOf(index, 16);
         SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
         IvParameterSpec iv = new IvParameterSpec(ivBytes);
-        javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
-        cipher.init(DECRYPT_MODE, keySpec, iv);
+
+        javax.crypto.Cipher cipher;
+        try {
+            cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
+            cipher.init(DECRYPT_MODE, keySpec, iv);
+        } catch (Exception e) {
+            progress.onFinish("Init decryption context error!");
+            return;
+        }
 
         try (InputStream in = Channels.newInputStream(fileChannel);
              InputStream cypherIn = new CipherInputStream(in, cipher)) {
-            Files.copy(cypherIn, Paths.get(path));
+            try {
+                Files.copy(cypherIn, Paths.get(path));
+            } catch (IOException e) {
+                progress.onFinish("Create file error!");
+                return;
+            }
+        } catch (IOException e) {
+            progress.onFinish("File decryption error!");
+            return;
         }
-        fileChannel.close();
+
+        try {
+            fileChannel.close();
+        } catch (Exception e) {
+            logger.warn("File close exception");
+        }
+
         progress.onFinish(null);
+
+        logger.info("Decrypt complete, download is success");
     }
 }
