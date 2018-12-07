@@ -1,5 +1,6 @@
 package network.genaro.storage;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,15 +26,148 @@ import org.apache.logging.log4j.Logger;
 
 import static network.genaro.storage.Parameters.*;
 
+class ShardMeta {
+    private String hash;
+    private byte[][] challenges;    // [GENARO_SHARD_CHALLENGES][32]
+    private String[] challengesAsStr;  // [GENARO_SHARD_CHALLENGES]
+
+    // Merkle Tree leaves. Each leaf is size of RIPEMD160 hash
+    private String[] tree;  // [GENARO_SHARD_CHALLENGES]
+    private int index;
+    private boolean isParity;
+    private long size;
+
+    public ShardMeta(int index) { this.setIndex(index); }
+
+    public String getHash() {
+        return hash;
+    }
+
+    public void setHash(String hash) {
+        this.hash = hash;
+    }
+
+    public byte[][] getChallenges() { return challenges; }
+
+    public void setChallenges(byte[][] challenges) {
+        this.challenges = challenges;
+    }
+
+    public String[] getChallengesAsStr() {
+        return challengesAsStr;
+    }
+
+    public void setChallengesAsStr(String[] challengesAsStr) {
+        this.challengesAsStr = challengesAsStr;
+    }
+
+    public String[] getTree() {
+        return tree;
+    }
+
+    public void setTree(String[] tree) {
+        this.tree = tree;
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
+    }
+
+    public boolean getParity() {
+        return isParity;
+    }
+
+    public void setParity(boolean parity) {
+        isParity = parity;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public void setSize(long size) {
+        this.size = size;
+    }
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+class FarmerPointer {
+    private String token;
+    private Farmer farmer;
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public Farmer getFarmer() {
+        return farmer;
+    }
+
+    public void setFarmer(Farmer farmer) {
+        this.farmer = farmer;
+    }
+}
+
+class ShardTracker {
+    //    int progress;
+    private int index;
+    private FarmerPointer pointer;
+    private ShardMeta meta;
+    private long uploadedSize;
+    private String shardFile;
+
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
+    }
+
+    public FarmerPointer getPointer() {
+        return pointer;
+    }
+
+    public void setPointer(FarmerPointer pointer) {
+        this.pointer = pointer;
+    }
+
+    public ShardMeta getMeta() {
+        return meta;
+    }
+
+    public void setMeta(ShardMeta meta) {
+        this.meta = meta;
+    }
+
+    public long getUploadedSize() {
+        return uploadedSize;
+    }
+
+    public void setUploadedSize(long uploadedSize) {
+        this.uploadedSize = uploadedSize;
+    }
+
+    public String getShardFile() { return shardFile; }
+
+    public void setShardFile(String shardFile) { this.shardFile = shardFile; }
+}
+
 public class Genaro {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
-    private static final ExecutorService executor = Executors.newCachedThreadPool();
-    private final OkHttpClient client = new OkHttpClient.Builder()
+    private final OkHttpClient.Builder client = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
-            .build();
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
 
     private String bridgeUrl = "http://118.31.61.119:8080";
     private GenaroWallet wallet;
@@ -128,12 +262,6 @@ public class Genaro {
                 return "Meta decryption error";
             case GENARO_TRANSFER_CANCELED:
                 return "File transfer canceled";
-            case GENARO_MEMORY_ERROR:
-                return "Memory error";
-            case GENARO_MAPPING_ERROR:
-                return "Memory mapped file error";
-            case GENARO_UNMAPPING_ERROR:
-                return "Memory mapped file unmap error";
             case GENARO_QUEUE_ERROR:
                 return "Queue error";
             case GENARO_HEX_DECODE_ERROR:
@@ -169,7 +297,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 String responseBody = response.body().string();
 
                 if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
@@ -209,7 +337,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -244,7 +372,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -287,7 +415,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -331,7 +459,7 @@ public class Genaro {
                     .post(body)
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -363,7 +491,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -412,7 +540,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -459,7 +587,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -528,7 +656,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -577,7 +705,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -614,7 +742,7 @@ public class Genaro {
                     .post(body)
                     .build();
 
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 

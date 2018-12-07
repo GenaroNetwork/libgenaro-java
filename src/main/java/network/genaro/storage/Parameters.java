@@ -50,11 +50,6 @@ public final class Parameters {
     public static final int GENARO_FILE_UNSUPPORTED_ERASURE = 3010;
     public static final int GENARO_FILE_PARITY_ERROR = 3011;
 
-    // Memory related errors
-    public static final int GENARO_MEMORY_ERROR = 4000;
-    public static final int GENARO_MAPPING_ERROR = 4001;
-    public static final int GENARO_UNMAPPING_ERROR = 4002;
-
     // Queue related errors
     public static final int GENARO_QUEUE_ERROR = 5000;
 

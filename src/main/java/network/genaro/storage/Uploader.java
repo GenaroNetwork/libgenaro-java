@@ -60,141 +60,6 @@ interface UploadProgress {
     default void onProgress(float progress) { }
 }
 
-class ShardMeta {
-    private String hash;
-    private byte[][] challenges;    // [GENARO_SHARD_CHALLENGES][32]
-    private String[] challengesAsStr;  // [GENARO_SHARD_CHALLENGES]
-
-    // Merkle Tree leaves. Each leaf is size of RIPEMD160 hash
-    private String[] tree;  // [GENARO_SHARD_CHALLENGES]
-    private int index;
-    private boolean isParity;
-    private long size;
-
-    public ShardMeta(int index) { this.setIndex(index); }
-
-    public String getHash() {
-        return hash;
-    }
-
-    public void setHash(String hash) {
-        this.hash = hash;
-    }
-
-    public byte[][] getChallenges() { return challenges; }
-
-    public void setChallenges(byte[][] challenges) {
-        this.challenges = challenges;
-    }
-
-    public String[] getChallengesAsStr() {
-        return challengesAsStr;
-    }
-
-    public void setChallengesAsStr(String[] challengesAsStr) {
-        this.challengesAsStr = challengesAsStr;
-    }
-
-    public String[] getTree() {
-        return tree;
-    }
-
-    public void setTree(String[] tree) {
-        this.tree = tree;
-    }
-
-    public int getIndex() {
-        return index;
-    }
-
-    public void setIndex(int index) {
-        this.index = index;
-    }
-
-    public boolean getParity() {
-        return isParity;
-    }
-
-    public void setParity(boolean parity) {
-        isParity = parity;
-    }
-
-    public long getSize() {
-        return size;
-    }
-
-    public void setSize(long size) {
-        this.size = size;
-    }
-}
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-class FarmerPointer {
-    private String token;
-    private Farmer farmer;
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    public Farmer getFarmer() {
-        return farmer;
-    }
-
-    public void setFarmer(Farmer farmer) {
-        this.farmer = farmer;
-    }
-}
-
-class ShardTracker {
-//    int progress;
-    private int index;
-    private FarmerPointer pointer;
-    private ShardMeta meta;
-    private long uploadedSize;
-    private String shardFile;
-
-    public int getIndex() {
-        return index;
-    }
-
-    public void setIndex(int index) {
-        this.index = index;
-    }
-
-    public FarmerPointer getPointer() {
-        return pointer;
-    }
-
-    public void setPointer(FarmerPointer pointer) {
-        this.pointer = pointer;
-    }
-
-    public ShardMeta getMeta() {
-        return meta;
-    }
-
-    public void setMeta(ShardMeta meta) {
-        this.meta = meta;
-    }
-
-    public long getUploadedSize() {
-        return uploadedSize;
-    }
-
-    public void setUploadedSize(long uploadedSize) {
-        this.uploadedSize = uploadedSize;
-    }
-
-    public String getShardFile() { return shardFile; }
-
-    public void setShardFile(String shardFile) { this.shardFile = shardFile; }
-}
-
 public class Uploader {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
@@ -240,11 +105,10 @@ public class Uploader {
     private static int SHARD_MULTIPLES_BACK = 4;
     private static int GENARO_SHARD_CHALLENGES = 4;
 
-    private final OkHttpClient client = new OkHttpClient.Builder()
+    private final OkHttpClient.Builder client = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
-            .build();
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
 
     // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
@@ -517,7 +381,7 @@ public class Uploader {
                 .build();
 
         logger.info(String.format("Pushing frame for shard index %s - JSON body: %s", shard.getIndex(), jsonStrBody));
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = client.build().newCall(request).execute()) {
             String responseBody = response.body().string();
 
             logger.info(String.format("Push frame finished for shard index %s - JSON Response: %s", shard.getIndex(), responseBody));
@@ -583,14 +447,17 @@ public class Uploader {
 
 //        RequestBody requestBody = RequestBody.create(MediaType.parse("application/octet-stream; charset=utf-8"), mBlock);
         UploadRequestBody uploadRequestBody = new UploadRequestBody(new ByteArrayInputStream(mBlock),
-            "application/octet-stream; charset=utf-8", delta -> {
-            shard.setUploadedSize(shard.getUploadedSize() + delta);
-            uploadedBytes.addAndGet(delta);
-            deltaUploaded.addAndGet(delta);
+                "application/octet-stream; charset=utf-8", new UploadRequestBody.ProgressListener() {
+            @Override
+            public void transferred(long delta) {
+                shard.setUploadedSize(shard.getUploadedSize() + delta);
+                uploadedBytes.addAndGet(delta);
+                deltaUploaded.addAndGet(delta);
 
-            if (deltaUploaded.get() * 1.0 / totalBytes >= 0.001) {  // call onProgress every 0.1%
-                progress.onProgress(uploadedBytes.get() * 1.0f / totalBytes);
-                deltaUploaded.set(0);
+                if (deltaUploaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
+                    progress.onProgress(uploadedBytes.floatValue() / totalBytes);
+                    deltaUploaded.set(0);
+                }
             }
         });
 
@@ -602,7 +469,7 @@ public class Uploader {
                 .post(uploadRequestBody)
                 .build();
 
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = client.build().newCall(request).execute()) {
             int code = response.code();
 
             if (code == 200 || code == 201 || code == 304) {
@@ -669,7 +536,7 @@ public class Uploader {
                 .build();
 
         logger.info(String.format("Create bucket entry - JSON body: %s", jsonStrBody));
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = client.build().newCall(request).execute()) {
             ObjectMapper om = new ObjectMapper();
             String responseBody = response.body().string();
             JsonNode bodyNode = om.readTree(responseBody);
@@ -773,7 +640,6 @@ public class Uploader {
             shards.add(shard);
         }
 
-        // TODO: not here
         progress.onProgress(0.0f);
 
         CompletableFuture[] upFutures = shards

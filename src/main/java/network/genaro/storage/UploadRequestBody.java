@@ -48,7 +48,9 @@ public class UploadRequestBody extends RequestBody {
 
             while ((delta = source.read(sink.buffer(), SEGMENT_SIZE)) != -1) {
                 sink.flush();
-                listener.transferred(delta);
+                if(listener != null) {
+                    listener.transferred(delta);
+                }
             }
         } finally {
             Util.closeQuietly(source);
