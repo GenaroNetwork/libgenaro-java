@@ -8,6 +8,7 @@ import org.web3j.crypto.Wallet;
 import org.web3j.crypto.WalletFile;
 
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 
@@ -27,7 +28,7 @@ public class GenaroWallet {
         }
     }
 
-    public String signMessage(String message) {
+    public String signMessage(String message) throws NoSuchAlgorithmException {
         return sha256EscdaSign(ecKeyPair.getPrivateKey(), message);
     }
 

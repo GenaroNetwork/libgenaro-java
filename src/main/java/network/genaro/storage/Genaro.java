@@ -13,6 +13,7 @@ import okhttp3.RequestBody;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.net.URLEncoder;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.*;
@@ -34,10 +35,7 @@ public class Genaro {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-//    private String bridgeUrl = "http://118.31.61.119:8080"; //http://192.168.0.74:8080
-//    private String bridgeUrl = "http://192.168.50.206:8080";
-//    private String bridgeUrl = "http://127.0.0.1:8080";
-    private String bridgeUrl = "http://120.77.247.10:8080";
+    private String bridgeUrl = "http://118.31.61.119:8080";
     private GenaroWallet wallet;
     private static final int POINT_PAGE_COUNT = 3;
 
@@ -157,7 +155,7 @@ public class Genaro {
         return this.wallet.getPublicKeyHexString();
     }
 
-    public String signRequest(final String method, final String path, final String body) {
+    public String signRequest(final String method, final String path, final String body) throws NoSuchAlgorithmException {
         String msg = method + "\n" + path + "\n" + body;
         return wallet.signMessage(msg);
     }
