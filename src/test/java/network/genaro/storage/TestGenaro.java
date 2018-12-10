@@ -189,12 +189,12 @@ public class TestGenaro {
         api.logIn(gw);
 
         try {
-//            new Downloader(api, TestbucketId, "5c00ef805a158a5612e66cde", "/Users/dingyi/Genaro/test/download/1.txt", new DownloadProgress() {
-//            new Downloader(api, TestbucketId, "5c0103fd5a158a5612e67461", "/Users/dingyi/Genaro/test/download/aaa.zip", new DownloadProgress() {
-//            new Downloader(api, TestbucketId, "5c0a3456bbdd6f2d157dcf06", "/Users/dingyi/Genaro/test/download/2m.data", new DownloadProgress() {
+//            new Downloader(api, TestbucketId, "5c0dd2dbbbdd6f2d157dd059", "/Users/dingyi/Genaro/test/download/6.txt", new DownloadProgress() {
+            new Downloader(api, TestbucketId, "5c0dd5b6bbdd6f2d157dd08c", "/Users/dingyi/Genaro/test/download/bbf.zip", new DownloadProgress() {
+//            new Downloader(api, TestbucketId, "5c0dd800bbdd6f2d157dd0a8", "/Users/dingyi/Genaro/test/download/111.data", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadProgress() {
-            new Downloader(api, TestbucketId, "5c0a37f8bbdd6f2d157dcf44", "/Users/dingyi/Genaro/test/download/16.zip", new DownloadProgress() {
+//            new Downloader(api, TestbucketId, "5c0dccd7bbdd6f2d157dcfff", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
                 @Override
                 public void onProgress(float progress) {
 //                    System.out.printf("Download progress: %.1f%%\n", progress * 100);
@@ -214,11 +214,11 @@ public class TestGenaro {
 
         try {
 //            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/test/2047k.data", "2047b.data", TestbucketId, new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "14.data", TestbucketId, new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "q.zip", TestbucketId, new UploadProgress() {
-            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "16.zip", TestbucketId, new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/test/1.txt", "6.txt", TestbucketId, new UploadProgress() {
+            new Uploader(api, false, "/Users/dingyi/test/2097152.data", "2097152.data", TestbucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/test/2097154.data", "19.data", TestbucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "r.zip", TestbucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "17.zip", TestbucketId, new UploadProgress() {
+//            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "79.txt", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2m.data", "2m.data", TestbucketId, new UploadProgress() {
                 @Override
                 public void onProgress(float progress) {

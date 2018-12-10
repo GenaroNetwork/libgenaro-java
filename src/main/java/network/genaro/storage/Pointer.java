@@ -115,6 +115,16 @@ public class Pointer {
                 ", farmer=" + farmer +
                 '}';
     }
+
+    public String toBriefString() {
+        return "Pointer{" +
+                "index=" + index +
+                ", size=" + size +
+                ", parity=" + parity +
+                ", farmer=" + farmer.toBriefString() +
+                '}';
+    }
+
     //
     public boolean isPointCreated() {
         return token != null && farmer != null;

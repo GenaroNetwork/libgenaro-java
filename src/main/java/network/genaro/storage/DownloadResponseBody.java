@@ -31,7 +31,8 @@ public class DownloadResponseBody extends ResponseBody {
         return responseBody.contentLength();
     }
 
-    @Override public BufferedSource source() {
+    @Override
+    public BufferedSource source() {
         if (bufferedSource == null) {
             bufferedSource = Okio.buffer(source(responseBody.source()));
         }
@@ -41,7 +42,8 @@ public class DownloadResponseBody extends ResponseBody {
 
     private Source source(Source source) {
         return new ForwardingSource(source) {
-            @Override public long read(Buffer sink, long byteCount) throws IOException {
+            @Override
+            public long read(Buffer sink, long byteCount) throws IOException {
                 // read() returns the number of bytes read, or -1 if this source is exhausted.
                 long delta = super.read(sink, byteCount);
 

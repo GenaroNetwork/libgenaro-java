@@ -103,6 +103,7 @@ public class Downloader {
                                          .get()
                                          .build();
 
+            // TODO: code below works bad when number of pointers is more than 1, downloadedBytes is sometimes larger than totalBytes.
             Interceptor interceptor = new Interceptor() {
                 @Override
                 public Response intercept(Chain chain) throws IOException {
@@ -117,9 +118,6 @@ public class Downloader {
                                    downloadedBytes.addAndGet(delta);
                                    deltaDownloaded.addAndGet(delta);
 
-//                                   System.out.println("delta: " + delta);
-//                                   System.out.println("downloadedBytes: " + downloadedBytes);
-
                                    if (deltaDownloaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
                                        progress.onProgress(downloadedBytes.floatValue() / totalBytes);
                                        deltaDownloaded.set(0);
@@ -127,11 +125,13 @@ public class Downloader {
                                }
                            })).build();
                 }};
-
             client.addNetworkInterceptor(interceptor);
+
+            logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
             try (Response response = client.build().newCall(request).execute()) {
                 int code = response.code();
+                byte[] body = response.body().bytes();
 
                 int errorStatus = 0;
                 if (code == 401 || code == 403) {
@@ -143,16 +143,16 @@ public class Downloader {
                 }
 
                 if(errorStatus != 0) {
+                    logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
                     downloadedBytes.addAndGet(-pointer.getDownloadedSize());
                     pointer.setDownloadedSize(0);
                     throw new GenaroRuntimeException(GenaroStrError(errorStatus));
                 }
 
-                byte[] body = response.body().bytes();
-
-                System.out.printf("shard %d: %d\n", pointer.getIndex(), pointer.getDownloadedSize());
+                logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
 
                 if(body.length != pointer.getSize()) {
+                    logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
                     downloadedBytes.addAndGet(-pointer.getDownloadedSize());
                     pointer.setDownloadedSize(0);
                     throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
@@ -213,12 +213,15 @@ public class Downloader {
 
         long fileSize = 0;
         for (Pointer pointer: pointers) {
+            logger.info(pointer.toBriefString());
             long size = pointer.getSize();
             totalBytes += size;
             if(!pointer.isParity()) {
                 fileSize += size;
             }
         }
+
+//        System.out.println("totalBytes: " + totalBytes);
 
         // TODO: check for replace pointer
 
