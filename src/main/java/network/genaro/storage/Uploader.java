@@ -560,7 +560,7 @@ public class Uploader {
 
     public void start() {
         if(!Files.exists(Paths.get(originPath))) {
-            progress.onFinish("Invalid file path!", null);
+            progress.onFinish("Invalid file path", null);
             return;
         }
 
@@ -593,7 +593,7 @@ public class Uploader {
         try {
             encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
         } catch (Exception e) {
-            progress.onFinish("Encrypt error!", null);
+            progress.onFinish("Encrypt error", null);
             return;
         }
 
@@ -605,12 +605,12 @@ public class Uploader {
             return;
         }
         if (exist) {
-            progress.onFinish("File already exists!", null);
+            progress.onFinish(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS), null);
             return;
         }
 
         if(!createEncryptedFile()) {
-            progress.onFinish("Create encrypted file error!", null);
+            progress.onFinish(GenaroStrError(GENARO_FILE_ENCRYPTION_ERROR), null);
             return;
         }
 

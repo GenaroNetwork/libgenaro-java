@@ -4,6 +4,8 @@ import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.Callback;
+import okhttp3.Call;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,6 +16,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import static javax.crypto.Cipher.DECRYPT_MODE;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -69,6 +72,9 @@ public class Downloader {
     private AtomicLong deltaDownloaded = new AtomicLong();
 
     private long shardSize;
+
+    FileChannel downFileChannel;
+
     private final OkHttpClient.Builder client = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
@@ -79,6 +85,80 @@ public class Downloader {
 
     // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
     private static final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+
+    class CallbackFuture extends CompletableFuture<Response> implements Callback {
+
+        public CallbackFuture(Pointer pointer) {
+            this.pointer = pointer;
+        }
+
+        private Pointer pointer;
+        private static final int SEGMENT_SIZE = 2 * 1024;
+
+        public void fail() {
+            logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
+            downloadedBytes.addAndGet(-pointer.getDownloadedSize());
+            pointer.setDownloadedSize(0);
+        }
+
+        @Override
+        public void onResponse(Call call, Response response) {
+            int code = response.code();
+
+            int errorStatus = 0;
+            if (code == 401 || code == 403) {
+                errorStatus = GENARO_FARMER_AUTH_ERROR;
+            } else if (code == 504) {
+                errorStatus = GENARO_FARMER_TIMEOUT_ERROR;
+            } else if(code != 200) {
+                errorStatus = GENARO_FARMER_REQUEST_ERROR;
+            }
+
+            if(errorStatus != 0) {
+                fail();
+                super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR)));
+                return;
+            }
+
+            logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
+
+            byte[] buff = new byte[SEGMENT_SIZE];
+            int delta;
+
+            try (InputStream is = response.body().byteStream();
+                 BufferedInputStream bis = new BufferedInputStream(is)) {
+                while ((delta = bis.read(buff)) != -1) {
+                    downFileChannel.write(ByteBuffer.wrap(buff, 0, delta), shardSize * pointer.getIndex() + pointer.getDownloadedSize());
+                    pointer.setDownloadedSize(pointer.getDownloadedSize() + delta);
+
+                    downloadedBytes.addAndGet(delta);
+                    deltaDownloaded.addAndGet(delta);
+
+                    if (deltaDownloaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
+                       progress.onProgress(downloadedBytes.floatValue() / totalBytes);
+                       deltaDownloaded.set(0);
+                   }
+                }
+
+                // if downloaded size is not the same with total size
+                if(pointer.getDownloadedSize() != pointer.getSize()) {
+                    fail();
+                    super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR)));
+                    return;
+                }
+            } catch (Exception e) {
+                super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR)));
+                return;
+            }
+
+            super.complete(response);
+        }
+
+        @Override
+        public void onFailure(Call call, IOException e) {
+            super.completeExceptionally(e);
+        }
+    }
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
         this.bridge = bridge;
@@ -93,7 +173,7 @@ public class Downloader {
         this(bridge, bucketId, fileId, path, new DownloadProgress() {});
     }
 
-    private CompletableFuture<ByteBuffer> requestShard(final Pointer pointer) {
+    private CompletableFuture<Void> requestShard(final Pointer pointer) {
         return BasicUtil.supplyAsync(() -> {
             Farmer farmer = pointer.getFarmer();
             String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
@@ -103,63 +183,13 @@ public class Downloader {
                                          .get()
                                          .build();
 
-            // TODO: code below works bad when number of pointers is more than 1, downloadedBytes is sometimes larger than totalBytes.
-            Interceptor interceptor = new Interceptor() {
-                @Override
-                public Response intercept(Chain chain) throws IOException {
-                    Response originalResponse = chain.proceed(chain.request());
-
-                    return originalResponse
-                           .newBuilder()
-                           .body(new DownloadResponseBody(originalResponse.body(), new DownloadResponseBody.ProgressListener() {
-                               @Override
-                               public void transferred(long delta) {
-                                   pointer.setDownloadedSize(pointer.getDownloadedSize() + delta);
-                                   downloadedBytes.addAndGet(delta);
-                                   deltaDownloaded.addAndGet(delta);
-
-                                   if (deltaDownloaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
-                                       progress.onProgress(downloadedBytes.floatValue() / totalBytes);
-                                       deltaDownloaded.set(0);
-                                   }
-                               }
-                           })).build();
-                }};
-            client.addNetworkInterceptor(interceptor);
-
             logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
-            try (Response response = client.build().newCall(request).execute()) {
-                int code = response.code();
-                byte[] body = response.body().bytes();
+            CallbackFuture future = new CallbackFuture(pointer);
+            client.build().newCall(request).enqueue(future);
+            future.get();
 
-                int errorStatus = 0;
-                if (code == 401 || code == 403) {
-                    errorStatus = GENARO_FARMER_AUTH_ERROR;
-                } else if (code == 504) {
-                    errorStatus = GENARO_FARMER_TIMEOUT_ERROR;
-                } else if(code != 200) {
-                    errorStatus = GENARO_FARMER_REQUEST_ERROR;
-                }
-
-                if(errorStatus != 0) {
-                    logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
-                    downloadedBytes.addAndGet(-pointer.getDownloadedSize());
-                    pointer.setDownloadedSize(0);
-                    throw new GenaroRuntimeException(GenaroStrError(errorStatus));
-                }
-
-                logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
-
-                if(body.length != pointer.getSize()) {
-                    logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
-                    downloadedBytes.addAndGet(-pointer.getDownloadedSize());
-                    pointer.setDownloadedSize(0);
-                    throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
-                }
-
-                return ByteBuffer.wrap(body);
-            }
+            return null;
         }, downloaderExecutor);
     }
 
@@ -221,16 +251,13 @@ public class Downloader {
             }
         }
 
-//        System.out.println("totalBytes: " + totalBytes);
-
         // TODO: check for replace pointer
 
-        FileChannel fileChannel;
         try {
-            fileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE,
+            downFileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
         } catch (IOException e) {
-            progress.onFinish("Create temp file error!");
+            progress.onFinish("Create temp file error");
             return;
         }
 
@@ -240,15 +267,7 @@ public class Downloader {
             // TODO: not only download none parity shards
 //            .filter(pointer -> !pointer.isParity())
             .map(pointer -> {
-                CompletableFuture<ByteBuffer> fu = requestShard(pointer);
-                fu.thenAcceptAsync(bf -> {
-                    try {
-                        fileChannel.write(bf, shardSize * pointer.getIndex());
-                    } catch (IOException e) {
-                        throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR));
-                    }
-                });
-
+                CompletableFuture<Void> fu = requestShard(pointer);
                 return fu;
             })
             .toArray(CompletableFuture[]::new);
@@ -263,13 +282,13 @@ public class Downloader {
         }
 
         if(downloadedBytes.get() != totalBytes) {
-            logger.error("downloadedBytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
+            logger.warn("downloadedBytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
 //            progress.onFinish(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
 //            return;
         }
 
         try {
-            fileChannel.truncate(fileSize);
+            downFileChannel.truncate(fileSize);
         } catch (IOException e) {
             progress.onFinish(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
             return;
@@ -284,7 +303,7 @@ public class Downloader {
         try {
             fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
         } catch (Exception e) {
-            progress.onFinish("Generate file key error!");
+            progress.onFinish("Generate file key error");
             return;
         }
 
@@ -297,25 +316,25 @@ public class Downloader {
             cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
             cipher.init(DECRYPT_MODE, keySpec, iv);
         } catch (Exception e) {
-            progress.onFinish("Init decryption context error!");
+            progress.onFinish("Init decryption context error");
             return;
         }
 
-        try (InputStream in = Channels.newInputStream(fileChannel);
+        try (InputStream in = Channels.newInputStream(downFileChannel);
              InputStream cypherIn = new CipherInputStream(in, cipher)) {
             try {
                 Files.copy(cypherIn, Paths.get(path));
             } catch (IOException e) {
-                progress.onFinish("Create file error!");
+                progress.onFinish("Create file error");
                 return;
             }
         } catch (IOException e) {
-            progress.onFinish("File decryption error!");
+            progress.onFinish("File decryption error");
             return;
         }
 
         try {
-            fileChannel.close();
+            downFileChannel.close();
         } catch (Exception e) {
             logger.warn("File close exception");
         }

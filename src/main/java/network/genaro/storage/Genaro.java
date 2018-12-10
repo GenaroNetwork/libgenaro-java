@@ -256,16 +256,8 @@ public class Genaro {
                 return "File unsupported erasure code error";
             case GENARO_FILE_PARITY_ERROR:
                 return "File create parity error";
-            case GENARO_META_ENCRYPTION_ERROR:
-                return "Meta encryption error";
-            case GENARO_META_DECRYPTION_ERROR:
-                return "Meta decryption error";
             case GENARO_TRANSFER_CANCELED:
                 return "File transfer canceled";
-            case GENARO_QUEUE_ERROR:
-                return "Queue error";
-            case GENARO_HEX_DECODE_ERROR:
-                return "Unable to decode hex string";
             case GENARO_TRANSFER_OK:
                 return "No errors";
             default:
@@ -506,11 +498,23 @@ public class Genaro {
                 }
 
                 ObjectMapper om = new ObjectMapper();
-                File file = om.readValue(responseBody, File.class);
-                String realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+
+                File file;
+                String realName;
+                try {
+                    file = om.readValue(responseBody, File.class);
+                    realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+                } catch (Exception e) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FILEINFO_ERROR));
+                }
+
                 file.setFilename(realName);
 
-                file.setRs("reedsolomon".equals(file.getErasure().getType()));
+                if("reedsolomon".equals(file.getErasure().getType())) {
+                    file.setRs(true);
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_UNSUPPORTED_ERASURE));
+                }
 
                 return file;
             }
@@ -746,10 +750,17 @@ public class Genaro {
                 int code = response.code();
                 String responseBody = response.body().string();
 
-                if (code != 200) {
-                    throw new GenaroRuntimeException("Request frame id error");
+                if (code == 429 || code == 420) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
+                } else if (code == 200) {
+                    Frame frame = new ObjectMapper().readValue(responseBody, Frame.class);
+                    if (frame.getId() != null) {
+                        return frame;
+                    } else {
+                        throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FRAME_ERROR));
+                    }
                 } else {
-                    return new ObjectMapper().readValue(responseBody, Frame.class);
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FRAME_ERROR));
                 }
             }
         });

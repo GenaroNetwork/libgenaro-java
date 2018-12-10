@@ -190,16 +190,42 @@ public class TestGenaro {
 
         try {
 //            new Downloader(api, TestbucketId, "5c0dd2dbbbdd6f2d157dd059", "/Users/dingyi/Genaro/test/download/6.txt", new DownloadProgress() {
-            new Downloader(api, TestbucketId, "5c0dd5b6bbdd6f2d157dd08c", "/Users/dingyi/Genaro/test/download/bbf.zip", new DownloadProgress() {
+//            new Downloader(api, TestbucketId, "5c0dd5b6bbdd6f2d157dd08c", "/Users/dingyi/Genaro/test/download/bbg.zip", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0dd800bbdd6f2d157dd0a8", "/Users/dingyi/Genaro/test/download/111.data", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadProgress() {
-//            new Downloader(api, TestbucketId, "5c0dccd7bbdd6f2d157dcfff", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
+            new Downloader(api, TestbucketId, "5c0dccd7bbdd6f2d157dcfff", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
                 @Override
                 public void onProgress(float progress) {
-//                    System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                    System.out.printf("Download progress: %.1f%%\n", progress * 100);
                 }
             }).start();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw e;
+        }
+    }
+
+    public void testDownload100() throws Exception {
+        Genaro api = new Genaro(TestBridgeUrl);
+        GenaroWallet gw;
+        try {
+            gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        } catch (CipherException | IOException e) {
+            System.out.println(e.getMessage());
+            throw e;
+        }
+        api.logIn(gw);
+
+        try {
+            for(int i = 0; i < 100; i++) {
+                new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new DownloadProgress() {
+                    @Override
+                    public void onProgress(float progress) {
+//                        System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                    }
+                }).start();
+            }
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw e;
@@ -246,6 +272,48 @@ public class TestGenaro {
                     }
                 }
             }).start();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw e;
+        }
+    }
+
+    public void testUpload100() throws Exception {
+        Genaro api = new Genaro(TestBridgeUrl);
+        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
+//        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
+        api.logIn(ww);
+
+        try {
+            for(int i = 0; i < 100; i++) {
+                new Uploader(api, false, "/Users/dingyi/test/spam.txt", "spam0" + i + ".txt", TestbucketId, new UploadProgress() {
+                    @Override
+                    public void onProgress(float progress) {
+//                        System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                    }
+
+                    @Override
+                    public void onFinish(String error, String fileId) {
+                        if (error != null) {
+                            System.out.println("Upload failed: " + error);
+                        } else {
+                            System.out.println("Upload finished, fileId: " + fileId);
+                            //                        boolean success = false;
+                            //                        try {
+                            //                            success = api.deleteFile(TestbucketId, fileId);
+                            //                        } catch (Exception e) {
+                            //                            System.out.println("Delete failed.");
+                            //                        }
+                            //
+                            //                        if(success) {
+                            //                            System.out.println("Delete success.");
+                            //                        } else {
+                            //                            System.out.println("Delete failed.");
+                            //                        }
+                        }
+                    }
+                }).start();
+            }
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw e;

@@ -50,17 +50,7 @@ public final class Parameters {
     public static final int GENARO_FILE_UNSUPPORTED_ERASURE = 3010;
     public static final int GENARO_FILE_PARITY_ERROR = 3011;
 
-    // Queue related errors
-    public static final int GENARO_QUEUE_ERROR = 5000;
-
-    // Meta related errors 6000 to 6999
-    public static final int GENARO_META_ENCRYPTION_ERROR = 6000;
-    public static final int GENARO_META_DECRYPTION_ERROR = 6001;
-
-    // Miscellaneous errors
-    public static final int GENARO_HEX_DECODE_ERROR = 7000;
-//
-//    // Exchange report codes
-//    public static final int GENARO_REPORT_SUCCESS = 1000;
-//    public static final int GENARO_REPORT_FAILURE = 1100;
+    // Exchange report codes
+    public static final int GENARO_REPORT_SUCCESS = 1000;
+    public static final int GENARO_REPORT_FAILURE = 1100;
 }

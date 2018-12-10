@@ -16,7 +16,7 @@ public class UploadRequestBody extends RequestBody {
         void transferred(long delta);
     }
 
-    public static final int SEGMENT_SIZE = 2 * 1024;
+    private static final int SEGMENT_SIZE = 2 * 1024;
 
     protected InputStream input;
     protected ProgressListener listener;
