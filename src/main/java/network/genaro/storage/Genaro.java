@@ -510,10 +510,13 @@ public class Genaro {
 
                 file.setFilename(realName);
 
-                if("reedsolomon".equals(file.getErasure().getType())) {
-                    file.setRs(true);
-                } else {
-                    throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_UNSUPPORTED_ERASURE));
+                String erasureType = file.getErasure().getType();
+                if (erasureType != null) {
+                    if (erasureType.equals("reedsolomon")) {
+                        file.setRs(true);
+                    } else {
+                        throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_UNSUPPORTED_ERASURE));
+                    }
                 }
 
                 return file;
@@ -528,9 +531,6 @@ public class Genaro {
 
     public CompletableFuture<File[]> listFilesFuture(final String bucketId) {
         return BasicUtil.supplyAsync(() -> {
-
-//            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
-//            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
 
             String path = String.format("/buckets/%s/files", bucketId);
 

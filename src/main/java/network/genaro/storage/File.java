@@ -133,13 +133,27 @@ public class File {
     @Override
     public String toString() {
         return "File{" +
-                "bucket='" + bucket + '\'' +
+                "filename='" + filename + '\'' +
+                ", bucket='" + bucket + '\'' +
                 ", frame='" + frame + '\'' +
                 ", hmac=" + hmac +
                 ", erasure=" + erasure +
                 ", index='" + index + '\'' +
-                ", filename='" + filename + '\'' +
                 ", mimetype='" + mimetype + '\'' +
+                ", size=" + size +
+                ", id='" + id + '\'' +
+                ", created='" + created + '\'' +
+                ", rsaKey='" + rsaKey + '\'' +
+                ", rsaCtr='" + rsaCtr + '\'' +
+                ", isShareFile=" + isShareFile +
+                '}';
+    }
+
+    public String toBriefString() {
+        return "File{" +
+                "filename='" + filename + '\'' +
+                ", bucket='" + bucket + '\'' +
+                ", index='" + index + '\'' +
                 ", size=" + size +
                 ", id='" + id + '\'' +
                 ", created='" + created + '\'' +

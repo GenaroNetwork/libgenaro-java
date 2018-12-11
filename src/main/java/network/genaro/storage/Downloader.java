@@ -1,6 +1,5 @@
 package network.genaro.storage;
 
-import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -55,7 +54,7 @@ interface DownloadProgress {
     default void onProgress(float progress) { }
 }
 
-public class Downloader {
+public class Downloader implements Runnable {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
     private String path;
@@ -342,5 +341,10 @@ public class Downloader {
         progress.onFinish(null);
 
         logger.info("Decrypt complete, download is success");
+    }
+
+    @Override
+    public void run() {
+        start();
     }
 }

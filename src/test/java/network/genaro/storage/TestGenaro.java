@@ -14,11 +14,12 @@ public class TestGenaro {
 
 //    private static String TestBridgeUrl = "http://118.31.61.119:8080";
 //        private static String TestBridgeUrl = "http://127.0.0.1:8080";
-    private static String TestBridgeUrl = "http://120.77.247.10:8080";
-
+//    private static String TestBridgeUrl = "http://120.77.247.10:8080";
+    private static String TestBridgeUrl = "http://47.100.33.60:8080";
 //        private static final String TestbucketId = "5bfcf4ea7991d267f4eb53b4";
 //    private static final String TestbucketId = "b5e9bd5fd6f571beee9b035f";
-    private static final String TestbucketId = "5ba341402e49103d8787e52d";
+//    private static final String TestbucketId = "5ba341402e49103d8787e52d";
+    private static final String TestbucketId = "5c0e5a8b312cfa12ae9f5bf3";
 
     public void testGetInfo() throws Exception {
         Genaro api = new Genaro(TestBridgeUrl);
@@ -97,7 +98,7 @@ public class TestGenaro {
             System.out.println("No files.");
         } else {
             for (File b : bs) {
-                System.out.println(b);
+                System.out.println(b.toBriefString());
             }
         }
     }
@@ -136,7 +137,7 @@ public class TestGenaro {
         Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        File file = api.getFileInfo(TestbucketId, "8bdbf74c8157254c2bc74cca");
+        File file = api.getFileInfo(TestbucketId, "5c0e6872a72fc61208285155");
 
         if(file == null) {
             System.out.println("Get file info failed.");
@@ -188,22 +189,24 @@ public class TestGenaro {
         }
         api.logIn(gw);
 
-        try {
 //            new Downloader(api, TestbucketId, "5c0dd2dbbbdd6f2d157dd059", "/Users/dingyi/Genaro/test/download/6.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0dd5b6bbdd6f2d157dd08c", "/Users/dingyi/Genaro/test/download/bbg.zip", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0dd800bbdd6f2d157dd0a8", "/Users/dingyi/Genaro/test/download/111.data", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadProgress() {
-            new Downloader(api, TestbucketId, "5c0dccd7bbdd6f2d157dcfff", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
-                @Override
-                public void onProgress(float progress) {
-                    System.out.printf("Download progress: %.1f%%\n", progress * 100);
-                }
-            }).start();
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            throw e;
-        }
+        Downloader downloader = new Downloader(api, TestbucketId, "5c0dccd7bbdd6f2d157dcfff", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
+            @Override
+            public void onProgress(float progress) {
+                System.out.printf("Download progress: %.1f%%\n", progress * 100);
+            }
+        });
+
+        Thread thread = new Thread(downloader);
+        thread.start();
+
+        Thread.sleep(5000);
+
+        thread.join();
     }
 
     public void testDownload100() throws Exception {
@@ -240,7 +243,7 @@ public class TestGenaro {
 
         try {
 //            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new UploadProgress() {
-            new Uploader(api, false, "/Users/dingyi/test/2097152.data", "2097152.data", TestbucketId, new UploadProgress() {
+            new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2097154.data", "19.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "r.zip", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "17.zip", TestbucketId, new UploadProgress() {
