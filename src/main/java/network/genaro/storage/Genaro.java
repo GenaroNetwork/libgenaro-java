@@ -347,8 +347,11 @@ public class Genaro {
         });
     }
 
-    public Bucket getBucket(final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
+    public Bucket getBucket(final Uploader uploader, final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Bucket> fu = getBucketFuture(bucketId);
+        if(uploader != null) {
+            uploader.setFutureGetBucket(fu);
+        }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
@@ -734,8 +737,11 @@ public class Genaro {
         });
     }
 
-    public boolean isFileExist(final String bucketId, final String encryptedFileName) throws InterruptedException, ExecutionException, TimeoutException {
+    public boolean isFileExist(final Uploader uploader, final String bucketId, final String encryptedFileName) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Boolean> fu = isFileExistFuture(bucketId, encryptedFileName);
+        if(uploader != null) {
+            uploader.setFutureIsFileExists(fu);
+        }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
@@ -775,8 +781,11 @@ public class Genaro {
         });
     }
 
-    public Frame requestNewFrame() throws InterruptedException, ExecutionException, TimeoutException {
+    public Frame requestNewFrame(final Uploader uploader) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Frame> fu = requestNewFrameFuture();
+        if(uploader != null) {
+            uploader.setFutureRequestNewFrame(fu);
+        }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 }

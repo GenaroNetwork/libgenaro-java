@@ -1,5 +1,8 @@
 package network.genaro.storage;
 
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
+
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -29,5 +32,20 @@ public class BasicUtil {
             try { f.complete(c.call()); } catch(Throwable t) { f.completeExceptionally(t); }
         }, executor);
         return f;
+    }
+
+    public static void cancelOkHttpCallWithTag(OkHttpClient client, Object tag) {
+        for(Call call : client.dispatcher().queuedCalls()) {
+            if(call.request().tag().equals(tag)) {
+                call.cancel();
+            }
+        }
+
+        for(Call call : client.dispatcher().runningCalls()) {
+            if(call.request().tag().equals(tag)) {
+                System.out.println("Cancel: " + tag);
+                call.cancel();
+            }
+        }
     }
 }

@@ -59,7 +59,7 @@ interface UploadProgress {
     default void onProgress(float progress) { }
 }
 
-public class Uploader {
+public class Uploader implements Runnable {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
     private String originPath;
@@ -98,16 +98,25 @@ public class Uploader {
     // increased uploaded bytes since last onProgress Call
     private AtomicLong deltaUploaded = new AtomicLong();
 
+    private CompletableFuture<Bucket> futureGetBucket;
+    private CompletableFuture<Boolean> futureIsFileExists;
+    private CompletableFuture<Frame> futureRequestNewFrame;
+    private CompletableFuture<Void> futureAllFromPrepareFrame;
+    private CompletableFuture<Void> futureCreateBucketEntry;
+
+    boolean isCanceled = false;
+
     private static Random random = new Random();
     private static long MAX_SHARD_SIZE = 4294967296L; // 4Gb
     private static long MIN_SHARD_SIZE = 2097152L; // 2Mb
     private static int SHARD_MULTIPLES_BACK = 4;
     private static int GENARO_SHARD_CHALLENGES = 4;
 
-    private final OkHttpClient.Builder client = new OkHttpClient.Builder()
+    private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+            .build();
 
     // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
@@ -123,6 +132,38 @@ public class Uploader {
         this.originFile = new File(filePath);
         this.bucketId = bucketId;
         this.progress = progress;
+    }
+
+    public CompletableFuture<Bucket> getFutureGetBucket() {
+        return futureGetBucket;
+    }
+
+    public void setFutureGetBucket(CompletableFuture<Bucket> futureGetBucket) {
+        this.futureGetBucket = futureGetBucket;
+    }
+
+    public CompletableFuture<Boolean> getFutureIsFileExists() {
+        return futureIsFileExists;
+    }
+
+    public void setFutureIsFileExists(CompletableFuture<Boolean> futureIsFileExists) {
+        this.futureIsFileExists = futureIsFileExists;
+    }
+
+    public CompletableFuture<Frame> getFutureRequestNewFrame() {
+        return futureRequestNewFrame;
+    }
+
+    public void setFutureRequestNewFrame(CompletableFuture<Frame> futureRequestNewFrame) {
+        this.futureRequestNewFrame = futureRequestNewFrame;
+    }
+
+    public CompletableFuture<Void> getFutureCreateBucketEntry() {
+        return futureCreateBucketEntry;
+    }
+
+    public void setFutureCreateBucketEntry(CompletableFuture<Void> futureCreateBucketEntry) {
+        this.futureCreateBucketEntry = futureCreateBucketEntry;
     }
 
     private static long shardSize(final int hops) {
@@ -158,13 +199,13 @@ public class Uploader {
         return determineShardSize(fileSize, ++accumulator);
     }
 
-    private static byte[] randomBuff(int len) {
+    private static byte[] randomBuff(final int len) {
         byte[] buff = new byte[len];
         random.nextBytes(buff);
         return buff;
     }
 
-    private String createTmpName(String encryptedFileName, String extension) {
+    private String createTmpName(final String encryptedFileName, final String extension) {
         String tmpFolder = System.getProperty("java.io.tmpdir");
         byte[] bytesEncoded;
         try {
@@ -176,7 +217,7 @@ public class Uploader {
         return String.format("%s/%s%s", tmpFolder, base16.toString(bytesEncoded).toLowerCase(), extension);
     }
 
-    private String getBucketEntryHmac(byte[] fileKey, List<ShardTracker> shards) throws NoSuchAlgorithmException, InvalidKeyException {
+    private String getBucketEntryHmac(final byte[] fileKey, final List<ShardTracker> shards) throws NoSuchAlgorithmException, InvalidKeyException {
         SecretKeySpec secretKeySpec = new SecretKeySpec(fileKey, "HmacSHA512");
         Mac mac = Mac.getInstance("HmacSHA512");
         mac.init(secretKeySpec);
@@ -225,7 +266,7 @@ public class Uploader {
         return true;
     }
 
-    private CompletableFuture<ShardTracker> prepareFrame(ShardTracker shard) {
+    private CompletableFuture<ShardTracker> prepareFrame(final ShardTracker shard) {
         return BasicUtil.supplyAsync(() -> {
             ShardMeta shardMeta = shard.getMeta();
             shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
@@ -332,7 +373,7 @@ public class Uploader {
         }, uploaderExecutor);
     }
 
-    private ShardTracker pushFrame(ShardTracker shard) {
+    private ShardTracker pushFrame(final ShardTracker shard) {
         //        if(shard.getPointer().getToken() == null) {
         //          logger.error("Token error");
         //          System.exit(1);
@@ -373,6 +414,7 @@ public class Uploader {
         }
         String pubKey = bridge.getPublicKeyHexString();
         Request request = new Request.Builder()
+                .tag("pushFrame")
                 .url(bridge.getBridgeUrl() + path)
                 .header("x-signature", signature)
                 .header("x-pubkey", pubKey)
@@ -380,7 +422,7 @@ public class Uploader {
                 .build();
 
         logger.info(String.format("Pushing frame for shard index %s - JSON body: %s", shard.getIndex(), jsonStrBody));
-        try (Response response = client.build().newCall(request).execute()) {
+        try (Response response = client.newCall(request).execute()) {
             String responseBody = response.body().string();
 
             logger.info(String.format("Push frame finished for shard index %s - JSON Response: %s", shard.getIndex(), responseBody));
@@ -402,7 +444,7 @@ public class Uploader {
         return shard;
     }
 
-    private ShardTracker pushShard(ShardTracker shard) {
+    private ShardTracker pushShard(final ShardTracker shard) {
         //                  // Reset shard index when using parity shards
 //                  req->shard_index = (index + 1 > state->total_data_shards) ? index - state->total_data_shards: index;
 //
@@ -463,12 +505,13 @@ public class Uploader {
         String url = String.format("http://%s:%s/shards/%s?token=%s", farmerAddress, farmerPort, metaHash, token);
 //        String url = String.format("http://192.168.50.206:9999/");
         Request request = new Request.Builder()
+                .tag("pushShard")
                 .url(url)
                 .header("x-storj-node-id", farmerNodeId)
                 .post(uploadRequestBody)
                 .build();
 
-        try (Response response = client.build().newCall(request).execute()) {
+        try (Response response = client.newCall(request).execute()) {
             int code = response.code();
 
             if (code == 200 || code == 201 || code == 304) {
@@ -491,71 +534,84 @@ public class Uploader {
         return shard;
     }
 
-    private void createBucketEntry(List<ShardTracker> shards) {
-        try {
-            hmacId = getBucketEntryHmac(fileKey, shards);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_GENERATE_HMAC_ERROR));
-        }
-
-        logger.info(String.format("[%s] Creating bucket entry... ", fileName));
-
-        String jsonStrBody;
-        if (!rs) {
-            jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}}",
-                    frameId, encryptedFileName, Hex.toHexString(index), hmacId);
-        } else {
-            // TODO: ReedSolomn is not completed.
-            jsonStrBody = "";
-            //                  if (state->rs) {
-            //                      struct json_object *erasure = json_object_new_object();
-            //                      json_object *erasure_type = json_object_new_string("reedsolomon");
-            //                      json_object_object_add(erasure, "type", erasure_type);
-            //                      json_object_object_add(body, "erasure", erasure);
-            //                  }
-        }
-
-        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-        RequestBody body = RequestBody.create(JSON, jsonStrBody);
-        String path = "/buckets/" + bucketId + "/files";
-
-        String signature;
-        try {
-            signature = bridge.signRequest("POST", path, jsonStrBody);
-        } catch (NoSuchAlgorithmException e) {
-            throw new GenaroRuntimeException(e.getMessage());
-        }
-
-        String pubKey = bridge.getPublicKeyHexString();
-        Request request = new Request.Builder()
-                .url(bridge.getBridgeUrl() + path)
-                .header("x-signature", signature)
-                .header("x-pubkey", pubKey)
-                .post(body)
-                .build();
-
-        logger.info(String.format("Create bucket entry - JSON body: %s", jsonStrBody));
-        try (Response response = client.build().newCall(request).execute()) {
-            ObjectMapper om = new ObjectMapper();
-            String responseBody = response.body().string();
-            JsonNode bodyNode = om.readTree(responseBody);
-
-            logger.info(String.format("Create bucket entry - JSON Response: %s", responseBody));
-
-            int code = response.code();
-
-            if (code != 200 && code != 201) {
-                String error = bodyNode.get("error").asText();
-                logger.error(error);
-                throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+    private CompletableFuture<Void> createBucketEntryFuture(final List<ShardTracker> shards) {
+        return BasicUtil.supplyAsync(() -> {
+            try {
+                hmacId = getBucketEntryHmac(fileKey, shards);
+            } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_GENERATE_HMAC_ERROR));
             }
 
-            logger.info("Successfully Added bucket entry");
+            logger.info(String.format("[%s] Creating bucket entry... ", fileName));
 
-            fileId = bodyNode.get("id").asText();
-        } catch (Exception e) {
-            throw new GenaroRuntimeException(e.getMessage());
+            String jsonStrBody;
+            if (!rs) {
+                jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}}",
+                        frameId, encryptedFileName, Hex.toHexString(index), hmacId);
+            } else {
+                // TODO: ReedSolomn is not completed.
+                jsonStrBody = "";
+                //                  if (state->rs) {
+                //                      struct json_object *erasure = json_object_new_object();
+                //                      json_object *erasure_type = json_object_new_string("reedsolomon");
+                //                      json_object_object_add(erasure, "type", erasure_type);
+                //                      json_object_object_add(body, "erasure", erasure);
+                //                  }
+            }
+
+            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+            RequestBody body = RequestBody.create(JSON, jsonStrBody);
+            String path = "/buckets/" + bucketId + "/files";
+
+            String signature;
+            try {
+                signature = bridge.signRequest("POST", path, jsonStrBody);
+            } catch (NoSuchAlgorithmException e) {
+                throw new GenaroRuntimeException(e.getMessage());
+            }
+
+            String pubKey = bridge.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .tag("createBucketEntry")
+                    .url(bridge.getBridgeUrl() + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .post(body)
+                    .build();
+
+            logger.info(String.format("Create bucket entry - JSON body: %s", jsonStrBody));
+            try (Response response = client.newCall(request).execute()) {
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+                JsonNode bodyNode = om.readTree(responseBody);
+
+                logger.info(String.format("Create bucket entry - JSON Response: %s", responseBody));
+
+                int code = response.code();
+
+                if (code != 200 && code != 201) {
+                    String error = bodyNode.get("error").asText();
+                    logger.error(error);
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
+
+                logger.info("Successfully Added bucket entry");
+
+                fileId = bodyNode.get("id").asText();
+            } catch (Exception e) {
+                throw new GenaroRuntimeException(e.getMessage());
+            }
+
+            return null;
+        });
+    }
+
+    private void createBucketEntry(final Uploader uploader, final List<ShardTracker> shards) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<Void> fu = createBucketEntryFuture(shards);
+        if(uploader != null) {
+            uploader.setFutureCreateBucketEntry(fu);
         }
+        fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     public void start() {
@@ -582,10 +638,19 @@ public class Uploader {
 
         // verify bucket id
         try {
-            bridge.getBucket(bucketId);
+            bridge.getBucket(this, bucketId);
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
         } catch (Exception e) {
 //            errorStatus = GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR;
             progress.onFinish(e.getCause().getMessage(), null);
+            return;
+        }
+
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
             return;
         }
 
@@ -599,11 +664,21 @@ public class Uploader {
 
         boolean exist;
         try {
-            exist = bridge.isFileExist(bucketId, encryptedFileName);
+            exist = bridge.isFileExist(this, bucketId, encryptedFileName);
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getCause().getMessage(), null);
             return;
         }
+
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
+        }
+
         if (exist) {
             progress.onFinish(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS), null);
             return;
@@ -618,11 +693,21 @@ public class Uploader {
         logger.info("Request frame id");
         Frame frame;
         try {
-            frame = bridge.requestNewFrame();
+            frame = bridge.requestNewFrame(this);
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getCause().getMessage(), null);
             return;
         }
+
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
+        }
+
         frameId = frame.getId();
 
         logger.info(String.format("Request frame id success, frame id: %s", frameId));
@@ -648,12 +733,21 @@ public class Uploader {
                 .map(future -> future.thenApply(this::pushShard))
                 .toArray(CompletableFuture[]::new);
 
-        CompletableFuture<Void> futureAll = CompletableFuture.allOf(upFutures);
+        futureAllFromPrepareFrame = CompletableFuture.allOf(upFutures);
 
         try {
-            futureAll.get();
+            futureAllFromPrepareFrame.get();
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getCause().getMessage(), null);
+            return;
+        }
+
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
             return;
         }
 
@@ -664,7 +758,10 @@ public class Uploader {
         }
 
         try {
-            createBucketEntry(shards);
+            createBucketEntry(this, shards);
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getMessage(), null);
             return;
@@ -675,5 +772,54 @@ public class Uploader {
 
         // TODO: send exchange report
         //
+    }
+
+    public void cancel() {
+        isCanceled = true;
+
+        // cancel the okhttp3 transfer, and the cancellation of getBucket is unnecessarily
+        BasicUtil.cancelOkHttpCallWithTag(client, "pushFrame");
+        BasicUtil.cancelOkHttpCallWithTag(client, "pushShard");
+        BasicUtil.cancelOkHttpCallWithTag(client, "createBucketEntry");
+
+        // cancel getBucket
+        if(futureGetBucket != null && !futureGetBucket.isDone()) {
+            // will cause a CancellationException, and will be caught on bridge.getBucket
+            futureGetBucket.cancel(true);
+            return;
+        }
+
+        // cancel isFileExists
+        if(futureIsFileExists != null && !futureIsFileExists.isDone()) {
+            // will cause a CancellationException, and will be caught on bridge.isFileExists
+            futureIsFileExists.cancel(true);
+            return;
+        }
+
+        // cancel requestNewFrame
+        if(futureRequestNewFrame != null && !futureRequestNewFrame.isDone()) {
+            // will cause a CancellationException, and will be caught on bridge.requestNewFrame
+            futureRequestNewFrame.cancel(true);
+            return;
+        }
+
+        // TODO: cancel prepareFrame, pushFrame and pushShard, but actually, it can only cancel pushShard.
+        if(futureAllFromPrepareFrame != null && !futureAllFromPrepareFrame.isDone()) {
+            // will cause a CancellationException, and will be caught on futureAllFromPrepareFrame.get()
+            futureAllFromPrepareFrame.cancel(true);
+            return;
+        }
+
+        // cancel createBucketEntry
+        if(futureCreateBucketEntry != null && !futureCreateBucketEntry.isDone()) {
+            // will cause a CancellationException, and will be caught on this.createBucketEntry
+            futureCreateBucketEntry.cancel(true);
+            return;
+        }
+    }
+
+    @Override
+    public void run() {
+        start();
     }
 }

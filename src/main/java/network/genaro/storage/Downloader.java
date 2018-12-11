@@ -77,10 +77,11 @@ public class Downloader implements Runnable {
 
     private boolean isCanceled = false;
 
-    private final OkHttpClient.Builder client = new OkHttpClient.Builder()
+    private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+            .build();
 
     // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
     // private static final ExecutorService downloaderExecutor = Executors.newCachedThreadPool();
@@ -104,9 +105,9 @@ public class Downloader implements Runnable {
         this.futureGetPointers = futureGetPointers;
     }
 
-    class CallbackFuture extends CompletableFuture<Response> implements Callback {
+    class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
 
-        public CallbackFuture(Pointer pointer) {
+        public RequestShardCallbackFuture(Pointer pointer) {
             this.pointer = pointer;
         }
 
@@ -196,6 +197,7 @@ public class Downloader implements Runnable {
             Farmer farmer = pointer.getFarmer();
             String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
             Request request = new Request.Builder()
+                                         .tag("requestShard")
                                          .header("x-storj-node-id", farmer.getNodeID())
                                          .url(url)
                                          .get()
@@ -203,8 +205,8 @@ public class Downloader implements Runnable {
 
             logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
-            CallbackFuture future = new CallbackFuture(pointer);
-            client.build().newCall(request).enqueue(future);
+            RequestShardCallbackFuture future = new RequestShardCallbackFuture(pointer);
+            client.newCall(request).enqueue(future);
             future.get();
 
             return null;
@@ -316,6 +318,7 @@ public class Downloader implements Runnable {
             progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         } catch (Exception e) {
+            // cause if is CancellationException, it doesn't work
             progress.onFinish(e.getCause().getMessage());
             return;
         }
@@ -396,6 +399,9 @@ public class Downloader implements Runnable {
 
     public void cancel() {
         isCanceled = true;
+
+        // cancel the okhttp3 transfer
+        BasicUtil.cancelOkHttpCallWithTag(client, "requestShard");
 
         // cancel getFileInfo
         if(futureGetFileInfo != null && !futureGetFileInfo.isDone()) {

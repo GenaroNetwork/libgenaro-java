@@ -76,7 +76,7 @@ public class TestGenaro {
 //        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        Bucket b = api.getBucket(TestbucketId);
+        Bucket b = api.getBucket(null, TestbucketId);
 
         if(b == null) {
             System.out.println("Get Bucket failed.");
@@ -112,7 +112,7 @@ public class TestGenaro {
         String fileName = "2049k.data";
         String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), gw.getPrivateKey(), Hex.decode(TestbucketId));
 
-        boolean exist = api.isFileExist(TestbucketId, encryptedFileName);
+        boolean exist = api.isFileExist(null, TestbucketId, encryptedFileName);
         if(exist) {
             System.out.println("File exists.");
         } else {
@@ -169,7 +169,7 @@ public class TestGenaro {
         Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        Frame frame = api.requestNewFrame();
+        Frame frame = api.requestNewFrame(null);
 
         if(frame == null) {
             System.out.println("Error!");
@@ -243,25 +243,24 @@ public class TestGenaro {
 //        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
         api.logIn(ww);
 
-        try {
 //            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new UploadProgress() {
-            new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadProgress() {
+//        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2097154.data", "19.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "r.zip", TestbucketId, new UploadProgress() {
-//            new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "17.zip", TestbucketId, new UploadProgress() {
+        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "18.zip", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "79.txt", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2m.data", "2m.data", TestbucketId, new UploadProgress() {
-                @Override
-                public void onProgress(float progress) {
-                    System.out.printf("Upload progress: %.1f%%\n", progress * 100);
-                }
+            @Override
+            public void onProgress(float progress) {
+//                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+            }
 
-                @Override
-                public void onFinish(String error, String fileId) {
-                    if(error != null) {
-                        System.out.println("Upload failed: " + error);
-                    } else {
-                        System.out.println("Upload finished, fileId: " + fileId);
+            @Override
+            public void onFinish(String error, String fileId) {
+                if(error != null) {
+                    System.out.println("Upload failed: " + error);
+                } else {
+                    System.out.println("Upload finished, fileId: " + fileId);
 //                        boolean success = false;
 //                        try {
 //                            success = api.deleteFile(TestbucketId, fileId);
@@ -274,13 +273,18 @@ public class TestGenaro {
 //                        } else {
 //                            System.out.println("Delete failed.");
 //                        }
-                    }
                 }
-            }).start();
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            throw e;
-        }
+            }
+        });
+
+        Thread thread = new Thread(uploader);
+        thread.start();
+
+        Thread.sleep(4500);
+        uploader.cancel();
+
+        thread.join();
+        while(true);
     }
 
     public void testUpload100() throws Exception {
