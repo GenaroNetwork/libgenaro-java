@@ -6,6 +6,7 @@ import okhttp3.Response;
 import okhttp3.Callback;
 import okhttp3.Call;
 
+import okio.Timeout;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Hex;
@@ -217,11 +218,15 @@ public class Downloader implements Runnable {
         File file;
         try {
             file = bridge.getFileInfo(this, bucketId, fileId);
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
-            return;
         } catch (Exception e) {
-            progress.onFinish(e.getCause().getMessage());
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else if(e instanceof TimeoutException) {
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+            } else {
+                progress.onFinish(e.getMessage());
+            }
             return;
         }
 
@@ -235,11 +240,15 @@ public class Downloader implements Runnable {
         List<Pointer> pointers;
         try {
             pointers = bridge.getPointers(this, bucketId, fileId);
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
-            return;
         } catch (Exception e) {
-            progress.onFinish(e.getCause().getMessage());
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else if(e instanceof TimeoutException) {
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+            } else {
+                progress.onFinish(e.getMessage());
+            }
             return;
         }
 
@@ -265,6 +274,7 @@ public class Downloader implements Runnable {
         }
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
+            stop();
             progress.onFinish(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
             return;
         }
@@ -292,6 +302,7 @@ public class Downloader implements Runnable {
             downFileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
         } catch (IOException e) {
+            stop();
             progress.onFinish("Create temp file error");
             return;
         }
@@ -311,12 +322,13 @@ public class Downloader implements Runnable {
 
         try {
             futureAllRequestShard.get();
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
-            return;
         } catch (Exception e) {
-            // cause if is CancellationException, it doesn't work
-            progress.onFinish(e.getCause().getMessage());
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else {
+                progress.onFinish(e.getMessage());
+            }
             return;
         }
 
@@ -333,6 +345,7 @@ public class Downloader implements Runnable {
         try {
             downFileChannel.truncate(fileSize);
         } catch (IOException e) {
+            stop();
             progress.onFinish(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
             return;
         }
@@ -346,6 +359,7 @@ public class Downloader implements Runnable {
         try {
             fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
         } catch (Exception e) {
+            stop();
             progress.onFinish("Generate file key error");
             return;
         }
@@ -359,6 +373,7 @@ public class Downloader implements Runnable {
             cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
             cipher.init(DECRYPT_MODE, keySpec, iv);
         } catch (Exception e) {
+            stop();
             progress.onFinish("Init decryption context error");
             return;
         }
@@ -374,10 +389,12 @@ public class Downloader implements Runnable {
             try {
                 Files.copy(cypherIn, Paths.get(path));
             } catch (IOException e) {
+                stop();
                 progress.onFinish("Create file error");
                 return;
             }
         } catch (IOException e) {
+            stop();
             progress.onFinish("File decryption error");
             return;
         }
@@ -385,6 +402,7 @@ public class Downloader implements Runnable {
         try {
             downFileChannel.close();
         } catch (Exception e) {
+            // do not call progress.onFinish here
             logger.warn("File close exception");
         }
 
@@ -394,9 +412,7 @@ public class Downloader implements Runnable {
         progress.onFinish(null);
     }
 
-    public void cancel() {
-        isCanceled = true;
-
+    public void stop() {
         // cancel getFileInfo
         if(futureGetFileInfo != null && !futureGetFileInfo.isDone()) {
             // cancel the okhttp3 transfer
@@ -423,6 +439,11 @@ public class Downloader implements Runnable {
             futureAllRequestShard.cancel(true);
             return;
         }
+    }
+
+    public void cancel() {
+        isCanceled = true;
+        stop();
     }
 
     @Override

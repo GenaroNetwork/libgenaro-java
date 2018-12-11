@@ -658,7 +658,9 @@ public class Genaro {
         if(downloader != null) {
             downloader.setFutureGetPointers(fu);
         }
-        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+
+        // wait it double seconds
+        return fu.get(2 * GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     private CompletableFuture<List<Pointer>> getPointersRawFuture(final String bucketId, final String fileId, final int limit, final int skipCount) {

@@ -280,7 +280,7 @@ public class TestGenaro {
         Thread thread = new Thread(uploader);
         thread.start();
 
-        Thread.sleep(4500);
+        Thread.sleep(6000);
         uploader.cancel();
 
         thread.join();

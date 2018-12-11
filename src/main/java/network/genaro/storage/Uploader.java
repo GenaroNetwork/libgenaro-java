@@ -636,12 +636,15 @@ public class Uploader implements Runnable {
         // verify bucket id
         try {
             bridge.getBucket(this, bucketId);
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
-            return;
         } catch (Exception e) {
-//            errorStatus = GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR;
-            progress.onFinish(e.getCause().getMessage(), null);
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            } else if(e instanceof TimeoutException) {
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else {
+                progress.onFinish(e.getMessage(), null);
+            }
             return;
         }
 
@@ -655,6 +658,7 @@ public class Uploader implements Runnable {
         try {
             encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
         } catch (Exception e) {
+            stop();
             progress.onFinish("Encrypt error", null);
             return;
         }
@@ -662,11 +666,15 @@ public class Uploader implements Runnable {
         boolean exist;
         try {
             exist = bridge.isFileExist(this, bucketId, encryptedFileName);
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
-            return;
         } catch (Exception e) {
-            progress.onFinish(e.getCause().getMessage(), null);
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            } else if(e instanceof TimeoutException) {
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else {
+                progress.onFinish(e.getMessage(), null);
+            }
             return;
         }
 
@@ -677,11 +685,13 @@ public class Uploader implements Runnable {
         }
 
         if (exist) {
+            stop();
             progress.onFinish(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS), null);
             return;
         }
 
         if(!createEncryptedFile()) {
+            stop();
             progress.onFinish(GenaroStrError(GENARO_FILE_ENCRYPTION_ERROR), null);
             return;
         }
@@ -691,11 +701,15 @@ public class Uploader implements Runnable {
         Frame frame;
         try {
             frame = bridge.requestNewFrame(this);
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
-            return;
         } catch (Exception e) {
-            progress.onFinish(e.getCause().getMessage(), null);
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            } else if(e instanceof TimeoutException) {
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else {
+                progress.onFinish(e.getMessage(), null);
+            }
             return;
         }
 
@@ -734,11 +748,13 @@ public class Uploader implements Runnable {
 
         try {
             futureAllFromPrepareFrame.get();
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
-            return;
         } catch (Exception e) {
-            progress.onFinish(e.getCause().getMessage(), null);
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            } else {
+                progress.onFinish(e.getMessage(), null);
+            }
             return;
         }
 
@@ -750,17 +766,22 @@ public class Uploader implements Runnable {
 
         if (uploadedBytes.get() != totalBytes) {
             logger.error("uploadedBytes: " + uploadedBytes + ", totalBytes: " + totalBytes);
+            stop();
             progress.onFinish(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR), null);
             return;
         }
 
         try {
             createBucketEntry(this, shards);
-        } catch (CancellationException e) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
-            return;
         } catch (Exception e) {
-            progress.onFinish(e.getMessage(), null);
+            stop();
+            if(e instanceof CancellationException) {
+                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            } else if(e instanceof TimeoutException) {
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else {
+                progress.onFinish(e.getMessage(), null);
+            }
             return;
         }
 
@@ -771,9 +792,7 @@ public class Uploader implements Runnable {
         //
     }
 
-    public void cancel() {
-        isCanceled = true;
-
+    public void stop() {
         // cancel getBucket
         if(futureGetBucket != null && !futureGetBucket.isDone()) {
             BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getBucket");
@@ -814,6 +833,11 @@ public class Uploader implements Runnable {
             futureCreateBucketEntry.cancel(true);
             return;
         }
+    }
+
+    public void cancel() {
+        isCanceled = true;
+        stop();
     }
 
     @Override
