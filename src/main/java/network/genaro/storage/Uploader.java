@@ -112,11 +112,7 @@ public class Uploader implements Runnable {
     private static int SHARD_MULTIPLES_BACK = 4;
     private static int GENARO_SHARD_CHALLENGES = 4;
 
-    private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
-            .build();
+    private final OkHttpClient okHttpClient;
 
     // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
@@ -126,6 +122,7 @@ public class Uploader implements Runnable {
 
     public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final UploadProgress progress) {
         this.bridge = bridge;
+        this.okHttpClient = bridge.getOkHttplient();
         this.rs = rs;
         this.originPath = filePath;
         this.fileName = fileName;
@@ -422,7 +419,7 @@ public class Uploader implements Runnable {
                 .build();
 
         logger.info(String.format("Pushing frame for shard index %s - JSON body: %s", shard.getIndex(), jsonStrBody));
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = okHttpClient.newCall(request).execute()) {
             String responseBody = response.body().string();
 
             logger.info(String.format("Push frame finished for shard index %s - JSON Response: %s", shard.getIndex(), responseBody));
@@ -511,7 +508,7 @@ public class Uploader implements Runnable {
                 .post(uploadRequestBody)
                 .build();
 
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = okHttpClient.newCall(request).execute()) {
             int code = response.code();
 
             if (code == 200 || code == 201 || code == 304) {
@@ -580,7 +577,7 @@ public class Uploader implements Runnable {
                     .build();
 
             logger.info(String.format("Create bucket entry - JSON body: %s", jsonStrBody));
-            try (Response response = client.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
                 JsonNode bodyNode = om.readTree(responseBody);
@@ -777,13 +774,9 @@ public class Uploader implements Runnable {
     public void cancel() {
         isCanceled = true;
 
-        // cancel the okhttp3 transfer, and the cancellation of getBucket is unnecessarily
-        BasicUtil.cancelOkHttpCallWithTag(client, "pushFrame");
-        BasicUtil.cancelOkHttpCallWithTag(client, "pushShard");
-        BasicUtil.cancelOkHttpCallWithTag(client, "createBucketEntry");
-
         // cancel getBucket
         if(futureGetBucket != null && !futureGetBucket.isDone()) {
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getBucket");
             // will cause a CancellationException, and will be caught on bridge.getBucket
             futureGetBucket.cancel(true);
             return;
@@ -791,6 +784,7 @@ public class Uploader implements Runnable {
 
         // cancel isFileExists
         if(futureIsFileExists != null && !futureIsFileExists.isDone()) {
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "isFileExist");
             // will cause a CancellationException, and will be caught on bridge.isFileExists
             futureIsFileExists.cancel(true);
             return;
@@ -798,6 +792,7 @@ public class Uploader implements Runnable {
 
         // cancel requestNewFrame
         if(futureRequestNewFrame != null && !futureRequestNewFrame.isDone()) {
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestNewFrame");
             // will cause a CancellationException, and will be caught on bridge.requestNewFrame
             futureRequestNewFrame.cancel(true);
             return;
@@ -805,6 +800,8 @@ public class Uploader implements Runnable {
 
         // TODO: cancel prepareFrame, pushFrame and pushShard, but actually, it can only cancel pushShard.
         if(futureAllFromPrepareFrame != null && !futureAllFromPrepareFrame.isDone()) {
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame");
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushShard");
             // will cause a CancellationException, and will be caught on futureAllFromPrepareFrame.get()
             futureAllFromPrepareFrame.cancel(true);
             return;
@@ -812,6 +809,7 @@ public class Uploader implements Runnable {
 
         // cancel createBucketEntry
         if(futureCreateBucketEntry != null && !futureCreateBucketEntry.isDone()) {
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "createBucketEntry");
             // will cause a CancellationException, and will be caught on this.createBucketEntry
             futureCreateBucketEntry.cancel(true);
             return;

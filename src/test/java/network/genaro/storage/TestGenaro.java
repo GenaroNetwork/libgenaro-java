@@ -137,7 +137,7 @@ public class TestGenaro {
         Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
-        File file = api.getFileInfo(TestbucketId, "5c0e6872a72fc61208285155");
+        File file = api.getFileInfo(null, TestbucketId, "5c0e6872a72fc61208285155");
 
         if(file == null) {
             System.out.println("Get file info failed.");

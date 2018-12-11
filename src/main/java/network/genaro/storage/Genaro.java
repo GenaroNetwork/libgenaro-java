@@ -164,10 +164,11 @@ class ShardTracker {
 public class Genaro {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
-    private final OkHttpClient.Builder client = new OkHttpClient.Builder()
+    private final OkHttpClient okHttplient = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+            .build();
 
     private String bridgeUrl = "http://118.31.61.119:8080";
     private GenaroWallet wallet;
@@ -185,6 +186,10 @@ public class Genaro {
 
     public void setBridgeUrl(String bridgeUrl) {
         this.bridgeUrl = bridgeUrl;
+    }
+
+    public OkHttpClient getOkHttplient() {
+        return okHttplient;
     }
 
     public static String GenaroStrError(int error_code)
@@ -289,7 +294,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 String responseBody = response.body().string();
 
                 if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
@@ -323,13 +328,14 @@ public class Genaro {
             String signature = signRequest("GET", "/buckets/" + bucketId, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
+                    .tag("getBucket")
                     .url(bridgeUrl + "/buckets/" + bucketId)
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -367,7 +373,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -410,7 +416,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -454,7 +460,7 @@ public class Genaro {
                     .post(body)
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -480,13 +486,14 @@ public class Genaro {
             String signature = signRequest("GET", path, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
+                    .tag("getFileInfo")
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -527,11 +534,6 @@ public class Genaro {
         });
     }
 
-    public File getFileInfo(final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<File> fu = getFileInfoFuture(bucketId, fileId);
-        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
-    }
-
     public File getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<File> fu = getFileInfoFuture(bucketId, fileId);
         if(downloader != null) {
@@ -555,7 +557,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -602,7 +604,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -668,13 +670,14 @@ public class Genaro {
             String signature = signRequest("GET", url, queryArgs);
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
+                    .tag("getPointersRaw")
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -715,13 +718,14 @@ public class Genaro {
             String signature = signRequest("GET", path, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
+                    .tag("isFileExist")
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -755,13 +759,14 @@ public class Genaro {
             String signature = signRequest("POST", "/frames", jsonStrBody);
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
+                    .tag("requestNewFrame")
                     .url(bridgeUrl + "/frames")
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
                     .post(body)
                     .build();
 
-            try (Response response = client.build().newCall(request).execute()) {
+            try (Response response = okHttplient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 

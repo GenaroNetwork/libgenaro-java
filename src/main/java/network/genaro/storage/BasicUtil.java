@@ -35,15 +35,14 @@ public class BasicUtil {
     }
 
     public static void cancelOkHttpCallWithTag(OkHttpClient client, Object tag) {
-        for(Call call : client.dispatcher().queuedCalls()) {
+        for(Call call: client.dispatcher().queuedCalls()) {
             if(call.request().tag().equals(tag)) {
                 call.cancel();
             }
         }
 
-        for(Call call : client.dispatcher().runningCalls()) {
+        for(Call call: client.dispatcher().runningCalls()) {
             if(call.request().tag().equals(tag)) {
-                System.out.println("Cancel: " + tag);
                 call.cancel();
             }
         }

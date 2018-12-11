@@ -77,17 +77,27 @@ public class Downloader implements Runnable {
 
     private boolean isCanceled = false;
 
-    private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
-            .build();
+    private final OkHttpClient okHttpClient;
 
     // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
     // private static final ExecutorService downloaderExecutor = Executors.newCachedThreadPool();
 
     // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
     private static final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
+        this.bridge = bridge;
+        this.okHttpClient = bridge.getOkHttplient();
+        this.fileId = fileId;
+        this.bucketId = bucketId;
+        this.path = path;
+        this.tempPath = path + ".genarotemp";
+        this.progress = progress;
+    }
+
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path) {
+        this(bridge, bucketId, fileId, path, new DownloadProgress() {});
+    }
 
     public CompletableFuture<File> getFutureGetFileInfo() {
         return futureGetFileInfo;
@@ -139,8 +149,6 @@ public class Downloader implements Runnable {
                 return;
             }
 
-            logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
-
             byte[] buff = new byte[SEGMENT_SIZE];
             int delta;
 
@@ -165,6 +173,8 @@ public class Downloader implements Runnable {
                     super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR)));
                     return;
                 }
+
+                logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
             } catch (Exception e) {
                 super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR)));
                 return;
@@ -177,19 +187,6 @@ public class Downloader implements Runnable {
         public void onFailure(Call call, IOException e) {
             super.completeExceptionally(e);
         }
-    }
-
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
-        this.bridge = bridge;
-        this.fileId = fileId;
-        this.bucketId = bucketId;
-        this.path = path;
-        this.tempPath = path + ".genarotemp";
-        this.progress = progress;
-    }
-
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path) {
-        this(bridge, bucketId, fileId, path, new DownloadProgress() {});
     }
 
     private CompletableFuture<Void> requestShardFuture(final Pointer pointer) {
@@ -206,7 +203,7 @@ public class Downloader implements Runnable {
             logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
             RequestShardCallbackFuture future = new RequestShardCallbackFuture(pointer);
-            client.newCall(request).enqueue(future);
+            okHttpClient.newCall(request).enqueue(future);
             future.get();
 
             return null;
@@ -400,11 +397,10 @@ public class Downloader implements Runnable {
     public void cancel() {
         isCanceled = true;
 
-        // cancel the okhttp3 transfer
-        BasicUtil.cancelOkHttpCallWithTag(client, "requestShard");
-
         // cancel getFileInfo
         if(futureGetFileInfo != null && !futureGetFileInfo.isDone()) {
+            // cancel the okhttp3 transfer
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getFileInfo");
             // will cause a CancellationException, and will be caught on bridge.getFileInfo
             futureGetFileInfo.cancel(true);
             return;
@@ -412,6 +408,8 @@ public class Downloader implements Runnable {
 
         // cancel getPointers
         if(futureGetPointers != null && !futureGetPointers.isDone()) {
+            // cancel the okhttp3 transfer
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getPointersRaw");
             // will cause a CancellationException, and will be caught on bridge.getPointers
             futureGetPointers.cancel(true);
             return;
@@ -419,6 +417,8 @@ public class Downloader implements Runnable {
 
         // cancel requestShard
         if(futureAllRequestShard != null && !futureAllRequestShard.isDone()) {
+            // cancel the okhttp3 transfer
+            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestShard");
             // will cause a CancellationException, and will be caught on futureAllRequestShard.get
             futureAllRequestShard.cancel(true);
             return;
