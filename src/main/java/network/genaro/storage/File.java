@@ -152,10 +152,10 @@ public class File {
     public String toBriefString() {
         return "File{" +
                 "filename='" + filename + '\'' +
+                ", id='" + id + '\'' +
+                ", size=" + size +
                 ", bucket='" + bucket + '\'' +
                 ", index='" + index + '\'' +
-                ", size=" + size +
-                ", id='" + id + '\'' +
                 ", created='" + created + '\'' +
                 ", rsaKey='" + rsaKey + '\'' +
                 ", rsaCtr='" + rsaCtr + '\'' +

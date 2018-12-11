@@ -26,10 +26,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static network.genaro.storage.Parameters.*;
@@ -72,7 +69,13 @@ public class Downloader implements Runnable {
 
     private long shardSize;
 
-    FileChannel downFileChannel;
+    private FileChannel downFileChannel;
+
+    private CompletableFuture<File> futureGetFileInfo;
+    private CompletableFuture<List<Pointer>> futureGetPointers;
+    private CompletableFuture<Void> futureAllRequestShard;
+
+    private boolean isCanceled = false;
 
     private final OkHttpClient.Builder client = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
@@ -84,6 +87,22 @@ public class Downloader implements Runnable {
 
     // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
     private static final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+
+    public CompletableFuture<File> getFutureGetFileInfo() {
+        return futureGetFileInfo;
+    }
+
+    public void setFutureGetFileInfo(CompletableFuture<File> futureGetFileInfo) {
+        this.futureGetFileInfo = futureGetFileInfo;
+    }
+
+    public CompletableFuture<List<Pointer>> getFutureGetPointers() {
+        return futureGetPointers;
+    }
+
+    public void setFutureGetPointers(CompletableFuture<List<Pointer>> futureGetPointers) {
+        this.futureGetPointers = futureGetPointers;
+    }
 
     class CallbackFuture extends CompletableFuture<Response> implements Callback {
 
@@ -172,7 +191,7 @@ public class Downloader implements Runnable {
         this(bridge, bucketId, fileId, path, new DownloadProgress() {});
     }
 
-    private CompletableFuture<Void> requestShard(final Pointer pointer) {
+    private CompletableFuture<Void> requestShardFuture(final Pointer pointer) {
         return BasicUtil.supplyAsync(() -> {
             Farmer farmer = pointer.getFarmer();
             String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
@@ -198,24 +217,42 @@ public class Downloader implements Runnable {
         // request info
         File file;
         try {
-            file = bridge.getFileInfo(bucketId, fileId);
+            file = bridge.getFileInfo(this, bucketId, fileId);
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getCause().getMessage());
+            return;
+        }
+
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
         // request pointers
         List<Pointer> pointers;
         try {
-            pointers = bridge.getPointers(bucketId, fileId);
+            pointers = bridge.getPointers(this, bucketId, fileId);
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getCause().getMessage());
             return;
         }
 
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            return;
+        }
+
         boolean hasMissingShard = pointers.stream().anyMatch(pointer -> pointer.isMissing());
 
-//         TODO: isRs() is not the
+        // TODO: isRs() is not the
 //        boolean canRecoverShards = file.isRs();
         boolean canRecoverShards = false;
 
@@ -223,9 +260,9 @@ public class Downloader implements Runnable {
             int missingPointers = (int) pointers.stream().filter(pointer -> pointer.isMissing()).count();
 
             // TODO:
-//        if(missingPointers <= total_parity_pointers) {
-//            canRecoverShards = true;
-//        }
+//            if(missingPointers <= total_parity_pointers) {
+//                canRecoverShards = true;
+//            }
         }
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
@@ -261,29 +298,36 @@ public class Downloader implements Runnable {
         }
 
         // downloading
-        CompletableFuture[] downFutures = pointers
+        CompletableFuture<Void>[] downFutures = pointers
             .stream()
             // TODO: not only download none parity shards
 //            .filter(pointer -> !pointer.isParity())
             .map(pointer -> {
-                CompletableFuture<Void> fu = requestShard(pointer);
+                CompletableFuture<Void> fu = requestShardFuture(pointer);
                 return fu;
             })
             .toArray(CompletableFuture[]::new);
 
-        CompletableFuture<Void> futureAll = CompletableFuture.allOf(downFutures);
+        futureAllRequestShard = CompletableFuture.allOf(downFutures);
 
         try {
-            futureAll.get();
+            futureAllRequestShard.get();
+        } catch (CancellationException e) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            return;
         } catch (Exception e) {
             progress.onFinish(e.getCause().getMessage());
             return;
         }
 
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            return;
+        }
+
         if(downloadedBytes.get() != totalBytes) {
-            logger.warn("downloadedBytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
-//            progress.onFinish(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
-//            return;
+            logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
         }
 
         try {
@@ -319,6 +363,12 @@ public class Downloader implements Runnable {
             return;
         }
 
+        // check if cancel() is called
+        if(isCanceled) {
+            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            return;
+        }
+
         try (InputStream in = Channels.newInputStream(downFileChannel);
              InputStream cypherIn = new CipherInputStream(in, cipher)) {
             try {
@@ -338,9 +388,35 @@ public class Downloader implements Runnable {
             logger.warn("File close exception");
         }
 
-        progress.onFinish(null);
-
         logger.info("Decrypt complete, download is success");
+
+        // download success
+        progress.onFinish(null);
+    }
+
+    public void cancel() {
+        isCanceled = true;
+
+        // cancel getFileInfo
+        if(futureGetFileInfo != null && !futureGetFileInfo.isDone()) {
+            // will cause a CancellationException, and will be caught on bridge.getFileInfo
+            futureGetFileInfo.cancel(true);
+            return;
+        }
+
+        // cancel getPointers
+        if(futureGetPointers != null && !futureGetPointers.isDone()) {
+            // will cause a CancellationException, and will be caught on bridge.getPointers
+            futureGetPointers.cancel(true);
+            return;
+        }
+
+        // cancel requestShard
+        if(futureAllRequestShard != null && !futureAllRequestShard.isDone()) {
+            // will cause a CancellationException, and will be caught on futureAllRequestShard.get
+            futureAllRequestShard.cancel(true);
+            return;
+        }
     }
 
     @Override

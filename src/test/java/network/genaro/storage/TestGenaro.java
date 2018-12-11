@@ -14,12 +14,12 @@ public class TestGenaro {
 
 //    private static String TestBridgeUrl = "http://118.31.61.119:8080";
 //        private static String TestBridgeUrl = "http://127.0.0.1:8080";
-//    private static String TestBridgeUrl = "http://120.77.247.10:8080";
-    private static String TestBridgeUrl = "http://47.100.33.60:8080";
+    private static String TestBridgeUrl = "http://120.77.247.10:8080";
+//    private static String TestBridgeUrl = "http://47.100.33.60:8080";
 //        private static final String TestbucketId = "5bfcf4ea7991d267f4eb53b4";
 //    private static final String TestbucketId = "b5e9bd5fd6f571beee9b035f";
-//    private static final String TestbucketId = "5ba341402e49103d8787e52d";
-    private static final String TestbucketId = "5c0e5a8b312cfa12ae9f5bf3";
+    private static final String TestbucketId = "5ba341402e49103d8787e52d";
+//    private static final String TestbucketId = "5c0e5a8b312cfa12ae9f5bf3";
 
     public void testGetInfo() throws Exception {
         Genaro api = new Genaro(TestBridgeUrl);
@@ -152,7 +152,7 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         api.logIn(gw);
 
-        List<Pointer> psa = api.getPointers(TestbucketId, "f40da862c00494bb0430e012");
+        List<Pointer> psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
 
         if(psa == null) {
             System.out.println("Error!");
@@ -194,7 +194,7 @@ public class TestGenaro {
 //            new Downloader(api, TestbucketId, "5c0dd800bbdd6f2d157dd0a8", "/Users/dingyi/Genaro/test/download/111.data", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadProgress() {
-        Downloader downloader = new Downloader(api, TestbucketId, "5c0dccd7bbdd6f2d157dcfff", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
+        Downloader downloader = new Downloader(api, TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadProgress() {
             @Override
             public void onProgress(float progress) {
                 System.out.printf("Download progress: %.1f%%\n", progress * 100);
@@ -205,8 +205,10 @@ public class TestGenaro {
         thread.start();
 
         Thread.sleep(5000);
+        downloader.cancel();
 
         thread.join();
+        while(true);
     }
 
     public void testDownload100() throws Exception {

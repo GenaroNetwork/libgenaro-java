@@ -529,6 +529,14 @@ public class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
+    public File getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<File> fu = getFileInfoFuture(bucketId, fileId);
+        if(downloader != null) {
+            downloader.setFutureGetFileInfo(fu);
+        }
+        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+    }
+
     public CompletableFuture<File[]> listFilesFuture(final String bucketId) {
         return BasicUtil.supplyAsync(() -> {
 
@@ -640,8 +648,11 @@ public class Genaro {
         });
     }
 
-    public List<Pointer> getPointers(final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
+    public List<Pointer> getPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<List<Pointer>> fu = getPointersFuture(bucketId, fileId);
+        if(downloader != null) {
+            downloader.setFutureGetPointers(fu);
+        }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
@@ -673,7 +684,7 @@ public class Genaro {
                 if (code == 429 || code == 420) {
                     logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_RATE_ERROR));
-                } else if (code != 200){
+                } else if (code != 200) {
                     logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_POINTER_ERROR));
                 }
@@ -695,8 +706,6 @@ public class Genaro {
     CompletableFuture<Boolean> isFileExistFuture(final String bucketId, final String encryptedFileName) {
         return BasicUtil.supplyAsync(() -> {
 
-            byte[] bucketKey = CryptoUtil.generateBucketKey(wallet.getPrivateKey(), Hex.decode(bucketId));
-            byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
             String escapedName = URLEncoder.encode(encryptedFileName, "UTF-8");
 
             String path = String.format("/buckets/%s/file-ids/%s", bucketId, escapedName);
