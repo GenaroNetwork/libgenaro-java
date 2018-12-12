@@ -8,6 +8,7 @@ import org.web3j.crypto.Wallet;
 import org.web3j.crypto.WalletFile;
 
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 
@@ -21,13 +22,13 @@ public class GenaroWallet {
             walletFile = objectMapper.readValue(v3Json, WalletFile.class);
             ecKeyPair = Wallet.decrypt(password, walletFile);
         } catch (CipherException e) {
-            throw new CipherException("incorrect wallet password");
+            throw new CipherException("Incorrect wallet password");
         } catch (IOException e) {
-            throw new IOException("bad json string input");
+            throw new IOException("Bad json string input");
         }
     }
 
-    public String signMessage(String message) {
+    public String signMessage(String message) throws NoSuchAlgorithmException {
         return sha256EscdaSign(ecKeyPair.getPrivateKey(), message);
     }
 

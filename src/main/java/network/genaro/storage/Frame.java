@@ -1,14 +1,5 @@
 package network.genaro.storage;
 
-
-// {"user":"0x5d14313c94f1b26d23f4ce3a49a2e136a88a584b",
-// "shards":[],
-// "storageSize":0,
-// "size":0,
-// "locked":false,
-// "created":"2018-11-14T10:44:06.594Z",
-// "id":"5bebfc767d314d2eca8339e0"}
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown=true)

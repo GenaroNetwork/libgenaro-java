@@ -54,27 +54,12 @@ public final class CryptoUtil {
     private static final ECDomainParameters CURVE = new ECDomainParameters(
             CURVE_PARAMS.getCurve(), CURVE_PARAMS.getG(), CURVE_PARAMS.getN(), CURVE_PARAMS.getH());
 
-    public static byte[] sha256(final byte[] input) {
-        MessageDigest digest = null;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-        return digest.digest(input);
+    public static byte[] sha256(final byte[] input) throws NoSuchAlgorithmException {
+        return MessageDigest.getInstance("SHA-256").digest(input);
     }
 
-    public static byte[] sha512(final byte[] input) {
-        MessageDigest digest = null;
-        try {
-            digest = MessageDigest.getInstance("SHA-512");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-        digest.update(input);
-        return digest.digest();
+    public static byte[] sha512(final byte[] input) throws NoSuchAlgorithmException {
+        return MessageDigest.getInstance("SHA-512").digest(input);
     }
 
     public static byte[] hmacSha512(final byte[] key, final byte[] input) {
@@ -101,24 +86,24 @@ public final class CryptoUtil {
         return out;
     }
 
-    public static byte[] ripemd160Sha256(final byte[] input) {
+    public static byte[] ripemd160Sha256(final byte[] input) throws NoSuchAlgorithmException {
         byte[] sha256bytes = sha256(input);
         return ripemd160(sha256bytes);
     }
 
-    public static byte[] ripemd160Sha256Double(final byte[] input) {
+    public static byte[] ripemd160Sha256Double(final byte[] input) throws NoSuchAlgorithmException {
         return ripemd160Sha256(ripemd160Sha256(input));
     }
 
-    public static String ripemd160Sha256HexString(final byte[] input) {
+    public static String ripemd160Sha256HexString(final byte[] input) throws NoSuchAlgorithmException {
         return Hex.toHexString(ripemd160Sha256(input));
     }
 
-    public static String ripemd160Sha256HexStringDouble(final byte[] input) {
+    public static String ripemd160Sha256HexStringDouble(final byte[] input) throws NoSuchAlgorithmException {
         return Hex.toHexString(ripemd160Sha256Double(input));
     }
 
-    public static byte[] generateDeterministicKey(final byte[] key, final byte[] id ) {
+    public static byte[] generateDeterministicKey(final byte[] key, final byte[] id ) throws NoSuchAlgorithmException {
         byte[] sha512input = ArrayUtils.addAll(key, id);
         return Arrays.copyOfRange(sha512(sha512input), 0, 32);
     }
@@ -129,86 +114,86 @@ public final class CryptoUtil {
         return ((KeyParameter) gen.generateDerivedParameters(SEED_KEY_SIZE)).getKey();
     }
 
-    public static byte[] generateBucketKey(final byte[] privKey, final byte[] bucketId) {
+    public static byte[] generateBucketKey(final byte[] privKey, final byte[] bucketId) throws NoSuchAlgorithmException {
         byte[] seed = generateGenaroSeed(privKey);
         return generateDeterministicKey(seed, bucketId);
     }
 
-    public static byte[] generateFileKey(final byte[] privKey, final byte[] bucketId, final byte[] index) {
+    public static byte[] generateFileKey(final byte[] privKey, final byte[] bucketId, final byte[] index) throws NoSuchAlgorithmException {
         byte[] bKey = generateBucketKey(privKey, bucketId);
         return generateDeterministicKey(bKey, index);
     }
 
-    // 6390959111c0ebf1f35ea599f856ed66
-    public static String encryptMeta(final byte[] fileMeta, final byte[] encryptKey, final byte[] encryptIv) {
+    public static String encryptMeta(final byte[] fileMeta, final byte[] encryptKey, final byte[] encryptIv)
+            throws NoSuchAlgorithmException, NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException,
+            InvalidKeyException, NoSuchProviderException, InvalidAlgorithmParameterException {
         if (encryptIv.length != AES_GCM_IV_LENGTH) {
             throw new IllegalArgumentException("IV length must be " + AES_GCM_IV_LENGTH);
         }
-        try {
-            Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
-            SecretKeySpec k = new SecretKeySpec(encryptKey, "AES");
-            c.init(Cipher.ENCRYPT_MODE, k, new IvParameterSpec(encryptIv));
-            byte[] cipherPlusDigest = c.doFinal(fileMeta);
-            // GCM digest + Iv + cipher text
-            byte[] encryptedData = new byte[cipherPlusDigest.length + encryptIv.length];
-            // digest
-            System.arraycopy(cipherPlusDigest,
-                    cipherPlusDigest.length - AES_GCM_DIGEST_LENGTH,
-                    encryptedData,
-                    0,
-                    AES_GCM_DIGEST_LENGTH);
-            // iv
-            System.arraycopy(encryptIv,
-                    0,
-                    encryptedData,
-                    AES_GCM_DIGEST_LENGTH,
-                    encryptIv.length);
-            // cipher text
-            System.arraycopy(cipherPlusDigest,
-                    0,
-                    encryptedData,
-                    AES_GCM_DIGEST_LENGTH + encryptIv.length,
-                    cipherPlusDigest.length - AES_GCM_DIGEST_LENGTH);
-            return Base64.toBase64String(encryptedData);
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-        return "";
+
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+        SecretKeySpec k = new SecretKeySpec(encryptKey, "AES");
+        c.init(Cipher.ENCRYPT_MODE, k, new IvParameterSpec(encryptIv));
+        byte[] cipherPlusDigest = c.doFinal(fileMeta);
+
+        // GCM digest + iv + cipher text
+        byte[] encryptedData = new byte[cipherPlusDigest.length + encryptIv.length];
+        // digest
+        System.arraycopy(cipherPlusDigest,
+                cipherPlusDigest.length - AES_GCM_DIGEST_LENGTH,
+                encryptedData,
+                0,
+                AES_GCM_DIGEST_LENGTH);
+        // iv
+        System.arraycopy(encryptIv,
+                0,
+                encryptedData,
+                AES_GCM_DIGEST_LENGTH,
+                encryptIv.length);
+        // cipher text
+        System.arraycopy(cipherPlusDigest,
+                0,
+                encryptedData,
+                AES_GCM_DIGEST_LENGTH + encryptIv.length,
+                cipherPlusDigest.length - AES_GCM_DIGEST_LENGTH);
+
+        return Base64.toBase64String(encryptedData);
     }
 
-    public static byte[] decryptMeta(final String base64Secret, final byte[] decryptKey) {
+    public static byte[] decryptMeta(final String base64Secret, final byte[] decryptKey) throws NoSuchAlgorithmException, InvalidKeyException,
+                IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchProviderException, InvalidAlgorithmParameterException {
         byte[] encryptedData = Base64.decode(base64Secret);
-        try {
-            // get IV
-            byte[] decryptIv = Arrays.copyOfRange(encryptedData, AES_GCM_DIGEST_LENGTH, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH);
-            // make cipher + Digest
-            byte[] cipherPlusDigest = new byte[encryptedData.length - AES_GCM_IV_LENGTH];
-            int cipherTextLen = encryptedData.length - AES_GCM_DIGEST_LENGTH - AES_GCM_IV_LENGTH;
-            // fill digest
-            System.arraycopy(encryptedData, 0, cipherPlusDigest, cipherTextLen, AES_GCM_DIGEST_LENGTH);
-            // fill cipher text
-            System.arraycopy(encryptedData, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH, cipherPlusDigest, 0, cipherTextLen);
 
-            Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
-            SecretKeySpec k = new SecretKeySpec(decryptKey, "AES");
-            c.init(Cipher.DECRYPT_MODE, k, new IvParameterSpec(decryptIv));
-            return c.doFinal(cipherPlusDigest);
-        } catch (NoSuchAlgorithmException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
-            e.printStackTrace();
-            System.exit(1);
-            return new byte[0];
-        }
+        // get IV
+        byte[] decryptIv = Arrays.copyOfRange(encryptedData, AES_GCM_DIGEST_LENGTH, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH);
+        // make cipher + Digest
+        byte[] cipherPlusDigest = new byte[encryptedData.length - AES_GCM_IV_LENGTH];
+        int cipherTextLen = encryptedData.length - AES_GCM_DIGEST_LENGTH - AES_GCM_IV_LENGTH;
+        // fill digest
+        System.arraycopy(encryptedData, 0, cipherPlusDigest, cipherTextLen, AES_GCM_DIGEST_LENGTH);
+        // fill cipher text
+        System.arraycopy(encryptedData, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH, cipherPlusDigest, 0, cipherTextLen);
+
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+        SecretKeySpec k = new SecretKeySpec(decryptKey, "AES");
+        c.init(Cipher.DECRYPT_MODE, k, new IvParameterSpec(decryptIv));
+
+        return c.doFinal(cipherPlusDigest);
     }
 
-    public static String encryptMetaHmacSha512(byte[] meta, byte[] privKey, byte[] bucketId) {
+    public static String encryptMetaHmacSha512(byte[] meta, byte[] privKey, byte[] bucketId)
+            throws NoSuchAlgorithmException, NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException,
+            InvalidKeyException, NoSuchProviderException, InvalidAlgorithmParameterException {
         byte[] bucketKey = CryptoUtil.generateBucketKey(privKey, bucketId);
         byte[] key = CryptoUtil.hmacSha512Half(bucketKey, BUCKET_META_MAGIC);
         byte[] nameIv = CryptoUtil.hmacSha512Half(bucketKey, meta);
+
         return  CryptoUtil.encryptMeta(meta, key, nameIv);
     }
 
-    public static String decryptMetaHmacSha512(String bufferBase64, byte[] privKey, byte[] bucketId) {
+    public static String decryptMetaHmacSha512(String bufferBase64, byte[] privKey, byte[] bucketId)
+            throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException,
+            NoSuchPaddingException, NoSuchProviderException, InvalidAlgorithmParameterException {
         byte[] bk = CryptoUtil.generateBucketKey(privKey, bucketId);
         byte[] decryptKey = CryptoUtil.hmacSha512Half(bk, BUCKET_META_MAGIC);
         byte[] realName = CryptoUtil.decryptMeta(bufferBase64, decryptKey);
@@ -216,11 +201,11 @@ public final class CryptoUtil {
         return BasicUtil.bytes2String(realName);
     }
 
-    public static String sha256EscdaSign(final BigInteger ecPrivateKey, final String message) {
+    public static String sha256EscdaSign(final BigInteger ecPrivateKey, final String message) throws NoSuchAlgorithmException {
         return sha256EscdaSign(ecPrivateKey, BasicUtil.string2Bytes(message));
     }
 
-    public static String sha256EscdaSign(final BigInteger ecPrivateKey, final byte[] message) {
+    public static String sha256EscdaSign(final BigInteger ecPrivateKey, final byte[] message) throws NoSuchAlgorithmException {
         byte[] hash = sha256(message);
         return escdaSign(ecPrivateKey, hash);
     }

@@ -40,14 +40,14 @@ public class TestCryptoUtil {
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
-    public void test() {
+    public void test() throws Exception {
         byte[] byts = BasicUtil.string2Bytes("123kkk");
         byte[] ripemded = CryptoUtil.ripemd160Sha256(byts);
         String hexx = Hex.toHexString(ripemded);
         Assert.assertEquals(hexx, "8792d67cdcf37195da42c6a8db27745424647d69");
     }
 
-    public void testSha256() {
+    public void testSha256() throws Exception {
         byte[] bbb = CryptoUtil.sha256((BasicUtil.string2Bytes("abcde")));
         String hresult = Hex.toHexString(bbb);
         Assert.assertEquals(hresult, "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c");
@@ -59,7 +59,7 @@ public class TestCryptoUtil {
         Assert.assertEquals(Hex.toHexString(out), "5d3405a87994ba690252b17a7cf33d774448df9c");
     }
 
-    public void testRipemd160Sha256() {
+    public void testRipemd160Sha256() throws Exception {
         byte[] bbb = CryptoUtil.ripemd160Sha256(Hex.decode("36217336fd8deee3"));
         String hresult = Hex.toHexString(bbb);
         Assert.assertEquals(hresult, "47bf19535be7d2058875c28dbac9fa3070bbd809");
@@ -70,7 +70,7 @@ public class TestCryptoUtil {
         Assert.assertEquals(tt, "12343213ef");
     }
 
-    public void testDeterministicKey() {
+    public void testDeterministicKey() throws Exception {
         byte[] ss = CryptoUtil.generateDeterministicKey(Hex.decode("1625348fba"), Hex.decode("385960ffa4"));
         Assert.assertEquals(Hex.toHexString(ss), "296195601e0557bef8963a418c53489f4216e8fe033768b5ca2a9bfb02188296");
     }
@@ -108,12 +108,12 @@ public class TestCryptoUtil {
         //seed	char *	"575e61fff94f741ccd1c2e3445a28f099ea44b05da7ea4d2d377acb61c339aa0f0e56cd771a2426b353e81dee3976857efbc789efdc3433cd3c0b3887730b9f0"	0x00000001029010e0
     }
 
-    public void testGenerateBucketKey() {
+    public void testGenerateBucketKey() throws Exception {
         byte[] key = CryptoUtil.generateBucketKey(BasicUtil.string2Bytes("abcde abcde abcde abcde abcde abcde abcde abcde abcde abcde abcd"), Hex.decode("0123456789ab0123456789ab"));
         Assert.assertEquals(Hex.toHexString(key), "b17403c5130847731abd1c233e74002aa666c71497a19c90b7c305479ccd5844");
     }
 
-    public void testGenerateBucketKey2() {
+    public void testGenerateBucketKey2() throws Exception {
         byte[] pkpk = Hex.decode("29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6");
         String magicBid = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
         byte[] key = CryptoUtil.generateBucketKey(pkpk, Hex.decode(magicBid));
@@ -121,7 +121,7 @@ public class TestCryptoUtil {
         Assert.assertEquals(kstr, "76afd3c76a52bd9a2fc7449c5701dbaaa2caa2e67e8bfcee3b108c06dacc576a");
     }
 
-    public void testGenerateFileKey() {
+    public void testGenerateFileKey() throws Exception {
 //        String mnemonic = "abandon";
         String mnemonic = "abcde abcde abcde abcde abcde abcde abcde abcde abcde abcde abcd";
         String bucket_id = "0123456789ab0123456789ab";
@@ -141,7 +141,7 @@ public class TestCryptoUtil {
 //        Assert.assertEquals(new String(messageBytes), message);
 //    }
 
-    public void testAES() {
+    public void testAES() throws Exception {
         String message = "1234567890"; // e105e1aaf8da 6019753b58409d356e5c1cfc5a053ea8
         //String message = "ewqew"; //    e105e1aaf8   fe6356a870b6db693a30a152d8e594b8
         byte[] key = Hex.decode("123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f");
@@ -152,7 +152,7 @@ public class TestCryptoUtil {
         Assert.assertEquals(new String(messageBytes), message);
     }
 
-    public void testDecryptMeta() {
+    public void testDecryptMeta() throws Exception {
         byte[] realnameba = CryptoUtil.decryptMeta("0PkgasRWbaPHhAlRIPf/ZdhopoGRv4nQk8PeZQeyCizXv+DeNGbx48KobaTbRI9r9CTLBwOo", Hex.decode("727324ff68e45f183951f13d7fd70efd653cccf73ef8b60e3cbe7560aacecd8c"));
         String name = new String(realnameba);
         System.out.println(name);
@@ -189,6 +189,7 @@ public class TestCryptoUtil {
         String sigStr = Hex.toHexString(sigsig);
         System.out.println(sigStr);
     }
+
     public void testSha256EscdaSign() throws Exception{
         String message = "hello world";
         String v3json = "{ \"address\": \"5d14313c94f1b26d23f4ce3a49a2e136a88a584b\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"12d3a710778aa884d32140466ce6c3932629d922fa1cd6b64996dff9b368743a\", \"cipherparams\": { \"iv\": \"f0eface44a93bac55857d74740912d13\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"62dd6d60fb04429fc8cf32fd39ea5e886d7f84eae258866c14905fa202dbc43d\" }, \"mac\": \"632e92cb1de1a708b2d349b9ae558a4d655c691d3e793fca501a857c7f0c3b1c\" }, \"id\": \"b12b56a5-7eaa-4d90-87b5-cc616e6694d0\", \"version\": 3 }";
@@ -200,7 +201,6 @@ public class TestCryptoUtil {
     }
 
     public void testAesCtr() throws Exception {
-
         // make Iv byte[]
 //        byte[] iv  = Hex.decode("f123abc2f123abcf2123abc2f123abc2");
 //        // make key
@@ -217,9 +217,8 @@ public class TestCryptoUtil {
     }
 
     public void testGetPrivateKey() throws Exception {
-        Genaro api = new Genaro();
-        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(ww);
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(null, gw);
 
         byte[] key = api.getPrivateKey();
         String keyStr = Hex.toHexString(key);

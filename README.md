@@ -18,7 +18,6 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 
 - Erasure encoding with reed solomon for data reliability
 - Retry when fail
-- Better exception handling
 - Exchange reports with bridge
 - Cli interface
 
@@ -50,14 +49,14 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
         \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
 String passwd = "xxxxxx";
-Genaro api = new Genaro("http://192.168.50.206:8080");
+String bridgeUrl = "http://192.168.50.206:8080";
 GenaroWallet gw;
 try {
     gw = new GenaroWallet(V3JSON, passwd);
 } catch (Exception e) {
     return;
 }
-api.logIn(gw);
+Genaro api = new Genaro(bridgeUrl, gw);
 ```
 
 List buckets:
@@ -121,17 +120,26 @@ Upload file:
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String filePath = "xxxxxxxxx";
 String fileName = "xxx";
-new Uploader(api, false, filePath, fileName, bucketId, new Progress() {
+boolean rs = false;
+Uploader uploader = new Uploader(api, rs, filePath, fileName, bucketId, new UploadCallback() {
     @Override
-    public void onBegin() {
+    public void onBegin(long fileSize) { }
+    @Override
+    public void onFail(String error) {
+        System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
     }
     @Override
-    public void onFinish(int status) {
+    public void onFinish(String fileId) {
+        System.out.println("Upload finished, fileId: " + fileId);
     }
     @Override
-    public void onProgress(float progress, String message) {
-    }
-}).start();
+    public void onProgress(float progress) { }
+});
+
+Thread thread = new Thread(uploader);
+thread.start();
+
+// if you want to cancel upload, call uploader.cancel()
 ```
 
 Download file:
@@ -140,17 +148,23 @@ Download file:
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String fileId = "5c0103fd5a158a5612e67461";
 String filePath = "xxxxxxxxx";
-new Downloader(api, bucketId, fileId, filePath, new Progress() {
+Downloader downloader = new Downloader(api, bucketId, fileId, filePath, new DownloadCallback() {
     @Override
-    public void onBegin() {
+    public void onBegin() { }
+    @Override
+    public void onFail(String error) {
+        System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
     }
+    @Override
+    public void onFinish() {
+        System.out.println("Download finished");
+    }
+    @Override
+    public void onProgress(float progress) { }
+});
 
-    @Override
-    public void onFinish(int status) {
-    }
+Thread thread = new Thread(downloader);
+thread.start();
 
-    @Override
-    public void onProgress(float progress, String message) {
-    }
-}).start();
+// if you want to cancel download, call downloader.cancel()
 ```

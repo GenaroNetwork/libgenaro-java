@@ -32,6 +32,8 @@ public class Pointer {
     private String operation;
     private Farmer farmer;
 
+    private long downloadedSize;
+
     private boolean isMissing;
 
     // extra
@@ -113,6 +115,16 @@ public class Pointer {
                 ", farmer=" + farmer +
                 '}';
     }
+
+    public String toBriefString() {
+        return "Pointer{" +
+                "index=" + index +
+                ", size=" + size +
+                ", parity=" + parity +
+                ", farmer=" + farmer.toBriefString() +
+                '}';
+    }
+
     //
     public boolean isPointCreated() {
         return token != null && farmer != null;
@@ -124,6 +136,14 @@ public class Pointer {
 
     public void setMissing(boolean missing) {
         isMissing = missing;
+    }
+
+    public long getDownloadedSize() {
+        return downloadedSize;
+    }
+
+    public void setDownloadedSize(long downloadedSize) {
+        this.downloadedSize = downloadedSize;
     }
 
     public enum PointerStatus

@@ -78,4 +78,11 @@ public class Farmer {
                 ", lastSeen='" + lastSeen + '\'' +
                 '}';
     }
+
+    public String toBriefString() {
+        return "Farmer{" +
+                "address='" + address + '\'' +
+                ", port='" + port + '\'' +
+                '}';
+    }
 }
