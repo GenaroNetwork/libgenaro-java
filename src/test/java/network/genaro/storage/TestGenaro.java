@@ -205,7 +205,7 @@ public class TestGenaro {
         thread.start();
 
         Thread.sleep(5000);
-        downloader.cancel();
+//        downloader.cancel();
 
         thread.join();
         while(true);
@@ -247,7 +247,7 @@ public class TestGenaro {
 //        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2097154.data", "19.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "r.zip", TestbucketId, new UploadProgress() {
-        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "18.zip", TestbucketId, new UploadProgress() {
+        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "20.zip", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "79.txt", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2m.data", "2m.data", TestbucketId, new UploadProgress() {
             @Override

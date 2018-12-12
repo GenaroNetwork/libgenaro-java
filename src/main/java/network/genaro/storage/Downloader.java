@@ -6,7 +6,6 @@ import okhttp3.Response;
 import okhttp3.Callback;
 import okhttp3.Call;
 
-import okio.Timeout;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Hex;
@@ -19,6 +18,7 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
@@ -190,25 +190,32 @@ public class Downloader implements Runnable {
         }
     }
 
-    private CompletableFuture<Void> requestShardFuture(final Pointer pointer) {
-        return BasicUtil.supplyAsync(() -> {
-            Farmer farmer = pointer.getFarmer();
-            String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
-            Request request = new Request.Builder()
-                                         .tag("requestShard")
-                                         .header("x-storj-node-id", farmer.getNodeID())
-                                         .url(url)
-                                         .get()
-                                         .build();
+    // Void not void, because it will be used as a supplier of Completable.supplyAsync
+    private Void requestShard(final Pointer pointer) {
+        Farmer farmer = pointer.getFarmer();
+        String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
+        Request request = new Request.Builder()
+                                     .tag("requestShard")
+                                     .header("x-storj-node-id", farmer.getNodeID())
+                                     .url(url)
+                                     .get()
+                                     .build();
 
-            logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
+        logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
-            RequestShardCallbackFuture future = new RequestShardCallbackFuture(pointer);
-            okHttpClient.newCall(request).enqueue(future);
+        RequestShardCallbackFuture future = new RequestShardCallbackFuture(pointer);
+        okHttpClient.newCall(request).enqueue(future);
+
+        try {
             future.get();
-
-            return null;
-        }, downloaderExecutor);
+        } catch (Exception e) {
+            if(e instanceof ExecutionException && e.getCause() instanceof SocketTimeoutException) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+            } else {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+            }
+        }
+        return null;
     }
 
     public void start() {
@@ -224,8 +231,10 @@ public class Downloader implements Runnable {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
                 progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage());
             } else {
-                progress.onFinish(e.getMessage());
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
@@ -246,8 +255,10 @@ public class Downloader implements Runnable {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
                 progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage());
             } else {
-                progress.onFinish(e.getMessage());
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
@@ -312,10 +323,7 @@ public class Downloader implements Runnable {
             .stream()
             // TODO: not only download none parity shards
 //            .filter(pointer -> !pointer.isParity())
-            .map(pointer -> {
-                CompletableFuture<Void> fu = requestShardFuture(pointer);
-                return fu;
-            })
+            .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
             .toArray(CompletableFuture[]::new);
 
         futureAllRequestShard = CompletableFuture.allOf(downFutures);
@@ -326,8 +334,10 @@ public class Downloader implements Runnable {
             stop();
             if(e instanceof CancellationException) {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage());
             } else {
-                progress.onFinish(e.getMessage());
+                progress.onFinish(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
             return;
         }
@@ -395,7 +405,7 @@ public class Downloader implements Runnable {
             }
         } catch (IOException e) {
             stop();
-            progress.onFinish("File decryption error");
+            progress.onFinish(GenaroStrError(GENARO_FILE_DECRYPTION_ERROR));
             return;
         }
 

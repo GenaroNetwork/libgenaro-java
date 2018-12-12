@@ -263,111 +263,113 @@ public class Uploader implements Runnable {
         return true;
     }
 
-    private CompletableFuture<ShardTracker> prepareFrame(final ShardTracker shard) {
-        return BasicUtil.supplyAsync(() -> {
-            ShardMeta shardMeta = shard.getMeta();
-            shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
-            shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
-            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
-                byte[] challenge = randomBuff(32);
-                //                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                //                                99, 99};
-                shardMeta.getChallenges()[i] = challenge;
-                shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
-            }
+    private ShardTracker prepareFrame(final ShardTracker shard) {
+        ShardMeta shardMeta = shard.getMeta();
+        shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
+        shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
+        for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+            byte[] challenge = randomBuff(32);
+            //                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+            //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+            //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+            //                                99, 99};
+            shardMeta.getChallenges()[i] = challenge;
+            shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
+        }
 
-            logger.info(String.format("Creating frame for shard index %d...", shard.getIndex()));
+        logger.info(String.format("Creating frame for shard index %d...", shard.getIndex()));
 
-            // Initialize context for sha256 of encrypted data
-            MessageDigest shardHashMd;
+        // Initialize context for sha256 of encrypted data
+        MessageDigest shardHashMd;
+        try {
+            shardHashMd = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
+        }
+
+        // Calculate the merkle tree with challenges
+        MessageDigest[] firstSha256ForLeaf = new MessageDigest[GENARO_SHARD_CHALLENGES];
+        for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
             try {
-                shardHashMd = MessageDigest.getInstance("SHA-256");
+                firstSha256ForLeaf[i] = MessageDigest.getInstance("SHA-256");
             } catch (NoSuchAlgorithmException e) {
-                throw new GenaroRuntimeException(e.getMessage());
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
             }
+            firstSha256ForLeaf[i].update(shardMeta.getChallenges()[i]);
+        }
 
-            // Calculate the merkle tree with challenges
-            MessageDigest[] firstSha256ForLeaf = new MessageDigest[GENARO_SHARD_CHALLENGES];
-            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
-                try {
-                    firstSha256ForLeaf[i] = MessageDigest.getInstance("SHA-256");
-                } catch (NoSuchAlgorithmException e) {
-                    throw new GenaroRuntimeException(e.getMessage());
+        if (shard.getIndex() + 1 > totalDataShards) {
+            // TODO: Reed-solomn is not implemented yet
+            shard.setShardFile("xxxxxx");
+        } else {
+            shard.setShardFile(cryptFilePath);
+        }
+
+        // Reset shard index when using parity shards
+        int shardIndex = shard.getIndex();
+        shardMeta.setIndex((shardIndex + 1 > totalDataShards) ? shardIndex - totalDataShards : shardIndex);
+
+        try (FileInputStream fin = new FileInputStream(cryptFilePath)) {
+            int readBytes;
+            final int BYTES = AES_BLOCK_SIZE * 256;
+
+            long totalRead = 0;
+
+            long position = shardMeta.getIndex() * shardSize;
+
+            byte[] readData = new byte[BYTES];
+            do {
+                // set file position
+                fin.getChannel().position(position);
+
+                readBytes = fin.read(readData, 0, BYTES);
+
+                // end of file
+                if (readBytes == -1) {
+                    break;
                 }
-                firstSha256ForLeaf[i].update(shardMeta.getChallenges()[i]);
-            }
 
-            if (shard.getIndex() + 1 > totalDataShards) {
-                // TODO: Reed-solomn is not implemented yet
-                shard.setShardFile("xxxxxx");
-            } else {
-                shard.setShardFile(cryptFilePath);
-            }
+                totalRead += readBytes;
+                position += readBytes;
 
-            // Reset shard index when using parity shards
-            int shardIndex = shard.getIndex();
-            shardMeta.setIndex((shardIndex + 1 > totalDataShards) ? shardIndex - totalDataShards : shardIndex);
+                shardHashMd.update(readData, 0, readBytes);
 
-            try (FileInputStream fin = new FileInputStream(cryptFilePath)) {
-                int readBytes;
-                final int BYTES = AES_BLOCK_SIZE * 256;
+                for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+                    firstSha256ForLeaf[i].update(readData, 0, readBytes);
+                }
+            } while (totalRead < shardSize);
 
-                long totalRead = 0;
+            shardMeta.setSize(totalRead);
+        } catch (IOException e) {
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_READ_ERROR));
+        }
 
-                long position = shardMeta.getIndex() * shardSize;
+        byte[] prehashSha256 = shardHashMd.digest();
+        byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
 
-                byte[] readData = new byte[BYTES];
-                do {
-                    // set file position
-                    fin.getChannel().position(position);
+        shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
+        byte[] preleafSha256;
+        byte[] preleafRipemd160;
 
-                    readBytes = fin.read(readData, 0, BYTES);
+        shardMeta.setTree(new String[GENARO_SHARD_CHALLENGES]);
+        for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
+            // finish first sha256 for leaf
+            preleafSha256 = firstSha256ForLeaf[i].digest();
 
-                    // end of file
-                    if (readBytes == -1) {
-                        break;
-                    }
+            // ripemd160 result of sha256
+            preleafRipemd160 = CryptoUtil.ripemd160(preleafSha256);
 
-                    totalRead += readBytes;
-                    position += readBytes;
-
-                    shardHashMd.update(readData, 0, readBytes);
-
-                    for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
-                        firstSha256ForLeaf[i].update(readData, 0, readBytes);
-                    }
-                } while (totalRead < shardSize);
-
-                shardMeta.setSize(totalRead);
-            } catch (IOException e) {
-                throw new GenaroRuntimeException(e.getMessage());
-            }
-
-            byte[] prehashSha256 = shardHashMd.digest();
-            byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
-
-            shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
-            byte[] preleafSha256;
-            byte[] preleafRipemd160;
-
-            shardMeta.setTree(new String[GENARO_SHARD_CHALLENGES]);
-            for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
-                // finish first sha256 for leaf
-                preleafSha256 = firstSha256ForLeaf[i].digest();
-
-                // ripemd160 result of sha256
-                preleafRipemd160 = CryptoUtil.ripemd160(preleafSha256);
-
-                // sha256 and ripemd160 again
+            // sha256 and ripemd160 again
+            try {
                 shardMeta.getTree()[i] = CryptoUtil.ripemd160Sha256HexString(preleafRipemd160);
+            } catch (NoSuchAlgorithmException e) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
             }
+        }
 
-            logger.info(String.format("Create frame finished for shard index %d", shard.getIndex()));
+        logger.info(String.format("Create frame finished for shard index %d", shard.getIndex()));
 
-            return shard;
-        }, uploaderExecutor);
+        return shard;
     }
 
     private ShardTracker pushFrame(final ShardTracker shard) {
@@ -393,7 +395,7 @@ public class Uploader implements Runnable {
             challengesJsonStr = om.writeValueAsString(challengesAsStr);
             treeJsonStr = om.writeValueAsString(tree);
         } catch (JsonProcessingException e) {
-            throw new GenaroRuntimeException(e.getMessage());
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
         }
         String jsonStrBody = String.format("{\"hash\":\"%s\",\"size\":%d,\"index\":%d,\"parity\":%b," +
                         "\"challenges\":%s,\"tree\":%s,\"exclude\":[]}",
@@ -407,7 +409,7 @@ public class Uploader implements Runnable {
         try {
             signature = bridge.signRequest("PUT", path, jsonStrBody);
         } catch (NoSuchAlgorithmException e) {
-            throw new GenaroRuntimeException(e.getMessage());
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
         }
         String pubKey = bridge.getPublicKeyHexString();
         Request request = new Request.Builder()
@@ -434,8 +436,8 @@ public class Uploader implements Runnable {
 
             FarmerPointer fp = om.readValue(responseBody, FarmerPointer.class);
             shard.setPointer(fp);
-        } catch (Exception e) {
-            throw new GenaroRuntimeException(e.getMessage());
+        } catch (IOException e) {
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
         }
 
         return shard;
@@ -522,10 +524,10 @@ public class Uploader implements Runnable {
             } else {
                 throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             uploadedBytes.addAndGet(-shard.getUploadedSize());
             shard.setUploadedSize(0);
-            throw new GenaroRuntimeException(e.getMessage());
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
         }
 
         return shard;
@@ -564,7 +566,7 @@ public class Uploader implements Runnable {
             try {
                 signature = bridge.signRequest("POST", path, jsonStrBody);
             } catch (NoSuchAlgorithmException e) {
-                throw new GenaroRuntimeException(e.getMessage());
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
             }
 
             String pubKey = bridge.getPublicKeyHexString();
@@ -595,8 +597,8 @@ public class Uploader implements Runnable {
                 logger.info("Successfully Added bucket entry");
 
                 fileId = bodyNode.get("id").asText();
-            } catch (Exception e) {
-                throw new GenaroRuntimeException(e.getMessage());
+            } catch (IOException e) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
 
             return null;
@@ -642,8 +644,10 @@ public class Uploader implements Runnable {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
             } else if(e instanceof TimeoutException) {
                 progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage(), null);
             } else {
-                progress.onFinish(e.getMessage(), null);
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
             }
             return;
         }
@@ -672,8 +676,10 @@ public class Uploader implements Runnable {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
             } else if(e instanceof TimeoutException) {
                 progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage(), null);
             } else {
-                progress.onFinish(e.getMessage(), null);
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
             }
             return;
         }
@@ -707,8 +713,10 @@ public class Uploader implements Runnable {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
             } else if(e instanceof TimeoutException) {
                 progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage(), null);
             } else {
-                progress.onFinish(e.getMessage(), null);
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
             }
             return;
         }
@@ -739,7 +747,7 @@ public class Uploader implements Runnable {
 
         CompletableFuture[] upFutures = shards
                 .stream()
-                .map(this::prepareFrame)
+                .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
                 .map(future -> future.thenApply(this::pushFrame))
                 .map(future -> future.thenApply(this::pushShard))
                 .toArray(CompletableFuture[]::new);
@@ -752,8 +760,10 @@ public class Uploader implements Runnable {
             stop();
             if(e instanceof CancellationException) {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage(), null);
             } else {
-                progress.onFinish(e.getMessage(), null);
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
             }
             return;
         }
@@ -779,8 +789,10 @@ public class Uploader implements Runnable {
                 progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
             } else if(e instanceof TimeoutException) {
                 progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                progress.onFinish(e.getCause().getMessage(), null);
             } else {
-                progress.onFinish(e.getMessage(), null);
+                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
             }
             return;
         }

@@ -265,6 +265,8 @@ public class Genaro {
                 return "File transfer canceled";
             case GENARO_TRANSFER_OK:
                 return "No errors";
+            case GENARO_ALGORITHM_ERROR:
+                return "Algorithm error";
             default:
                 return "Unknown error";
         }

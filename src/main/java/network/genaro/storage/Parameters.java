@@ -50,6 +50,9 @@ public final class Parameters {
     public static final int GENARO_FILE_UNSUPPORTED_ERASURE = 3010;
     public static final int GENARO_FILE_PARITY_ERROR = 3011;
 
+    // algorithm error
+    public static final int GENARO_ALGORITHM_ERROR = 4000;
+
     // Exchange report codes
     public static final int GENARO_REPORT_SUCCESS = 1000;
     public static final int GENARO_REPORT_FAILURE = 1100;
