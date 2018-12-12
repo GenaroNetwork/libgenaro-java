@@ -182,7 +182,7 @@ public class TestGenaro {
         thread.start();
 
         Thread.sleep(5000);
-//        downloader.cancel();
+        downloader.cancel();
 
         thread.join();
         while(true);
@@ -215,7 +215,7 @@ public class TestGenaro {
 //        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2097154.data", "19.data", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/Downloads/genaroNetwork-windows.zip", "r.zip", TestbucketId, new UploadProgress() {
-        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "20.zip", TestbucketId, new UploadProgress() {
+        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "21.zip", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2049k.data", "79.txt", TestbucketId, new UploadProgress() {
 //            new Uploader(api, false, "/Users/dingyi/test/2m.data", "2m.data", TestbucketId, new UploadProgress() {
             @Override
@@ -224,11 +224,13 @@ public class TestGenaro {
             }
 
             @Override
-            public void onFinish(String error, String fileId) {
-                if(error != null) {
-                    System.out.println("Upload failed: " + error);
-                } else {
-                    System.out.println("Upload finished, fileId: " + fileId);
+            public void onFail(String error) {
+                System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+            }
+
+            @Override
+            public void onFinish(String fileId) {
+                System.out.println("Upload finished, fileId: " + fileId);
 //                        boolean success = false;
 //                        try {
 //                            success = api.deleteFile(TestbucketId, fileId);
@@ -241,18 +243,17 @@ public class TestGenaro {
 //                        } else {
 //                            System.out.println("Delete failed.");
 //                        }
-                }
             }
         });
 
         Thread thread = new Thread(uploader);
         thread.start();
 
-        Thread.sleep(6000);
-        uploader.cancel();
+//        Thread.sleep(4500);
+//        uploader.cancel();
 
         thread.join();
-        while(true);
+//        while(true);
     }
 
     public void testUpload100() throws Exception {
@@ -268,24 +269,25 @@ public class TestGenaro {
                     }
 
                     @Override
-                    public void onFinish(String error, String fileId) {
-                        if (error != null) {
-                            System.out.println("Upload failed: " + error);
-                        } else {
-                            System.out.println("Upload finished, fileId: " + fileId);
-                            //                        boolean success = false;
-                            //                        try {
-                            //                            success = api.deleteFile(TestbucketId, fileId);
-                            //                        } catch (Exception e) {
-                            //                            System.out.println("Delete failed.");
-                            //                        }
-                            //
-                            //                        if(success) {
-                            //                            System.out.println("Delete success.");
-                            //                        } else {
-                            //                            System.out.println("Delete failed.");
-                            //                        }
-                        }
+                    public void onFail(String error) {
+                        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                    }
+
+                    @Override
+                    public void onFinish(String fileId) {
+                        System.out.println("Upload finished, fileId: " + fileId);
+                        //                        boolean success = false;
+                        //                        try {
+                        //                            success = api.deleteFile(TestbucketId, fileId);
+                        //                        } catch (Exception e) {
+                        //                            System.out.println("Delete failed.");
+                        //                        }
+                        //
+                        //                        if(success) {
+                        //                            System.out.println("Delete success.");
+                        //                        } else {
+                        //                            System.out.println("Delete failed.");
+                        //                        }
                     }
                 }).start();
             }

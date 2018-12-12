@@ -38,12 +38,12 @@ import static network.genaro.storage.Genaro.GenaroStrError;
 interface DownloadProgress {
     default void onBegin() { System.out.println("Download started"); }
 
-    default void onFinish(String error) {
-        if(error != null) {
-            System.out.println("Download failed: " + error);
-        } else {
-            System.out.println("Download finished");
-        }
+    default void onFinish() {
+        System.out.println("Download finished");
+    }
+
+    default void onFail(String error) {
+        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
     }
 
     /**
@@ -239,20 +239,20 @@ public class Downloader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage());
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
@@ -263,20 +263,20 @@ public class Downloader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage());
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
@@ -297,7 +297,7 @@ public class Downloader implements Runnable {
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
             stop();
-            progress.onFinish(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            progress.onFail(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
             return;
         }
 
@@ -325,7 +325,7 @@ public class Downloader implements Runnable {
                     StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
         } catch (IOException e) {
             stop();
-            progress.onFinish("Create temp file error");
+            progress.onFail("Create temp file error");
             return;
         }
 
@@ -344,18 +344,18 @@ public class Downloader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage());
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                progress.onFail(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
@@ -367,7 +367,7 @@ public class Downloader implements Runnable {
             downFileChannel.truncate(fileSize);
         } catch (IOException e) {
             stop();
-            progress.onFinish(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
+            progress.onFail(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
             return;
         }
 
@@ -381,7 +381,7 @@ public class Downloader implements Runnable {
             fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
         } catch (Exception e) {
             stop();
-            progress.onFinish("Generate file key error");
+            progress.onFail("Generate file key error");
             return;
         }
 
@@ -395,13 +395,13 @@ public class Downloader implements Runnable {
             cipher.init(DECRYPT_MODE, keySpec, iv);
         } catch (Exception e) {
             stop();
-            progress.onFinish("Init decryption context error");
+            progress.onFail("Init decryption context error");
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
@@ -411,26 +411,26 @@ public class Downloader implements Runnable {
                 Files.copy(cypherIn, Paths.get(path));
             } catch (IOException e) {
                 stop();
-                progress.onFinish("Create file error");
+                progress.onFail("Create file error");
                 return;
             }
         } catch (IOException e) {
             stop();
-            progress.onFinish(GenaroStrError(GENARO_FILE_DECRYPTION_ERROR));
+            progress.onFail(GenaroStrError(GENARO_FILE_DECRYPTION_ERROR));
             return;
         }
 
         try {
             downFileChannel.close();
         } catch (Exception e) {
-            // do not call progress.onFinish here
+            // do not call progress.onFail here
             logger.warn("File close exception");
         }
 
         logger.info("Decrypt complete, download is success");
 
         // download success
-        progress.onFinish(null);
+        progress.onFinish();
     }
 
     public void stop() {

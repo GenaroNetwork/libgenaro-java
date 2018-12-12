@@ -45,12 +45,12 @@ import static network.genaro.storage.Genaro.GenaroStrError;
 interface UploadProgress {
     default void onBegin(long fileSize) { System.out.println("Upload started"); }
 
-    default void onFinish(String error, String fileId) {
-        if(error != null) {
-            System.out.println("Upload failed: " + error);
-        } else {
-            System.out.println("Upload finished, fileId: " + fileId);
-        }
+    default void onFinish(String fileId) {
+        System.out.println("Upload finished, fileId: " + fileId);
+    }
+
+    default void onFail(String error) {
+        System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
     }
 
     /**
@@ -631,7 +631,7 @@ public class Uploader implements Runnable {
 
     public void start() {
         if(!Files.exists(Paths.get(originPath))) {
-            progress.onFinish("Invalid file path", null);
+            progress.onFail("Invalid file path");
             return;
         }
 
@@ -640,7 +640,7 @@ public class Uploader implements Runnable {
         shardSize = determineShardSize(fileSize, 0);
         if(shardSize <= 0) {
             errorStatus = GENARO_FILE_SIZE_ERROR;
-            progress.onFinish(GenaroStrError(errorStatus), null);
+            progress.onFail(GenaroStrError(errorStatus));
             return;
         }
 
@@ -657,20 +657,20 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage(), null);
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
@@ -679,7 +679,7 @@ public class Uploader implements Runnable {
             encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
         } catch (Exception e) {
             stop();
-            progress.onFinish("Encrypt error", null);
+            progress.onFail("Encrypt error");
             return;
         }
 
@@ -689,32 +689,32 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage(), null);
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
         if (exist) {
             stop();
-            progress.onFinish(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS), null);
+            progress.onFail(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS));
             return;
         }
 
         if(!createEncryptedFile()) {
             stop();
-            progress.onFinish(GenaroStrError(GENARO_FILE_ENCRYPTION_ERROR), null);
+            progress.onFail(GenaroStrError(GENARO_FILE_ENCRYPTION_ERROR));
             return;
         }
 
@@ -726,20 +726,20 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage(), null);
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
@@ -775,25 +775,25 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage(), null);
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             return;
         }
 
         if (uploadedBytes.get() != totalBytes) {
             logger.error("uploadedBytes: " + uploadedBytes + ", totalBytes: " + totalBytes);
             stop();
-            progress.onFinish(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR), null);
+            progress.onFail(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
             return;
         }
 
@@ -802,19 +802,19 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFinish(GenaroStrError(GENARO_TRANSFER_CANCELED), null);
+                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
             } else if(e instanceof TimeoutException) {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFinish(e.getCause().getMessage(), null);
+                progress.onFail(e.getCause().getMessage());
             } else {
-                progress.onFinish(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR), null);
+                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         progress.onProgress(1.0f);
-        progress.onFinish(null, fileId);
+        progress.onFinish(fileId);
 
         // TODO: send exchange report
         //
