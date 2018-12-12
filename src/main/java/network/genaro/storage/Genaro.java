@@ -164,17 +164,17 @@ class ShardTracker {
 }
 
 public class Genaro {
-    private static final Logger logger = LogManager.getLogger(Genaro.class);
+    private final Logger logger = LogManager.getLogger(Genaro.class);
+    private static final int POINT_PAGE_COUNT = 3;
 
-    private final OkHttpClient okHttpClient = new OkHttpClient.Builder()
+    private String bridgeUrl;
+    private GenaroWallet wallet;
+
+    OkHttpClient genaroHttpClient = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
-
-    private String bridgeUrl;
-    private GenaroWallet wallet;
-    private static final int POINT_PAGE_COUNT = 3;
 
     public Genaro() {}
 
@@ -200,10 +200,6 @@ public class Genaro {
 
     public void setBridgeUrl(String bridgeUrl) {
         this.bridgeUrl = bridgeUrl;
-    }
-
-    public OkHttpClient getOkHttpClient() {
-        return okHttpClient;
     }
 
     public static String GenaroStrError(int error_code)
@@ -306,7 +302,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
                 String responseBody = response.body().string();
 
                 if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
@@ -340,7 +336,7 @@ public class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    public CompletableFuture<Bucket> getBucketFuture(final String bucketId) {
+    public CompletableFuture<Bucket> getBucketFuture(final Uploader uploader, final String bucketId) {
         return BasicUtil.supplyAsync(() -> {
 
             CheckInit();
@@ -353,6 +349,13 @@ public class Genaro {
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
+
+            OkHttpClient okHttpClient;
+            if(uploader != null) {
+                okHttpClient = uploader.getUpHttpClient();
+            } else {
+                okHttpClient = genaroHttpClient;
+            }
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
@@ -379,7 +382,7 @@ public class Genaro {
     }
 
     public Bucket getBucket(final Uploader uploader, final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Bucket> fu = getBucketFuture(bucketId);
+        CompletableFuture<Bucket> fu = getBucketFuture(uploader, bucketId);
         if(uploader != null) {
             uploader.setFutureGetBucket(fu);
         }
@@ -399,7 +402,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -449,7 +452,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -498,7 +501,7 @@ public class Genaro {
                     .post(body)
                     .build();
 
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -522,7 +525,7 @@ public class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    CompletableFuture<File> getFileInfoFuture(final String bucketId, final String fileId) {
+    CompletableFuture<File> getFileInfoFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return BasicUtil.supplyAsync(() -> {
 
             CheckInit();
@@ -536,6 +539,13 @@ public class Genaro {
                 .header("x-pubkey", pubKey)
                 .get()
                 .build();
+
+            OkHttpClient okHttpClient;
+            if(downloader != null) {
+                okHttpClient = downloader.getDownHttpClient();
+            } else {
+                okHttpClient = genaroHttpClient;
+            }
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
@@ -586,7 +596,7 @@ public class Genaro {
     }
 
     public File getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<File> fu = getFileInfoFuture(bucketId, fileId);
+        CompletableFuture<File> fu = getFileInfoFuture(downloader, bucketId, fileId);
         if(downloader != null) {
             downloader.setFutureGetFileInfo(fu);
         }
@@ -608,7 +618,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -662,7 +672,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -693,7 +703,7 @@ public class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    CompletableFuture<List<Pointer>> getPointersFuture(final String bucketId, final String fileId) {
+    CompletableFuture<List<Pointer>> getPointersFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return BasicUtil.supplyAsync(() -> {
 
             CheckInit();
@@ -702,7 +712,7 @@ public class Genaro {
             int skipCount = 0;
             while (true) {
                 logger.info("Requesting next set of pointers, total pointers: " + skipCount);
-                List<Pointer> psr = this.getPointersRaw(bucketId, fileId, POINT_PAGE_COUNT, skipCount);
+                List<Pointer> psr = this.getPointersRaw(downloader, bucketId, fileId, POINT_PAGE_COUNT, skipCount);
 
                 if(psr.size() == 0) {
                     logger.info("Finished requesting pointers");
@@ -718,7 +728,7 @@ public class Genaro {
     }
 
     public List<Pointer> getPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<List<Pointer>> fu = getPointersFuture(bucketId, fileId);
+        CompletableFuture<List<Pointer>> fu = getPointersFuture(downloader, bucketId, fileId);
         if(downloader != null) {
             downloader.setFutureGetPointers(fu);
         }
@@ -727,7 +737,7 @@ public class Genaro {
         return fu.get(2 * GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    private CompletableFuture<List<Pointer>> getPointersRawFuture(final String bucketId, final String fileId, final int limit, final int skipCount) {
+    private CompletableFuture<List<Pointer>> getPointersRawFuture(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) {
         return BasicUtil.supplyAsync(() -> {
 
             CheckInit();
@@ -743,6 +753,13 @@ public class Genaro {
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
+
+            OkHttpClient okHttpClient;
+            if(downloader != null) {
+                okHttpClient = downloader.getDownHttpClient();
+            } else {
+                okHttpClient = genaroHttpClient;
+            }
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
@@ -777,12 +794,12 @@ public class Genaro {
         });
     }
 
-    public List<Pointer> getPointersRaw(final String bucketId, final String fileId, final int limit, final int skipCount) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<List<Pointer>> fu = getPointersRawFuture(bucketId, fileId, limit, skipCount);
+    public List<Pointer> getPointersRaw(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<List<Pointer>> fu = getPointersRawFuture(downloader, bucketId, fileId, limit, skipCount);
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    CompletableFuture<Boolean> isFileExistFuture(final String bucketId, final String encryptedFileName) {
+    CompletableFuture<Boolean> isFileExistFuture(final Uploader uploader, final String bucketId, final String encryptedFileName) {
         return BasicUtil.supplyAsync(() -> {
 
             CheckInit();
@@ -798,6 +815,13 @@ public class Genaro {
                     .header("x-pubkey", pubKey)
                     .get()
                     .build();
+
+            OkHttpClient okHttpClient;
+            if(uploader != null) {
+                okHttpClient = uploader.getUpHttpClient();
+            } else {
+                okHttpClient = genaroHttpClient;
+            }
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
@@ -822,14 +846,14 @@ public class Genaro {
     }
 
     public boolean isFileExist(final Uploader uploader, final String bucketId, final String encryptedFileName) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Boolean> fu = isFileExistFuture(bucketId, encryptedFileName);
+        CompletableFuture<Boolean> fu = isFileExistFuture(uploader, bucketId, encryptedFileName);
         if(uploader != null) {
             uploader.setFutureIsFileExists(fu);
         }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    CompletableFuture<Frame> requestNewFrameFuture() {
+    CompletableFuture<Frame> requestNewFrameFuture(final Uploader uploader) {
         return BasicUtil.supplyAsync(() -> {
 
             CheckInit();
@@ -846,6 +870,13 @@ public class Genaro {
                     .header("x-pubkey", pubKey)
                     .post(body)
                     .build();
+
+            OkHttpClient okHttpClient;
+            if(uploader != null) {
+                okHttpClient = uploader.getUpHttpClient();
+            } else {
+                okHttpClient = genaroHttpClient;
+            }
 
             try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
@@ -875,7 +906,7 @@ public class Genaro {
     }
 
     public Frame requestNewFrame(final Uploader uploader) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Frame> fu = requestNewFrameFuture();
+        CompletableFuture<Frame> fu = requestNewFrameFuture(uploader);
         if(uploader != null) {
             uploader.setFutureRequestNewFrame(fu);
         }

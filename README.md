@@ -121,12 +121,12 @@ String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String filePath = "xxxxxxxxx";
 String fileName = "xxx";
 boolean rs = false;
-Uploader uploader = new Uploader(api, rs, filePath, fileName, bucketId, new UploadProgress() {
+Uploader uploader = new Uploader(api, rs, filePath, fileName, bucketId, new UploadCallback() {
     @Override
     public void onBegin(long fileSize) { }
     @Override
     public void onFail(String error) {
-        System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+        System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
     }
     @Override
     public void onFinish(String fileId) {
@@ -148,12 +148,12 @@ Download file:
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String fileId = "5c0103fd5a158a5612e67461";
 String filePath = "xxxxxxxxx";
-Downloader downloader = new Downloader(api, bucketId, fileId, filePath, new DownloadProgress() {
+Downloader downloader = new Downloader(api, bucketId, fileId, filePath, new DownloadCallback() {
     @Override
     public void onBegin() { }
     @Override
     public void onFail(String error) {
-        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+        System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
     }
     @Override
     public void onFinish() {

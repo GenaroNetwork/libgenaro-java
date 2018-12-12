@@ -18,16 +18,14 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.io.File;
 import java.net.SocketException;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,26 +40,14 @@ import javax.crypto.Mac;
 
 import static network.genaro.storage.Genaro.GenaroStrError;
 
-interface UploadProgress {
-    default void onBegin(long fileSize) { System.out.println("Upload started"); }
-
-    default void onFinish(String fileId) {
-        System.out.println("Upload finished, fileId: " + fileId);
-    }
-
-    default void onFail(String error) {
-        System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
-    }
-
-    /**
-     * called when progress update
-     * @param progress range from 0 to 1
-     */
-    default void onProgress(float progress) { }
-}
-
 public class Uploader implements Runnable {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
+
+    private static Random random = new Random();
+    private static long MAX_SHARD_SIZE = 4294967296L; // 4Gb
+    private static long MIN_SHARD_SIZE = 2097152L; // 2Mb
+    private static int SHARD_MULTIPLES_BACK = 4;
+    private static int GENARO_SHARD_CHALLENGES = 4;
 
     private String originPath;
     private String fileName;
@@ -72,7 +58,6 @@ public class Uploader implements Runnable {
 
     private Genaro bridge;
     private String bucketId;
-    private UploadProgress progress;
     private File originFile;
     private boolean rs;
 
@@ -106,30 +91,30 @@ public class Uploader implements Runnable {
     private CompletableFuture<Void> futureCreateBucketEntry;
 
     boolean isCanceled = false;
+    boolean isStopping = false;
 
-    private static Random random = new Random();
-    private static long MAX_SHARD_SIZE = 4294967296L; // 4Gb
-    private static long MIN_SHARD_SIZE = 2097152L; // 2Mb
-    private static int SHARD_MULTIPLES_BACK = 4;
-    private static int GENARO_SHARD_CHALLENGES = 4;
+    private UploadCallback uploadCallback;
 
-    private final OkHttpClient okHttpClient;
-
-    // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
+    // 使用CachedThreadPool比较耗内存，并发高的时候会造成内存溢出
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
 
     // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
-    private static final ExecutorService uploaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+    private final ExecutorService uploaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
-    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final UploadProgress progress) {
+    private final OkHttpClient upHttpClient = new OkHttpClient.Builder()
+            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+            .build();
+
+    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final UploadCallback uploadCallback) {
         this.bridge = bridge;
-        this.okHttpClient = bridge.getOkHttpClient();
         this.rs = rs;
         this.originPath = filePath;
         this.fileName = fileName;
         this.originFile = new File(filePath);
         this.bucketId = bucketId;
-        this.progress = progress;
+        this.uploadCallback = uploadCallback;
     }
 
     public CompletableFuture<Bucket> getFutureGetBucket() {
@@ -162,6 +147,10 @@ public class Uploader implements Runnable {
 
     public void setFutureCreateBucketEntry(CompletableFuture<Void> futureCreateBucketEntry) {
         this.futureCreateBucketEntry = futureCreateBucketEntry;
+    }
+
+    public OkHttpClient getUpHttpClient() {
+        return upHttpClient;
     }
 
     private static long shardSize(final int hops) {
@@ -342,7 +331,11 @@ public class Uploader implements Runnable {
 
             shardMeta.setSize(totalRead);
         } catch (IOException e) {
-            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_READ_ERROR));
+            if (e instanceof ClosedByInterruptException) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_READ_ERROR));
+            }
         }
 
         byte[] prehashSha256 = shardHashMd.digest();
@@ -422,7 +415,7 @@ public class Uploader implements Runnable {
                 .build();
 
         logger.info(String.format("Pushing frame for shard index %s - JSON body: %s", shard.getIndex(), jsonStrBody));
-        try (Response response = okHttpClient.newCall(request).execute()) {
+        try (Response response = upHttpClient.newCall(request).execute()) {
             String responseBody = response.body().string();
 
             logger.info(String.format("Push frame finished for shard index %s - JSON Response: %s", shard.getIndex(), responseBody));
@@ -501,7 +494,7 @@ public class Uploader implements Runnable {
                 deltaUploaded.addAndGet(delta);
 
                 if (deltaUploaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
-                    progress.onProgress(uploadedBytes.floatValue() / totalBytes);
+                    uploadCallback.onProgress(uploadedBytes.floatValue() / totalBytes);
                     deltaUploaded.set(0);
                 }
             }
@@ -516,7 +509,7 @@ public class Uploader implements Runnable {
                 .post(uploadRequestBody)
                 .build();
 
-        try (Response response = okHttpClient.newCall(request).execute()) {
+        try (Response response = upHttpClient.newCall(request).execute()) {
             int code = response.code();
 
             if (code == 200 || code == 201 || code == 304) {
@@ -590,7 +583,7 @@ public class Uploader implements Runnable {
                     .build();
 
             logger.info(String.format("Create bucket entry - JSON body: %s", jsonStrBody));
-            try (Response response = okHttpClient.newCall(request).execute()) {
+            try (Response response = upHttpClient.newCall(request).execute()) {
                 ObjectMapper om = new ObjectMapper();
                 String responseBody = response.body().string();
                 JsonNode bodyNode = om.readTree(responseBody);
@@ -631,7 +624,7 @@ public class Uploader implements Runnable {
 
     public void start() {
         if(!Files.exists(Paths.get(originPath))) {
-            progress.onFail("Invalid file path");
+            uploadCallback.onFail("Invalid file path");
             return;
         }
 
@@ -640,11 +633,11 @@ public class Uploader implements Runnable {
         shardSize = determineShardSize(fileSize, 0);
         if(shardSize <= 0) {
             errorStatus = GENARO_FILE_SIZE_ERROR;
-            progress.onFail(GenaroStrError(errorStatus));
+            uploadCallback.onFail(GenaroStrError(errorStatus));
             return;
         }
 
-        progress.onBegin(fileSize);
+        uploadCallback.onBegin(fileSize);
 
         totalDataShards = (int)Math.ceil((double)fileSize / shardSize);
         totalParityShards = rs ? (int)Math.ceil((double)totalDataShards * 2.0 / 3.0) : 0;
@@ -657,20 +650,20 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                uploadCallback.onCancel();
             } else if(e instanceof TimeoutException) {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                uploadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            uploadCallback.onCancel();
             return;
         }
 
@@ -679,7 +672,7 @@ public class Uploader implements Runnable {
             encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
         } catch (Exception e) {
             stop();
-            progress.onFail("Encrypt error");
+            uploadCallback.onFail("Encrypt error");
             return;
         }
 
@@ -689,32 +682,32 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                uploadCallback.onCancel();
             } else if(e instanceof TimeoutException) {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                uploadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            uploadCallback.onCancel();
             return;
         }
 
         if (exist) {
             stop();
-            progress.onFail(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS));
+            uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_BUCKET_FILE_EXISTS));
             return;
         }
 
         if(!createEncryptedFile()) {
             stop();
-            progress.onFail(GenaroStrError(GENARO_FILE_ENCRYPTION_ERROR));
+            uploadCallback.onFail(GenaroStrError(GENARO_FILE_ENCRYPTION_ERROR));
             return;
         }
 
@@ -726,20 +719,20 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                uploadCallback.onCancel();
             } else if(e instanceof TimeoutException) {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                uploadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            uploadCallback.onCancel();
             return;
         }
 
@@ -759,7 +752,7 @@ public class Uploader implements Runnable {
             shards.add(shard);
         }
 
-        progress.onProgress(0.0f);
+        uploadCallback.onProgress(0.0f);
 
         CompletableFuture[] upFutures = shards
                 .stream()
@@ -775,25 +768,25 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                uploadCallback.onCancel();
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                uploadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            uploadCallback.onCancel();
             return;
         }
 
         if (uploadedBytes.get() != totalBytes) {
             logger.error("uploadedBytes: " + uploadedBytes + ", totalBytes: " + totalBytes);
             stop();
-            progress.onFail(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
+            uploadCallback.onFail(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
             return;
         }
 
@@ -802,65 +795,70 @@ public class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                uploadCallback.onCancel();
             } else if(e instanceof TimeoutException) {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                uploadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                uploadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
-        progress.onProgress(1.0f);
-        progress.onFinish(fileId);
+        uploadCallback.onProgress(1.0f);
+        uploadCallback.onFinish(fileId);
 
         // TODO: send exchange report
         //
     }
 
     public void stop() {
+        if (isStopping) {
+            return;
+        }
+
+        isStopping = true;
+
         // cancel getBucket
         if(futureGetBucket != null && !futureGetBucket.isDone()) {
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getBucket");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "getBucket");
             // will cause a CancellationException, and will be caught on bridge.getBucket
             futureGetBucket.cancel(true);
-            return;
         }
 
         // cancel isFileExists
         if(futureIsFileExists != null && !futureIsFileExists.isDone()) {
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "isFileExist");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "isFileExist");
             // will cause a CancellationException, and will be caught on bridge.isFileExists
             futureIsFileExists.cancel(true);
-            return;
         }
 
         // cancel requestNewFrame
         if(futureRequestNewFrame != null && !futureRequestNewFrame.isDone()) {
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestNewFrame");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "requestNewFrame");
             // will cause a CancellationException, and will be caught on bridge.requestNewFrame
             futureRequestNewFrame.cancel(true);
-            return;
         }
 
-        // TODO: cancel prepareFrame, pushFrame and pushShard, but actually, it can only cancel pushShard.
         if(futureAllFromPrepareFrame != null && !futureAllFromPrepareFrame.isDone()) {
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame");
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushShard");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushFrame");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushShard");
             // will cause a CancellationException, and will be caught on futureAllFromPrepareFrame.get()
+
+            // this call will only terminate pushShard, prepareFrame and pushFrame will not be terminated,
+            // but uploaderExecutor.shutdown() can terminate them
             futureAllFromPrepareFrame.cancel(true);
-            return;
         }
 
         // cancel createBucketEntry
         if(futureCreateBucketEntry != null && !futureCreateBucketEntry.isDone()) {
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "createBucketEntry");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "createBucketEntry");
             // will cause a CancellationException, and will be caught on this.createBucketEntry
             futureCreateBucketEntry.cancel(true);
-            return;
         }
+
+        uploaderExecutor.shutdown();
     }
 
     public void cancel() {

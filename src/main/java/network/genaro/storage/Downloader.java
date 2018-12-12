@@ -35,24 +35,6 @@ import static network.genaro.storage.Parameters.*;
 
 import static network.genaro.storage.Genaro.GenaroStrError;
 
-interface DownloadProgress {
-    default void onBegin() { System.out.println("Download started"); }
-
-    default void onFinish() {
-        System.out.println("Download finished");
-    }
-
-    default void onFail(String error) {
-        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
-    }
-
-    /**
-     * called when progress update
-     * @param progress range from 0 to 1
-     */
-    default void onProgress(float progress) { }
-}
-
 public class Downloader implements Runnable {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
@@ -61,7 +43,6 @@ public class Downloader implements Runnable {
     private Genaro bridge;
     private String bucketId;
     private String fileId;
-    private DownloadProgress progress;
 
     private AtomicLong downloadedBytes = new AtomicLong();
     private long totalBytes;
@@ -78,27 +59,33 @@ public class Downloader implements Runnable {
     private CompletableFuture<Void> futureAllRequestShard;
 
     private boolean isCanceled = false;
+    private boolean isStopping = false;
 
-    private final OkHttpClient okHttpClient;
+    private DownloadCallback downloadCallback;
 
-    // 使用CachedThreadPool比较耗内存，并发200+的时候会造成内存溢出
-    // private static final ExecutorService downloaderExecutor = Executors.newCachedThreadPool();
+    // 使用CachedThreadPool比较耗内存，并发高的时候会造成内存溢出
+    // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
 
     // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
-    private static final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
+    private final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
+    private final OkHttpClient downHttpClient = new OkHttpClient.Builder()
+            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+            .build();
+
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadCallback downloadCallback) {
         this.bridge = bridge;
-        this.okHttpClient = bridge.getOkHttpClient();
         this.fileId = fileId;
         this.bucketId = bucketId;
         this.path = path;
         this.tempPath = path + ".genarotemp";
-        this.progress = progress;
+        this.downloadCallback = downloadCallback;
     }
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path) {
-        this(bridge, bucketId, fileId, path, new DownloadProgress() {});
+        this(bridge, bucketId, fileId, path, new DownloadCallback() {});
     }
 
     public CompletableFuture<File> getFutureGetFileInfo() {
@@ -115,6 +102,10 @@ public class Downloader implements Runnable {
 
     public void setFutureGetPointers(CompletableFuture<List<Pointer>> futureGetPointers) {
         this.futureGetPointers = futureGetPointers;
+    }
+
+    public OkHttpClient getDownHttpClient() {
+        return downHttpClient;
     }
 
     class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
@@ -164,7 +155,7 @@ public class Downloader implements Runnable {
                     deltaDownloaded.addAndGet(delta);
 
                     if (deltaDownloaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
-                       progress.onProgress(downloadedBytes.floatValue() / totalBytes);
+                       downloadCallback.onProgress(downloadedBytes.floatValue() / totalBytes);
                        deltaDownloaded.set(0);
                    }
                 }
@@ -210,7 +201,7 @@ public class Downloader implements Runnable {
         logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
         RequestShardCallbackFuture future = new RequestShardCallbackFuture(pointer);
-        okHttpClient.newCall(request).enqueue(future);
+        downHttpClient.newCall(request).enqueue(future);
 
         try {
             future.get();
@@ -230,7 +221,7 @@ public class Downloader implements Runnable {
     }
 
     public void start() {
-        progress.onBegin();
+        downloadCallback.onBegin();
 
         // request info
         File file;
@@ -239,20 +230,20 @@ public class Downloader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                downloadCallback.onCancel();
             } else if(e instanceof TimeoutException) {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                downloadCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                downloadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                downloadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            downloadCallback.onCancel();
             return;
         }
 
@@ -263,20 +254,20 @@ public class Downloader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                downloadCallback.onCancel();
             } else if(e instanceof TimeoutException) {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                downloadCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                downloadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                downloadCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            downloadCallback.onCancel();
             return;
         }
 
@@ -297,7 +288,7 @@ public class Downloader implements Runnable {
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
             stop();
-            progress.onFail(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            downloadCallback.onFail(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
             return;
         }
 
@@ -325,7 +316,7 @@ public class Downloader implements Runnable {
                     StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
         } catch (IOException e) {
             stop();
-            progress.onFail("Create temp file error");
+            downloadCallback.onFail("Create temp file error");
             return;
         }
 
@@ -344,18 +335,18 @@ public class Downloader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                downloadCallback.onCancel();
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                progress.onFail(e.getCause().getMessage());
+                downloadCallback.onFail(e.getCause().getMessage());
             } else {
-                progress.onFail(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                downloadCallback.onFail(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            downloadCallback.onCancel();
             return;
         }
 
@@ -367,7 +358,7 @@ public class Downloader implements Runnable {
             downFileChannel.truncate(fileSize);
         } catch (IOException e) {
             stop();
-            progress.onFail(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
+            downloadCallback.onFail(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
             return;
         }
 
@@ -381,7 +372,7 @@ public class Downloader implements Runnable {
             fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
         } catch (Exception e) {
             stop();
-            progress.onFail("Generate file key error");
+            downloadCallback.onFail("Generate file key error");
             return;
         }
 
@@ -395,13 +386,13 @@ public class Downloader implements Runnable {
             cipher.init(DECRYPT_MODE, keySpec, iv);
         } catch (Exception e) {
             stop();
-            progress.onFail("Init decryption context error");
+            downloadCallback.onFail("Init decryption context error");
             return;
         }
 
         // check if cancel() is called
         if(isCanceled) {
-            progress.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            downloadCallback.onCancel();
             return;
         }
 
@@ -411,57 +402,63 @@ public class Downloader implements Runnable {
                 Files.copy(cypherIn, Paths.get(path));
             } catch (IOException e) {
                 stop();
-                progress.onFail("Create file error");
+                downloadCallback.onFail("Create file error");
                 return;
             }
         } catch (IOException e) {
             stop();
-            progress.onFail(GenaroStrError(GENARO_FILE_DECRYPTION_ERROR));
+            downloadCallback.onFail(GenaroStrError(GENARO_FILE_DECRYPTION_ERROR));
             return;
         }
 
         try {
             downFileChannel.close();
         } catch (Exception e) {
-            // do not call progress.onFail here
+            // do not call downloadCallback.onFail here
             logger.warn("File close exception");
         }
 
         logger.info("Decrypt complete, download is success");
 
         // download success
-        progress.onFinish();
+        downloadCallback.onFinish();
     }
 
     public void stop() {
+        if (isStopping) {
+            return;
+        }
+
+        isStopping = true;
+
         // cancel getFileInfo
         if(futureGetFileInfo != null && !futureGetFileInfo.isDone()) {
             // cancel the okhttp3 transfer
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getFileInfo");
+            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "getFileInfo");
             // will cause a CancellationException, and will be caught on bridge.getFileInfo
             futureGetFileInfo.cancel(true);
-            return;
         }
 
         // cancel getPointers
         if(futureGetPointers != null && !futureGetPointers.isDone()) {
             // cancel the okhttp3 transfer
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getPointersRaw");
+            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "getPointersRaw");
             // will cause a CancellationException, and will be caught on bridge.getPointers
             futureGetPointers.cancel(true);
-            return;
         }
 
         // cancel requestShard
         if(futureAllRequestShard != null && !futureAllRequestShard.isDone()) {
             // cancel the okhttp3 transfer
-            BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestShard");
+            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "requestShard");
             // will cause a CancellationException, and will be caught on futureAllRequestShard.get
             futureAllRequestShard.cancel(true);
-            return;
         }
+
+        downloaderExecutor.shutdown();
     }
 
+    // Non-blocking
     public void cancel() {
         isCanceled = true;
         stop();
