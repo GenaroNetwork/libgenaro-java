@@ -22,16 +22,14 @@ public class TestGenaro {
 //    private static final String TestbucketId = "5c0e5a8b312cfa12ae9f5bf3";
 
     public void testGetInfo() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
+        Genaro api = new Genaro(TestBridgeUrl, null);
         String info = api.getInfo();
         System.out.println(info);
     }
 
     public void testGetBuckets() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, null);
         Bucket[] bs = api.getBuckets();
 
         if(bs == null) {
@@ -46,11 +44,10 @@ public class TestGenaro {
     }
 
     public void testDeleteBucket() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         boolean success = api.deleteBucket("99bcb3bd3d9884905ccd3d62");
+
         if(success) {
             System.out.println("Delete success.");
         } else {
@@ -59,9 +56,8 @@ public class TestGenaro {
     }
 
     public void testRenameBucket() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         boolean success = api.renameBucket(TestbucketId, "呵呵");
 
         if(success) {
@@ -72,10 +68,8 @@ public class TestGenaro {
     }
 
     public void testGetBucket() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         Bucket b = api.getBucket(null, TestbucketId);
 
         if(b == null) {
@@ -86,10 +80,8 @@ public class TestGenaro {
     }
 
     public void testListFiles() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         File[] bs = api.listFiles(TestbucketId);
 
         if(bs == null) {
@@ -104,10 +96,8 @@ public class TestGenaro {
     }
 
     public void testIsFileExist() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
 
         String fileName = "2049k.data";
         String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), gw.getPrivateKey(), Hex.decode(TestbucketId));
@@ -121,9 +111,8 @@ public class TestGenaro {
     }
 
     public void testDeleteFile() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         boolean success = api.deleteFile(TestbucketId, "2c5b84e3d682afdce73dcdfd");
 
         if(success) {
@@ -134,9 +123,8 @@ public class TestGenaro {
     }
 
     public void testGetFileInfo() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         File file = api.getFileInfo(null, TestbucketId, "5c0e6872a72fc61208285155");
 
         if(file == null) {
@@ -147,11 +135,8 @@ public class TestGenaro {
     }
 
     public void testGetPointers() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-//        GenaroWallet gw = new GenaroWallet(V3JSON, "123456");
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
-
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         List<Pointer> psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
 
         if(psa == null) {
@@ -166,9 +151,8 @@ public class TestGenaro {
     }
 
     public void testRequestFrameId() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(gw);
+        Genaro api = new Genaro(TestBridgeUrl, gw);
         Frame frame = api.requestNewFrame(null);
 
         if(frame == null) {
@@ -179,15 +163,8 @@ public class TestGenaro {
     }
 
     public void testDownload() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-        GenaroWallet gw;
-        try {
-            gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        } catch (CipherException | IOException e) {
-            System.out.println(e.getMessage());
-            throw e;
-        }
-        api.logIn(gw);
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, gw);
 
 //            new Downloader(api, TestbucketId, "5c0dd2dbbbdd6f2d157dd059", "/Users/dingyi/Genaro/test/download/6.txt", new DownloadProgress() {
 //            new Downloader(api, TestbucketId, "5c0dd5b6bbdd6f2d157dd08c", "/Users/dingyi/Genaro/test/download/bbg.zip", new DownloadProgress() {
@@ -212,15 +189,8 @@ public class TestGenaro {
     }
 
     public void testDownload100() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-        GenaroWallet gw;
-        try {
-            gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        } catch (CipherException | IOException e) {
-            System.out.println(e.getMessage());
-            throw e;
-        }
-        api.logIn(gw);
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, gw);
 
         try {
             for(int i = 0; i < 100; i++) {
@@ -238,10 +208,8 @@ public class TestGenaro {
     }
 
     public void testUpload() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
-//        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
-        api.logIn(ww);
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, gw);
 
 //            new Uploader(api, "/Users/dingyi/Downloads/bzip2-1.0.5-bin.zip", "bzip2-1.0.5-bin.zip", "5ba341402e49103d8787e52d", new UploadProgress() {
 //        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadProgress() {
@@ -288,10 +256,8 @@ public class TestGenaro {
     }
 
     public void testUpload100() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl);
-        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
-//        GenaroWallet ww = new GenaroWallet(V3JSON, "123456");
-        api.logIn(ww);
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, gw);
 
         try {
             for(int i = 0; i < 100; i++) {

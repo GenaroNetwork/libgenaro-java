@@ -201,7 +201,6 @@ public class TestCryptoUtil {
     }
 
     public void testAesCtr() throws Exception {
-
         // make Iv byte[]
 //        byte[] iv  = Hex.decode("f123abc2f123abcf2123abc2f123abc2");
 //        // make key
@@ -218,9 +217,8 @@ public class TestCryptoUtil {
     }
 
     public void testGetPrivateKey() throws Exception {
-        Genaro api = new Genaro();
-        GenaroWallet ww = new GenaroWallet(V3JSON, "lgygn_9982");
-        api.logIn(ww);
+        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(null, gw);
 
         byte[] key = api.getPrivateKey();
         String keyStr = Hex.toHexString(key);

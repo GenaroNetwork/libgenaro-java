@@ -122,7 +122,7 @@ public class Uploader implements Runnable {
 
     public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final UploadProgress progress) {
         this.bridge = bridge;
-        this.okHttpClient = bridge.getOkHttplient();
+        this.okHttpClient = bridge.getOkHttpClient();
         this.rs = rs;
         this.originPath = filePath;
         this.fileName = fileName;

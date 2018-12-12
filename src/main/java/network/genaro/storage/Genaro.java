@@ -164,21 +164,33 @@ class ShardTracker {
 public class Genaro {
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
-    private final OkHttpClient okHttplient = new OkHttpClient.Builder()
+    private final OkHttpClient okHttpClient = new OkHttpClient.Builder()
             .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-    private String bridgeUrl = "http://118.31.61.119:8080";
+    private String bridgeUrl;
     private GenaroWallet wallet;
     private static final int POINT_PAGE_COUNT = 3;
 
-    public Genaro(final String bridgeUrl) {
+    public Genaro() {}
+
+    public Genaro(final String bridgeUrl, final GenaroWallet wallet) {
         this.bridgeUrl = bridgeUrl;
+        this.wallet = wallet;
     }
 
-    public Genaro() { }
+    public void Init(final String bridgeUrl, final GenaroWallet wallet) {
+        this.bridgeUrl = bridgeUrl;
+        this.wallet = wallet;
+    }
+
+    public void CheckInit() {
+        if (bridgeUrl == null || wallet == null) {
+            throw new GenaroRuntimeException("Please pass parameters to Genaro::Genaro or call Genaro::Init first!");
+        }
+    }
 
     public String getBridgeUrl() {
         return bridgeUrl;
@@ -188,8 +200,8 @@ public class Genaro {
         this.bridgeUrl = bridgeUrl;
     }
 
-    public OkHttpClient getOkHttplient() {
-        return okHttplient;
+    public OkHttpClient getOkHttpClient() {
+        return okHttpClient;
     }
 
     public static String GenaroStrError(int error_code)
@@ -272,14 +284,10 @@ public class Genaro {
         }
     }
 
-    public void logIn(final GenaroWallet wallet) {
-        this.wallet = wallet;
-    }
-
-    public byte[] getPrivateKey() { return this.wallet.getPrivateKey(); }
+    public byte[] getPrivateKey() { return wallet.getPrivateKey(); }
 
     public String getPublicKeyHexString() {
-        return this.wallet.getPublicKeyHexString();
+        return wallet.getPublicKeyHexString();
     }
 
     public String signRequest(final String method, final String path, final String body) throws NoSuchAlgorithmException {
@@ -288,15 +296,15 @@ public class Genaro {
     }
 
     public CompletableFuture<String> getInfoFuture() {
-//        Preconditions.checkNotNull(this.wallet, "Please login first");
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             Request request = new Request.Builder()
                     .url(bridgeUrl)
                     .get()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 String responseBody = response.body().string();
 
                 if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
@@ -327,6 +335,7 @@ public class Genaro {
     public CompletableFuture<Bucket> getBucketFuture(final String bucketId) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String signature = signRequest("GET", "/buckets/" + bucketId, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
@@ -337,7 +346,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -366,6 +375,7 @@ public class Genaro {
     public CompletableFuture<Bucket[]> getBucketsFuture() {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String signature = signRequest("GET", "/buckets", "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
@@ -375,7 +385,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -409,6 +419,7 @@ public class Genaro {
     public CompletableFuture<Boolean> deleteBucketFuture(final String bucketId) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String signature = signRequest("DELETE", "/buckets/" + bucketId, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
@@ -418,7 +429,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -447,8 +458,8 @@ public class Genaro {
     public CompletableFuture<Boolean> renameBucketFuture(final String bucketId, final String name) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
-
             String jsonStrBody = String.format("{\"name\": \"%s\", \"nameIsEncrypted\": true}", encryptedName);
 
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -462,7 +473,7 @@ public class Genaro {
                     .post(body)
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -482,27 +493,28 @@ public class Genaro {
     }
 
     CompletableFuture<File> getFileInfoFuture(final String bucketId, final String fileId) {
-         return BasicUtil.supplyAsync(() -> {
+        return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
             String signature = signRequest("GET", path, "");
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
-                    .tag("getFileInfo")
-                    .url(bridgeUrl + path)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .get()
-                    .build();
+                .tag("getFileInfo")
+                .url(bridgeUrl + path)
+                .header("x-signature", signature)
+                .header("x-pubkey", pubKey)
+                .get()
+                .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
                 if(code == 403 || code == 401) {
                     throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else if (code == 404 || code == 400) {
-                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                     throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
                 } else if(code == 500) {
                     throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
                 } else if (code != 200 && code != 304){
@@ -525,7 +537,7 @@ public class Genaro {
                 String erasureType = file.getErasure().getType();
                 if (erasureType != null) {
                     if (erasureType.equals("reedsolomon")) {
-                        file.setRs(true);
+                         file.setRs(true);
                     } else {
                         throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_UNSUPPORTED_ERASURE));
                     }
@@ -547,8 +559,8 @@ public class Genaro {
     public CompletableFuture<File[]> listFilesFuture(final String bucketId) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String path = String.format("/buckets/%s/files", bucketId);
-
             String signature = signRequest("GET", path, "");
 
             String pubKey = getPublicKeyHexString();
@@ -559,7 +571,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -596,6 +608,7 @@ public class Genaro {
     public CompletableFuture<Boolean> deleteFileFuture(final String bucketId, final String fileId) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String path = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String signature = signRequest("DELETE", path, "");
             String pubKey = getPublicKeyHexString();
@@ -606,7 +619,7 @@ public class Genaro {
                     .delete()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -635,6 +648,7 @@ public class Genaro {
     CompletableFuture<List<Pointer>> getPointersFuture(final String bucketId, final String fileId) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             List<Pointer> ps= new ArrayList<>();
 
             int skipCount = 0;
@@ -668,6 +682,7 @@ public class Genaro {
     private CompletableFuture<List<Pointer>> getPointersRawFuture(final String bucketId, final String fileId, final int limit, final int skipCount) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
             String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String path = String.format("%s?%s", url, queryArgs);
@@ -681,7 +696,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 
@@ -716,6 +731,7 @@ public class Genaro {
     CompletableFuture<Boolean> isFileExistFuture(final String bucketId, final String encryptedFileName) {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String escapedName = URLEncoder.encode(encryptedFileName, "UTF-8");
 
             String path = String.format("/buckets/%s/file-ids/%s", bucketId, escapedName);
@@ -729,7 +745,7 @@ public class Genaro {
                     .get()
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 response.close();
 
@@ -756,6 +772,7 @@ public class Genaro {
     CompletableFuture<Frame> requestNewFrameFuture() {
         return BasicUtil.supplyAsync(() -> {
 
+            CheckInit();
             String jsonStrBody = "{}";
 
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -770,7 +787,7 @@ public class Genaro {
                     .post(body)
                     .build();
 
-            try (Response response = okHttplient.newCall(request).execute()) {
+            try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
 

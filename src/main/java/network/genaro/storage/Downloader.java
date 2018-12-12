@@ -88,7 +88,7 @@ public class Downloader implements Runnable {
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final DownloadProgress progress) {
         this.bridge = bridge;
-        this.okHttpClient = bridge.getOkHttplient();
+        this.okHttpClient = bridge.getOkHttpClient();
         this.fileId = fileId;
         this.bucketId = bucketId;
         this.path = path;

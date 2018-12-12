@@ -22,9 +22,9 @@ public class GenaroWallet {
             walletFile = objectMapper.readValue(v3Json, WalletFile.class);
             ecKeyPair = Wallet.decrypt(password, walletFile);
         } catch (CipherException e) {
-            throw new CipherException("incorrect wallet password");
+            throw new CipherException("Incorrect wallet password");
         } catch (IOException e) {
-            throw new IOException("bad json string input");
+            throw new IOException("Bad json string input");
         }
     }
 
