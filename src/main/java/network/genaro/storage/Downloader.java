@@ -18,6 +18,7 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
@@ -176,8 +177,13 @@ public class Downloader implements Runnable {
                 }
 
                 logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
-            } catch (Exception e) {
-                super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR)));
+            } catch (IOException e) {
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestShard") will cause an SocketException
+                if (e instanceof SocketException) {
+                    super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED)));
+                } else {
+                    super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR)));
+                }
                 return;
             }
 
@@ -209,8 +215,13 @@ public class Downloader implements Runnable {
         try {
             future.get();
         } catch (Exception e) {
-            if(e instanceof ExecutionException && e.getCause() instanceof SocketTimeoutException) {
-                throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+            if(e instanceof ExecutionException) {
+                Throwable cause = e.getCause();
+                if (cause instanceof SocketTimeoutException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+                } else if (cause instanceof GenaroRuntimeException) {
+                    throw new GenaroRuntimeException(cause.getMessage());
+                }
             } else {
                 throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }

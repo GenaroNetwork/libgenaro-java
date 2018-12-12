@@ -13,6 +13,8 @@ import okhttp3.RequestBody;
 
 import org.bouncycastle.util.encoders.Hex;
 
+import java.io.IOException;
+import java.net.SocketException;
 import java.net.URLEncoder;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -323,6 +325,12 @@ public class Genaro {
                        "Description: " + description + "\n" +
                        "Version:     " + version + "\n" +
                        "Host:        " + host + "\n";
+            } catch (IOException e) {
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
         });
     }
@@ -359,8 +367,14 @@ public class Genaro {
                 ObjectMapper om = new ObjectMapper();
                 Bucket bucket = om.readValue(responseBody, Bucket.class);
                 return bucket;
+            } catch (IOException e) {
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getBucket") will cause an SocketException
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
-
         });
     }
 
@@ -407,6 +421,12 @@ public class Genaro {
                 }
 
                 return buckets;
+            } catch (IOException e) {
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
         });
     }
@@ -445,8 +465,13 @@ public class Genaro {
                     logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Failed to destroy bucket. (" + code + ")");
                 }
+            } catch (IOException e) {
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
-
         });
     }
 
@@ -482,8 +507,13 @@ public class Genaro {
                 }
 
                 return true;
+            } catch (IOException e) {
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
-
         });
     }
 
@@ -544,6 +574,13 @@ public class Genaro {
                 }
 
                 return file;
+            } catch (IOException e) {
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getFileInfo") will cause an SocketException
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
         });
     }
@@ -596,6 +633,12 @@ public class Genaro {
                 }
 
                 return files;
+            } catch (IOException e) {
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
         });
     }
@@ -635,8 +678,13 @@ public class Genaro {
                     logger.error(bodyNode.get("error").asText());
                     throw new GenaroRuntimeException("Failed to remove file from bucket. (" + code + ")");
                 }
+            } catch (IOException e) {
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
-
         });
     }
 
@@ -718,8 +766,14 @@ public class Genaro {
                 pointers.stream().forEach(pointer -> pointer.setMissing(pointer.getToken() == null || pointer.getFarmer() == null));
 
                 return pointers;
+            } catch (IOException e) {
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getPointersRaw") will cause an SocketException
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
-
         });
     }
 
@@ -756,8 +810,14 @@ public class Genaro {
                 } else {
                     throw new GenaroRuntimeException("Request file-ids failed");
                 }
+            } catch (IOException e) {
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "isFileExist") will cause an SocketException
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
-
         });
     }
 
@@ -802,6 +862,13 @@ public class Genaro {
                     }
                 } else {
                     throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_FRAME_ERROR));
+                }
+            } catch (IOException e) {
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestNewFrame") will cause an SocketException
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                 }
             }
         });

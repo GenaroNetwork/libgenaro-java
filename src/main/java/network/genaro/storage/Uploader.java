@@ -17,6 +17,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import java.io.*;
 import java.io.File;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -437,7 +438,12 @@ public class Uploader implements Runnable {
             FarmerPointer fp = om.readValue(responseBody, FarmerPointer.class);
             shard.setPointer(fp);
         } catch (IOException e) {
-            throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+            // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame") will cause an SocketException
+            if (e instanceof SocketException) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+            }
         }
 
         return shard;
@@ -527,7 +533,12 @@ public class Uploader implements Runnable {
         } catch (IOException e) {
             uploadedBytes.addAndGet(-shard.getUploadedSize());
             shard.setUploadedSize(0);
-            throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+            // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushShard") will cause an SocketException
+            if (e instanceof SocketException) {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else {
+                throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+            }
         }
 
         return shard;
@@ -598,7 +609,12 @@ public class Uploader implements Runnable {
 
                 fileId = bodyNode.get("id").asText();
             } catch (IOException e) {
-                throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "createBucketEntry") will cause an SocketException
+                if (e instanceof SocketException) {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                } else {
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
             }
 
             return null;
