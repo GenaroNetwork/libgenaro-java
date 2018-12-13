@@ -962,4 +962,20 @@ public class Genaro {
         }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
+
+    public Downloader resolveFile(final String bucketId, final String fileId, final String path, final ResolveFileCallback callback) {
+        Downloader downloader = new Downloader(this, bucketId, fileId, path, callback);
+        CompletableFuture<Void> fu = CompletableFuture.runAsync(downloader);
+        downloader.setFutureBelongsTo(fu);
+
+        return downloader;
+    }
+
+    public Uploader storeFile(final boolean rs, final String filePath, final String fileName, final String bucketId, final StoreFileCallback callback) {
+        Uploader uploader = new Uploader(this, rs, filePath, fileName, bucketId, callback);
+        CompletableFuture<Void> fu = CompletableFuture.runAsync(uploader);
+        uploader.setFutureBelongsTo(fu);
+
+        return uploader;
+    }
 }

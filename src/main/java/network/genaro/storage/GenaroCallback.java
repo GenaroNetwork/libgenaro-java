@@ -25,7 +25,7 @@ interface DeleteFileCallback {
     void onFail(String error);
 }
 
-interface DownloadCallback {
+interface ResolveFileCallback {
     default void onBegin() {
 //        System.out.println("Download started");
     }
@@ -48,7 +48,7 @@ interface DownloadCallback {
     default void onProgress(float progress) { }
 }
 
-interface UploadCallback {
+interface StoreFileCallback {
     default void onBegin(long fileSize) {
 //        System.out.println("Upload started");
     }

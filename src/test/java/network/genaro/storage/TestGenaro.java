@@ -199,20 +199,20 @@ public class TestGenaro {
         }
     }
 
-    public void testDownloadNewThread() throws Exception {
+    public void testDownload() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-//            Downloader downloader = new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadCallback() {
-//        Downloader downloader = new Downloader(api, TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadCallback() {
-        Downloader downloader = new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", new DownloadCallback() {
+//        Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
+//        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                System.out.printf("Download progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
@@ -228,58 +228,22 @@ public class TestGenaro {
             }
         });
 
-        Thread thread = new Thread(downloader);
-        thread.start();
-
-        thread.join();
-    }
-
-    public void testDownloadFuture() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-
-//            Downloader downloader = new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadCallback() {
-//        Downloader downloader = new Downloader(api, TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadCallback() {
-            Downloader downloader = new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", new DownloadCallback() {
-            @Override
-            public void onBegin() {
-                System.out.println("Download started");
-            }
-            @Override
-            public void onProgress(float progress) {
-//                System.out.printf("Download progress: %.1f%%\n", progress * 100);
-            }
-            @Override
-            public void onFail(String error) {
-                System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
-            }
-            @Override
-            public void onCancel() {
-                System.out.println("Download is cancelled");
-            }
-            @Override
-            public void onFinish() {
-                System.out.println("Download finished");
-            }
-        });
-
-        CompletableFuture<Void> downFuture = CompletableFuture.runAsync(downloader).thenRun(() -> System.out.println("aaaaaaa"));
-        downFuture.join();
+        downloader.join();
     }
 
     public void testDownloadCancel() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-//            Downloader downloader = new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadCallback() {
-        Downloader downloader = new Downloader(api, TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadCallback() {
+//            Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                System.out.printf("Download progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
@@ -295,21 +259,20 @@ public class TestGenaro {
             }
         });
 
-        CompletableFuture<Void> downFuture = CompletableFuture.runAsync(downloader).thenRun(() -> System.out.println("aaaaaaa"));
         Thread.sleep(5000);
         downloader.cancel();
-        downFuture.join();
+        downloader.join();
     }
 
     public void testDownloadParallel() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        List<Thread> threads = new ArrayList<>();
+        List<Downloader> downloaders = new ArrayList<>();
 
         try {
             for(int i = 0; i < 5; i++) {
-                Downloader downloader = new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new DownloadCallback() {
+                Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new ResolveFileCallback() {
                     @Override
                     public void onBegin() {
                         System.out.println("Download started");
@@ -332,74 +295,29 @@ public class TestGenaro {
                     }
                 });
 
-                Thread thread = new Thread(downloader);
-                thread.start();
-
-                threads.add(thread);
+                downloaders.add(downloader);
             }
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw e;
         }
 
-        threads.stream().forEach(thread -> {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-
-            }
-        });
-    }
-
-    public void testDownloadParallelFuture() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-
-        List<CompletableFuture<Void>> downFutures = new ArrayList<>();
-
-        for(int i = 0; i < 5; i++) {
-            Downloader downloader = new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new DownloadCallback() {
-                @Override
-                public void onBegin() {
-                    System.out.println("Download started");
-                }
-                @Override
-                public void onProgress(float progress) {
-//                        System.out.printf("Download progress: %.1f%%\n", progress * 100);
-                }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
-                }
-                @Override
-                public void onCancel() {
-                    System.out.println("Download is cancelled");
-                }
-                @Override
-                public void onFinish() {
-                    System.out.println("Download finished");
-                }
-            });
-
-            downFutures.add(CompletableFuture.runAsync(downloader));
-        }
-
-        downFutures.stream().forEach(downFuture -> downFuture.join());
+        downloaders.stream().forEach(downloader -> downloader.join());
     }
 
     public void testUpload() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "6.data", TestbucketId, new UploadCallback() {
-//        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new UploadCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "7.data", TestbucketId, new StoreFileCallback() {
+//        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
@@ -415,23 +333,21 @@ public class TestGenaro {
             }
         });
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(uploader);
-        fu.join();
+        uploader.join();
     }
 
     public void testUploadCancel() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-//        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadCallback() {
-        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new UploadCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "26.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
@@ -447,20 +363,19 @@ public class TestGenaro {
             }
         });
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(uploader);
-        Thread.sleep(4000);
+        Thread.sleep(5000);
         uploader.cancel();
-        fu.join();
+        uploader.join();
     }
 
-    public void testUploadParallelFuture() throws Exception {
+    public void testUploadParallel() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        List<CompletableFuture<Void>> upFutures = new ArrayList<>();
+        List<Uploader> uploaders = new ArrayList<>();
 
         for (int i = 0; i < 5; i++) {
-            Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/spam.txt", "spam12" + i + ".txt", TestbucketId, new UploadCallback() {
+            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam13" + i + ".txt", TestbucketId, new StoreFileCallback() {
                 @Override
                 public void onBegin(long fileSize) {
                     System.out.println("Upload started");
@@ -487,8 +402,9 @@ public class TestGenaro {
                 }
             });
 
-            upFutures.add(CompletableFuture.runAsync(uploader));
+            uploaders.add(uploader);
         }
-        upFutures.stream().forEach(upFuture -> upFuture.join());
+
+        uploaders.stream().forEach(uploader -> uploader.join());
     }
 }
