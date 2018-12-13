@@ -1,5 +1,30 @@
 package network.genaro.storage;
 
+interface GetBucketsCallback {
+    void onFinish(Bucket[] buckets);
+    void onFail(String error);
+}
+
+interface DeleteBucketCallback {
+    void onFinish();
+    void onFail(String error);
+}
+
+interface RenameBucketCallback {
+    void onFinish();
+    void onFail(String error);
+}
+
+interface ListFilesCallback {
+    void onFinish(File[] files);
+    void onFail(String error);
+}
+
+interface DeleteFileCallback {
+    void onFinish();
+    void onFail(String error);
+}
+
 interface DownloadCallback {
     default void onBegin() {
 //        System.out.println("Download started");

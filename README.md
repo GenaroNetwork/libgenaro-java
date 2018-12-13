@@ -136,8 +136,13 @@ Uploader uploader = new Uploader(api, rs, filePath, fileName, bucketId, new Uplo
     public void onProgress(float progress) { }
 });
 
+// use Thread:
 Thread thread = new Thread(uploader);
 thread.start();
+
+// you can use CompletableFuture either:
+// CompletableFuture<Void> upFuture = CompletableFuture.runAsync(uploader);
+// upFuture.join();
 
 // if you want to cancel upload, call uploader.cancel()
 ```
@@ -165,6 +170,10 @@ Downloader downloader = new Downloader(api, bucketId, fileId, filePath, new Down
 
 Thread thread = new Thread(downloader);
 thread.start();
+
+// you can use CompletableFuture either:
+// CompletableFuture<Void> downFuture = CompletableFuture.runAsync(downloader);
+// downFuture.join();
 
 // if you want to cancel download, call downloader.cancel()
 ```

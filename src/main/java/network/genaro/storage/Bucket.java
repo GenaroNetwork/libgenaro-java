@@ -11,6 +11,7 @@ public class Bucket {
     private String encryptionKey;
     private String created;
     private String name;
+    private String type;
     private long  limitStorage;
     private long  usedStorage;
     private long  timeStart;
@@ -70,13 +71,13 @@ public class Bucket {
 
     public void setTimeEnd(long timeEnd) { this.timeEnd = timeEnd; }
 
-    public String getId() {
-        return id;
-    }
+    public String getId() { return id; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public void setId(String id) { this.id = id; }
+
+    public String getType() { return type; }
+
+    public void setType(String type) { this.type = type; }
 
     @Override
     public String toString() {
@@ -85,6 +86,7 @@ public class Bucket {
                 ", bucketId='" + bucketId + '\'' +
                 ", nameIsEncrypted=" + nameIsEncrypted +
                 ", encryptionKey='" + encryptionKey + '\'' +
+                ", type=" + type + '\'' +
                 ", created='" + created + '\'' +
                 ", name='" + name + '\'' +
                 ", usedStorage=" + usedStorage +
