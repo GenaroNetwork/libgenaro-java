@@ -90,8 +90,10 @@ public class Uploader implements Runnable {
     private CompletableFuture<Void> futureAllFromPrepareFrame;
     private CompletableFuture<Void> futureCreateBucketEntry;
 
-    boolean isCanceled = false;
-    boolean isStopping = false;
+    // whether cancel() is called
+    private boolean isCanceled = false;
+    // ensure not stop again
+    private boolean isStopping = false;
 
     private UploadCallback uploadCallback;
 
@@ -117,39 +119,39 @@ public class Uploader implements Runnable {
         this.uploadCallback = uploadCallback;
     }
 
-    public CompletableFuture<Bucket> getFutureGetBucket() {
+    CompletableFuture<Bucket> getFutureGetBucket() {
         return futureGetBucket;
     }
 
-    public void setFutureGetBucket(CompletableFuture<Bucket> futureGetBucket) {
+    void setFutureGetBucket(CompletableFuture<Bucket> futureGetBucket) {
         this.futureGetBucket = futureGetBucket;
     }
 
-    public CompletableFuture<Boolean> getFutureIsFileExists() {
+    CompletableFuture<Boolean> getFutureIsFileExists() {
         return futureIsFileExists;
     }
 
-    public void setFutureIsFileExists(CompletableFuture<Boolean> futureIsFileExists) {
+    void setFutureIsFileExists(CompletableFuture<Boolean> futureIsFileExists) {
         this.futureIsFileExists = futureIsFileExists;
     }
 
-    public CompletableFuture<Frame> getFutureRequestNewFrame() {
+    CompletableFuture<Frame> getFutureRequestNewFrame() {
         return futureRequestNewFrame;
     }
 
-    public void setFutureRequestNewFrame(CompletableFuture<Frame> futureRequestNewFrame) {
+    void setFutureRequestNewFrame(CompletableFuture<Frame> futureRequestNewFrame) {
         this.futureRequestNewFrame = futureRequestNewFrame;
     }
 
-    public CompletableFuture<Void> getFutureCreateBucketEntry() {
+    CompletableFuture<Void> getFutureCreateBucketEntry() {
         return futureCreateBucketEntry;
     }
 
-    public void setFutureCreateBucketEntry(CompletableFuture<Void> futureCreateBucketEntry) {
+    void setFutureCreateBucketEntry(CompletableFuture<Void> futureCreateBucketEntry) {
         this.futureCreateBucketEntry = futureCreateBucketEntry;
     }
 
-    public OkHttpClient getUpHttpClient() {
+    OkHttpClient getUpHttpClient() {
         return upHttpClient;
     }
 
@@ -813,7 +815,7 @@ public class Uploader implements Runnable {
         //
     }
 
-    public void stop() {
+    private void stop() {
         if (isStopping) {
             return;
         }

@@ -58,7 +58,9 @@ public class Downloader implements Runnable {
     private CompletableFuture<List<Pointer>> futureGetPointers;
     private CompletableFuture<Void> futureAllRequestShard;
 
+    // whether cancel() is called
     private boolean isCanceled = false;
+    // ensure not stop again
     private boolean isStopping = false;
 
     private DownloadCallback downloadCallback;
@@ -88,27 +90,27 @@ public class Downloader implements Runnable {
         this(bridge, bucketId, fileId, path, new DownloadCallback() {});
     }
 
-    public CompletableFuture<File> getFutureGetFileInfo() {
+    CompletableFuture<File> getFutureGetFileInfo() {
         return futureGetFileInfo;
     }
 
-    public void setFutureGetFileInfo(CompletableFuture<File> futureGetFileInfo) {
+    void setFutureGetFileInfo(CompletableFuture<File> futureGetFileInfo) {
         this.futureGetFileInfo = futureGetFileInfo;
     }
 
-    public CompletableFuture<List<Pointer>> getFutureGetPointers() {
+    CompletableFuture<List<Pointer>> getFutureGetPointers() {
         return futureGetPointers;
     }
 
-    public void setFutureGetPointers(CompletableFuture<List<Pointer>> futureGetPointers) {
+    void setFutureGetPointers(CompletableFuture<List<Pointer>> futureGetPointers) {
         this.futureGetPointers = futureGetPointers;
     }
 
-    public OkHttpClient getDownHttpClient() {
+    OkHttpClient getDownHttpClient() {
         return downHttpClient;
     }
 
-    class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
+    private class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
 
         public RequestShardCallbackFuture(Pointer pointer) {
             this.pointer = pointer;
@@ -117,7 +119,7 @@ public class Downloader implements Runnable {
         private Pointer pointer;
         private static final int SEGMENT_SIZE = 2 * 1024;
 
-        public void fail() {
+        private void fail() {
             logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
             downloadedBytes.addAndGet(-pointer.getDownloadedSize());
             pointer.setDownloadedSize(0);
@@ -424,7 +426,7 @@ public class Downloader implements Runnable {
         downloadCallback.onFinish();
     }
 
-    public void stop() {
+    private void stop() {
         if (isStopping) {
             return;
         }

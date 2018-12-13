@@ -240,7 +240,7 @@ public class TestGenaro {
         List<Thread> threads = new ArrayList<>();
 
         try {
-            for(int i = 0; i < 10; i++) {
+            for(int i = 0; i < 5; i++) {
                 Downloader downloader = new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new DownloadCallback() {
                     @Override
                     public void onBegin() {
@@ -362,7 +362,7 @@ public class TestGenaro {
 
         try {
             for(int i = 0; i < 5; i++) {
-                Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/spam.txt", "spam10" + i + ".txt", TestbucketId, new UploadCallback() {
+                Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/spam.txt", "spam11" + i + ".txt", TestbucketId, new UploadCallback() {
                     @Override
                     public void onBegin(long fileSize) {
                         System.out.println("Upload started");
