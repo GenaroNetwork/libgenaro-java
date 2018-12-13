@@ -29,23 +29,22 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(() ->
-            api.getBuckets(new GetBucketsCallback() {
-                @Override
-                public void onFinish(Bucket[] buckets) {
-                    if(buckets.length == 0) {
-                        System.out.println("No buckets.");
-                    } else {
-                        for (Bucket b : buckets) {
-                            System.out.println(b);
-                        }
+        CompletableFuture<Void> fu = api.getBuckets(new GetBucketsCallback() {
+            @Override
+            public void onFinish(Bucket[] buckets) {
+                if(buckets.length == 0) {
+                    System.out.println("No buckets.");
+                } else {
+                    for (Bucket b : buckets) {
+                        System.out.println(b);
                     }
                 }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("List buckets failed, reason: " + error + ".");
-                }
-            }));
+            }
+            @Override
+            public void onFail(String error) {
+                System.out.println("List buckets failed, reason: " + error + ".");
+            }
+        });
 
         fu.join();
     }
@@ -54,17 +53,17 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(() ->
-            api.deleteBucket("5bfcf77cea9b6322c5abd929", new DeleteBucketCallback() {
-                @Override
-                public void onFinish() {
-                    System.out.println("Delete bucket success.");
-                }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("Delete bucket failed, reason: " + error + ".");
-                }
-            }));
+        CompletableFuture<Void> fu = api.deleteBucket("5bfcf77cea9b6322c5abd929", new DeleteBucketCallback() {
+            @Override
+            public void onFinish() {
+                System.out.println("Delete bucket success.");
+            }
+
+            @Override
+            public void onFail(String error) {
+                System.out.println("Delete bucket failed, reason: " + error + ".");
+            }
+        });
 
         fu.join();
     }
@@ -73,8 +72,7 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(() ->
-            api.renameBucket(TestbucketId, "啧啧", new RenameBucketCallback() {
+        CompletableFuture<Void> fu = api.renameBucket(TestbucketId, "呵呵", new RenameBucketCallback() {
             @Override
             public void onFinish() {
                 System.out.println("Rename bucket success.");
@@ -83,7 +81,7 @@ public class TestGenaro {
             public void onFail(String error) {
                 System.out.println("Rename bucket failed, reason: " + error + ".");
             }
-        }));
+        });
 
         fu.join();
     }
@@ -104,23 +102,22 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(() ->
-            api.listFiles(TestbucketId, new ListFilesCallback() {
-                @Override
-                public void onFinish(File[] files) {
-                    if(files.length == 0) {
-                        System.out.println("No files.");
-                    } else {
-                        for (File b : files) {
-                            System.out.println(b.toBriefString());
-                        }
+        CompletableFuture<Void> fu = api.listFiles(TestbucketId, new ListFilesCallback() {
+            @Override
+            public void onFinish(File[] files) {
+                if(files.length == 0) {
+                    System.out.println("No files.");
+                } else {
+                    for (File b : files) {
+                        System.out.println(b.toBriefString());
                     }
                 }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("List files failed, reason: " + error + ".");
-                }
-            }));
+            }
+            @Override
+            public void onFail(String error) {
+                System.out.println("List files failed, reason: " + error + ".");
+            }
+        });
 
         fu.join();
     }
@@ -144,17 +141,16 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        CompletableFuture<Void> fu = CompletableFuture.runAsync(() ->
-            api.deleteFile(TestbucketId, "5c0e1289bbdd6f2d157dd8b2", new DeleteFileCallback() {
-                @Override
-                public void onFinish() {
-                    System.out.println("Delete file success.");
-                }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("Delete file failed, reason: " + error + ".");
-                }
-            }));
+        CompletableFuture<Void> fu = api.deleteFile(TestbucketId, "5c10ee10bbdd6f2d157de097", new DeleteFileCallback() {
+            @Override
+            public void onFinish() {
+                System.out.println("Delete file success.");
+            }
+            @Override
+            public void onFail(String error) {
+                System.out.println("Delete file failed, reason: " + error + ".");
+            }
+        });
 
         fu.join();
     }
