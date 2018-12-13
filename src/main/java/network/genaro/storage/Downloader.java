@@ -39,6 +39,10 @@ import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Genaro.GenaroStrError;
 
 public class Downloader implements Runnable {
+    public static final int GENARO_MAX_REPORT_TRIES = 2;
+    public static final int GENARO_MAX_GET_POINTERS = 3;
+    public static final int GENARO_MAX_GET_FILE_INFO = 3;
+
     private static final Logger logger = LogManager.getLogger(Genaro.class);
 
     private String path;
@@ -259,21 +263,30 @@ public class Downloader implements Runnable {
         resolveFileCallback.onBegin();
 
         // request info
-        File file;
-        try {
-            file = bridge.getFileInfo(this, bucketId, fileId);
-        } catch (Exception e) {
-            stop();
-            if(e instanceof CancellationException) {
-                resolveFileCallback.onCancel();
-            } else if(e instanceof TimeoutException) {
-                resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                resolveFileCallback.onFail(e.getCause().getMessage());
-            } else {
-                resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+        File file = null;
+
+        for (int i = 0; i < GENARO_MAX_GET_FILE_INFO; i++) {
+            try {
+                file = bridge.getFileInfo(this, bucketId, fileId);
+            } catch (Exception e) {
+                if (i == GENARO_MAX_GET_FILE_INFO - 1) {
+                    stop();
+                    if (e instanceof CancellationException) {
+                        resolveFileCallback.onCancel();
+                    } else if (e instanceof TimeoutException) {
+                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                    } else if (e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                        resolveFileCallback.onFail(e.getCause().getMessage());
+                    } else {
+                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    }
+                    return;
+                }
+                // try again
+                continue;
             }
-            return;
+            // success
+            break;
         }
 
         // check if cancel() is called
@@ -283,21 +296,30 @@ public class Downloader implements Runnable {
         }
 
         // request pointers
-        List<Pointer> pointers;
-        try {
-            pointers = bridge.getPointers(this, bucketId, fileId);
-        } catch (Exception e) {
-            stop();
-            if(e instanceof CancellationException) {
-                resolveFileCallback.onCancel();
-            } else if(e instanceof TimeoutException) {
-                resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
-                resolveFileCallback.onFail(e.getCause().getMessage());
-            } else {
-                resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+        List<Pointer> pointers = null;
+
+        for (int i = 0; i < GENARO_MAX_GET_POINTERS; i++) {
+            try {
+                pointers = bridge.getPointers(this, bucketId, fileId);
+            } catch (Exception e) {
+                if (i == GENARO_MAX_GET_POINTERS - 1) {
+                    stop();
+                    if (e instanceof CancellationException) {
+                        resolveFileCallback.onCancel();
+                    } else if (e instanceof TimeoutException) {
+                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                    } else if (e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                        resolveFileCallback.onFail(e.getCause().getMessage());
+                    } else {
+                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    }
+                    return;
+                }
+                // try again
+                continue;
             }
-            return;
+            // success
+            break;
         }
 
         // check if cancel() is called
