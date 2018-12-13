@@ -355,6 +355,7 @@ public class Uploader implements Runnable {
         byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
 
         shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
+
         byte[] preleafSha256;
         byte[] preleafRipemd160;
 
@@ -858,7 +859,6 @@ public class Uploader implements Runnable {
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushFrame");
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushShard");
             // will cause a CancellationException, and will be caught on futureAllFromPrepareFrame.get()
-
             // this call will only terminate pushShard, prepareFrame and pushFrame will not be terminated,
             // but uploaderExecutor.shutdown() can terminate them
             futureAllFromPrepareFrame.cancel(true);

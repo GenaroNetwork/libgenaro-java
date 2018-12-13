@@ -9,6 +9,7 @@ import okhttp3.Call;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Hex;
+import org.xbill.DNS.utils.base16;
 
 import javax.crypto.CipherInputStream;
 import javax.crypto.spec.IvParameterSpec;
@@ -26,6 +27,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
@@ -43,6 +46,7 @@ public class Downloader implements Runnable {
     private Genaro bridge;
     private String bucketId;
     private String fileId;
+    private boolean overwrite;
 
     private AtomicLong downloadedBytes = new AtomicLong();
     private long totalBytes;
@@ -80,17 +84,18 @@ public class Downloader implements Runnable {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final ResolveFileCallback resolveFileCallback) {
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite, final ResolveFileCallback resolveFileCallback) {
         this.bridge = bridge;
         this.fileId = fileId;
         this.bucketId = bucketId;
         this.path = path;
+        this.overwrite = overwrite;
         this.tempPath = path + ".genarotemp";
         this.resolveFileCallback = resolveFileCallback;
     }
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path) {
-        this(bridge, bucketId, fileId, path, new ResolveFileCallback() {});
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite) {
+        this(bridge, bucketId, fileId, path, overwrite, new ResolveFileCallback() {});
     }
 
     CompletableFuture<File> getFutureGetFileInfo() {
@@ -157,10 +162,19 @@ public class Downloader implements Runnable {
 
             byte[] buff = new byte[SEGMENT_SIZE];
             int delta;
+            MessageDigest downloadedMd;
+            try {
+                downloadedMd = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR)));
+                return;
+            }
 
             try (InputStream is = response.body().byteStream();
                  BufferedInputStream bis = new BufferedInputStream(is)) {
                 while ((delta = bis.read(buff)) != -1) {
+                    downloadedMd.update(buff, 0, delta);
+
                     downFileChannel.write(ByteBuffer.wrap(buff, 0, delta), shardSize * pointer.getIndex() + pointer.getDownloadedSize());
                     pointer.setDownloadedSize(pointer.getDownloadedSize() + delta);
 
@@ -173,8 +187,11 @@ public class Downloader implements Runnable {
                    }
                 }
 
-                // if downloaded size is not the same with total size
-                if(pointer.getDownloadedSize() != pointer.getSize()) {
+                byte[] prehashSha256 = downloadedMd.digest();
+                byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
+
+                String downloadedHash = base16.toString(prehashRipemd160).toLowerCase();
+                if(pointer.getDownloadedSize() != pointer.getSize() || !downloadedHash.equals(pointer.getHash())) {
                     fail();
                     super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR)));
                     return;
@@ -234,6 +251,11 @@ public class Downloader implements Runnable {
     }
 
     public void start() {
+        if(!overwrite && Files.exists(Paths.get(path))) {
+            resolveFileCallback.onFail("File already exists");
+            return;
+        }
+
         resolveFileCallback.onBegin();
 
         // request info

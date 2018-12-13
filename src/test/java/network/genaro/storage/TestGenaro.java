@@ -201,7 +201,7 @@ public class TestGenaro {
 
 //        Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
 //        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new ResolveFileCallback() {
-        Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", true, new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
@@ -212,7 +212,7 @@ public class TestGenaro {
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -232,7 +232,7 @@ public class TestGenaro {
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
 //            Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
-        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", true, new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
@@ -243,7 +243,7 @@ public class TestGenaro {
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -268,7 +268,7 @@ public class TestGenaro {
 
         try {
             for(int i = 0; i < 5; i++) {
-                Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new ResolveFileCallback() {
+                Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", true, new ResolveFileCallback() {
                     @Override
                     public void onBegin() {
                         System.out.println("Download started");
@@ -279,7 +279,7 @@ public class TestGenaro {
                     }
                     @Override
                     public void onFail(String error) {
-                        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                        System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
                     }
                     @Override
                     public void onCancel() {
@@ -317,7 +317,7 @@ public class TestGenaro {
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -347,7 +347,7 @@ public class TestGenaro {
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {

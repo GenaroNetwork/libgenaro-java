@@ -2,24 +2,6 @@ package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-/*
-
-[{"index":0,
-"hash":"44ab343bf59d0ab5e7cb1deebcc485b9344c3638",
-"size":86918,
-"parity":false,
-"token":"beeb1cc8256bea01faa67bced8da003eb3944a67",
-
-"farmer":{
-"userAgent":"8.7.3",
-"protocol":"1.2.0-local",
-"address":"59.46.230.210",
-"port":9001,
-"nodeID":"70a8a597a49aa732860218292b73f6bbc2f63925",
-"lastSeen":"2018-11-06T09:34:47.564Z"},
-
-"operation":"PULL"}]
- */
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class Pointer {
     private int index;

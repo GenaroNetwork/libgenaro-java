@@ -983,8 +983,8 @@ public class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    public Downloader resolveFile(final String bucketId, final String fileId, final String path, final ResolveFileCallback callback) {
-        Downloader downloader = new Downloader(this, bucketId, fileId, path, callback);
+    public Downloader resolveFile(final String bucketId, final String fileId, final String path, final boolean overwrite, final ResolveFileCallback callback) {
+        Downloader downloader = new Downloader(this, bucketId, fileId, path, overwrite, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(downloader);
         downloader.setFutureBelongsTo(fu);
 
