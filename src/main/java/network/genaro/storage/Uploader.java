@@ -18,6 +18,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.io.File;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -154,20 +155,12 @@ public class Uploader implements Runnable {
         this.futureRequestNewFrame = futureRequestNewFrame;
     }
 
-    CompletableFuture<Void> getFutureCreateBucketEntry() {
-        return futureCreateBucketEntry;
-    }
-
     public CompletableFuture<Void> getFutureBelongsTo() {
         return futureBelongsTo;
     }
 
     public void setFutureBelongsTo(CompletableFuture<Void> futureBelongsTo) {
         this.futureBelongsTo = futureBelongsTo;
-    }
-
-    void setFutureCreateBucketEntry(CompletableFuture<Void> futureCreateBucketEntry) {
-        this.futureCreateBucketEntry = futureCreateBucketEntry;
     }
 
     OkHttpClient getUpHttpClient() {
@@ -428,6 +421,7 @@ public class Uploader implements Runnable {
             throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
         }
         String pubKey = bridge.getPublicKeyHexString();
+
         Request request = new Request.Builder()
                 .tag("pushFrame")
                 .url(bridge.getBridgeUrl() + path)
@@ -435,7 +429,6 @@ public class Uploader implements Runnable {
                 .header("x-pubkey", pubKey)
                 .put(body)
                 .build();
-
         for (int i = 0; i < GENARO_MAX_PUSH_FRAME; i++) {
             logger.info(String.format("Pushing frame for shard index %d(retry: %d) - JSON body: %s", shard.getIndex(), i, jsonStrBody));
             try {
@@ -458,6 +451,8 @@ public class Uploader implements Runnable {
                     // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame") will cause an SocketException
                     if (e instanceof SocketException) {
                         throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                    } else if (e instanceof SocketTimeoutException) {
+                        throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
                     } else {
                         throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                     }
@@ -561,9 +556,10 @@ public class Uploader implements Runnable {
                 } catch (IOException e) {
                     uploadedBytes.addAndGet(-shard.getUploadedSize());
                     shard.setUploadedSize(0);
-                    // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushShard") will cause an SocketException
                     if (e instanceof SocketException) {
                         throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
+                    } else if (e instanceof SocketTimeoutException) {
+                        throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
                     } else {
                         throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
                     }
@@ -582,101 +578,76 @@ public class Uploader implements Runnable {
         return shard;
     }
 
-    private CompletableFuture<Void> createBucketEntryFuture(final List<ShardTracker> shards) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                hmacId = getBucketEntryHmac(fileKey, shards);
-            } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-                throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_GENERATE_HMAC_ERROR));
-            }
-
-            logger.info(String.format("[%s] Creating bucket entry... ", fileName));
-
-            String jsonStrBody;
-            if (!rs) {
-                jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}}",
-                        frameId, encryptedFileName, Hex.toHexString(index), hmacId);
-            } else {
-                // TODO: ReedSolomn is not completed.
-                jsonStrBody = "";
-                //                  if (state->rs) {
-                //                      struct json_object *erasure = json_object_new_object();
-                //                      json_object *erasure_type = json_object_new_string("reedsolomon");
-                //                      json_object_object_add(erasure, "type", erasure_type);
-                //                      json_object_object_add(body, "erasure", erasure);
-                //                  }
-            }
-
-            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-            RequestBody body = RequestBody.create(JSON, jsonStrBody);
-            String path = "/buckets/" + bucketId + "/files";
-
-            String signature;
-            try {
-                signature = bridge.signRequest("POST", path, jsonStrBody);
-            } catch (NoSuchAlgorithmException e) {
-                throw new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR));
-            }
-
-            String pubKey = bridge.getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .tag("createBucketEntry")
-                    .url(bridge.getBridgeUrl() + path)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .post(body)
-                    .build();
-
-            for (int i = 0; i < GENARO_MAX_CREATE_BUCKET_ENTRY; i++) {
-                try {
-                    logger.info(String.format("Create bucket entry(retry: %d) - JSON body: %s", i, jsonStrBody));
-                    try (Response response = upHttpClient.newCall(request).execute()) {
-                        ObjectMapper om = new ObjectMapper();
-                        String responseBody = response.body().string();
-                        JsonNode bodyNode = om.readTree(responseBody);
-
-                        logger.info(String.format("Create bucket entry(retry: %d) - JSON Response: %s", i, responseBody));
-
-                        int code = response.code();
-
-                        if (code != 200 && code != 201) {
-                            String error = bodyNode.get("error").asText();
-                            logger.error(error);
-                            throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                        }
-
-                        logger.info("Successfully Added bucket entry");
-
-                        fileId = bodyNode.get("id").asText();
-                    } catch (IOException e) {
-                        // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "createBucketEntry") will cause an SocketException
-                        if (e instanceof SocketException) {
-                            throw new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED));
-                        } else {
-                            throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                        }
-                    }
-                } catch (GenaroRuntimeException e) {
-                    if(i == GENARO_MAX_CREATE_BUCKET_ENTRY - 1) {
-                        throw e;
-                    }
-                    // fail
-                    break;
-                }
-                // success
-                break;
-            }
-
-            return null;
-        });
-    }
-
-    private void createBucketEntry(final Uploader uploader, final List<ShardTracker> shards) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Void> fu = createBucketEntryFuture(shards);
-        if (uploader != null) {
-            uploader.setFutureCreateBucketEntry(fu);
+    private void createBucketEntry(final List<ShardTracker> shards) throws NoSuchAlgorithmException, IOException {
+        try {
+            hmacId = getBucketEntryHmac(fileKey, shards);
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new GenaroRuntimeException(GenaroStrError(GENARO_FILE_GENERATE_HMAC_ERROR));
         }
-        fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+
+        logger.info(String.format("[%s] Creating bucket entry... ", fileName));
+
+        String jsonStrBody;
+        if (!rs) {
+            jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}}",
+                    frameId, encryptedFileName, Hex.toHexString(index), hmacId);
+        } else {
+            // TODO: ReedSolomn is not completed.
+            jsonStrBody = "";
+            //                  if (state->rs) {
+            //                      struct json_object *erasure = json_object_new_object();
+            //                      json_object *erasure_type = json_object_new_string("reedsolomon");
+            //                      json_object_object_add(erasure, "type", erasure_type);
+            //                      json_object_object_add(body, "erasure", erasure);
+            //                  }
+        }
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(JSON, jsonStrBody);
+        String path = "/buckets/" + bucketId + "/files";
+
+        String signature;
+        signature = bridge.signRequest("POST", path, jsonStrBody);
+
+        String pubKey = bridge.getPublicKeyHexString();
+        Request request = new Request.Builder()
+                .tag("createBucketEntry")
+                .url(bridge.getBridgeUrl() + path)
+                .header("x-signature", signature)
+                .header("x-pubkey", pubKey)
+                .post(body)
+                .build();
+
+        for (int i = 0; i < GENARO_MAX_CREATE_BUCKET_ENTRY; i++) {
+            logger.info(String.format("Create bucket entry(retry: %d) - JSON body: %s", i, jsonStrBody));
+            try (Response response = upHttpClient.newCall(request).execute()) {
+                ObjectMapper om = new ObjectMapper();
+                String responseBody = response.body().string();
+                JsonNode bodyNode = om.readTree(responseBody);
+
+                logger.info(String.format("Create bucket entry(retry: %d) - JSON Response: %s", i, responseBody));
+
+                int code = response.code();
+
+                if (code != 200 && code != 201) {
+                    String error = bodyNode.get("error").asText();
+                    logger.error(error);
+                    throw new GenaroRuntimeException(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                }
+
+                logger.info("Successfully Added bucket entry");
+
+                fileId = bodyNode.get("id").asText();
+            } catch (IOException | GenaroRuntimeException e) {
+                if(i == GENARO_MAX_CREATE_BUCKET_ENTRY - 1) {
+                    throw e;
+                }
+                // try again
+                continue;
+            }
+            // success
+            break;
+        }
     }
 
     public void start() {
@@ -854,6 +825,7 @@ public class Uploader implements Runnable {
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else {
+                logger.warn("Warn: Can not get here");
                 storeFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
@@ -873,15 +845,17 @@ public class Uploader implements Runnable {
         }
 
         try {
-            createBucketEntry(this, shards);
+            createBucketEntry(shards);
         } catch (Exception e) {
             stop();
-            if(e instanceof CancellationException) {
-                storeFileCallback.onCancel();
-            } else if(e instanceof TimeoutException) {
-                storeFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+            if(e instanceof GenaroRuntimeException) {
                 storeFileCallback.onFail(e.getCause().getMessage());
+            } else if(e instanceof NoSuchAlgorithmException) {
+                storeFileCallback.onFail(GenaroStrError(GENARO_ALGORITHM_ERROR));
+            } else if (e instanceof SocketException) {
+                storeFileCallback.onFail(GenaroStrError(GENARO_TRANSFER_CANCELED));
+            } else if (e instanceof SocketTimeoutException) {
+                storeFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else {
                 storeFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
