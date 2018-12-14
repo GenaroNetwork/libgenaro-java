@@ -158,24 +158,32 @@ public class TestGenaro {
     public void testGetFileInfo() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
-        File file = api.getFileInfo(null, TestbucketId, "5c0e6872a72fc61208285155");
+        File file;
 
-        if(file == null) {
-            System.out.println("Get file info failed.");
-        } else {
-            System.out.println(file);
+        try {
+            file = api.getFileInfo(null, TestbucketId, "5c0e6872a72fc61208285155");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
         }
+
+        System.out.println(file);
     }
 
     public void testGetPointers() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
-        List<Pointer> psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
+        List<Pointer> psa;
 
-        if(psa == null) {
-            System.out.println("Error!");
-        } else if(psa.size() == 0) {
-            System.out.println("No such file or pointer invalid.");
+        try {
+            psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
+        }
+
+        if(psa.size() == 0) {
+            System.out.println("No pointers.");
         } else {
             for (Pointer p : psa) {
                 System.out.println(p);
@@ -186,13 +194,16 @@ public class TestGenaro {
     public void testRequestFrameId() throws Exception {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
-        Frame frame = api.requestNewFrame(null);
 
-        if(frame == null) {
-            System.out.println("Error!");
-        } else {
-            System.out.println(frame);
+        Frame frame;
+        try {
+            frame = api.requestNewFrame(null);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
         }
+
+        System.out.println(frame);
     }
 
     public void testDownload() throws Exception {
@@ -305,7 +316,7 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "8.data", TestbucketId, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "9.data", TestbucketId, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {

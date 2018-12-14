@@ -26,6 +26,7 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 This library use Java Future/Execution framework, and the following 3rd party libs.
 
 - [Bouncy Castle](https://www.bouncycastle.org/java.html) for crypto algorithms.
+- [dnsjava](http://www.xbill.org/dnsjava/) for base16 encoding.
 - [web3j](https://github.com/web3j/web3j) for wallet managment, BIP39 and Interaction with blockchain.
 - [JavaReedSolomon](https://github.com/Backblaze/JavaReedSolomon) for reed solomon algorithm.
 - [jackson](https://github.com/FasterXML/jackson) for JSON parse/compose.

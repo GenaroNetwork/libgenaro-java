@@ -20,7 +20,7 @@
         </repository>
 
         <repository>
-            <id>central</id>
+            <id>Jabylon</id>
             <name>Jabylon Repository</name>
             <url>http://www.jabylon.org/maven/</url>
             <layout>default</layout>

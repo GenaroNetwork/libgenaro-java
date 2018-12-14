@@ -4,6 +4,11 @@ target/classes/network
 target/generated-sources
 target/generated-test-sources
 target/test-classes
+target/maven-archiver
+target/maven-status
+target/surefire
+target/surefire-reports
+target/genaro-sdk-0.1.jar
 .classpath
 .factorypath
 .project

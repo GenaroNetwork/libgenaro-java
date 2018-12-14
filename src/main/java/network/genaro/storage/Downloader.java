@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static network.genaro.storage.Parameters.*;
 
-import static network.genaro.storage.Genaro.GenaroStrError;
+import static network.genaro.storage.Genaro.genaroStrError;
 
 public class Downloader implements Runnable {
     // each shard has GENARO_DEFAULT_MIRRORS mirrors(not include the first uploaded shard) at most
@@ -160,7 +160,7 @@ public class Downloader implements Runnable {
 
             if(errorStatus != 0) {
                 fail();
-                super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FILE_WRITE_ERROR)));
+                super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_FILE_WRITE_ERROR)));
                 return;
             }
 
@@ -170,7 +170,7 @@ public class Downloader implements Runnable {
             try {
                 downloadedMd = MessageDigest.getInstance("SHA-256");
             } catch (NoSuchAlgorithmException e) {
-                super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_ALGORITHM_ERROR)));
+                super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_ALGORITHM_ERROR)));
                 return;
             }
 
@@ -197,7 +197,7 @@ public class Downloader implements Runnable {
                 String downloadedHash = base16.toString(prehashRipemd160).toLowerCase();
                 if(pointer.getDownloadedSize() != pointer.getSize() || !downloadedHash.equals(pointer.getHash())) {
                     fail();
-                    super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_INTEGRITY_ERROR)));
+                    super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR)));
                     return;
                 }
 
@@ -205,9 +205,9 @@ public class Downloader implements Runnable {
             } catch (IOException e) {
                 // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestShard") will cause an SocketException
                 if (e instanceof SocketException) {
-                    super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_TRANSFER_CANCELED)));
+                    super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED)));
                 } else {
-                    super.completeExceptionally(new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR)));
+                    super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR)));
                 }
                 return;
             }
@@ -243,12 +243,12 @@ public class Downloader implements Runnable {
             if(e instanceof ExecutionException) {
                 Throwable cause = e.getCause();
                 if (cause instanceof SocketTimeoutException) {
-                    throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
                 } else if (cause instanceof GenaroRuntimeException) {
                     throw new GenaroRuntimeException(cause.getMessage());
                 }
             } else {
-                throw new GenaroRuntimeException(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
         }
         return null;
@@ -274,11 +274,11 @@ public class Downloader implements Runnable {
                     if (e instanceof CancellationException) {
                         resolveFileCallback.onCancel();
                     } else if (e instanceof TimeoutException) {
-                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                        resolveFileCallback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
                     } else if (e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                         resolveFileCallback.onFail(e.getCause().getMessage());
                     } else {
-                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                        resolveFileCallback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                     }
                     return;
                 }
@@ -307,11 +307,11 @@ public class Downloader implements Runnable {
                     if (e instanceof CancellationException) {
                         resolveFileCallback.onCancel();
                     } else if (e instanceof TimeoutException) {
-                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                        resolveFileCallback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
                     } else if (e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                         resolveFileCallback.onFail(e.getCause().getMessage());
                     } else {
-                        resolveFileCallback.onFail(GenaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                        resolveFileCallback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                     }
                     return;
                 }
@@ -345,7 +345,7 @@ public class Downloader implements Runnable {
 
         if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
             stop();
-            resolveFileCallback.onFail(GenaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            resolveFileCallback.onFail(genaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
             return;
         }
 
@@ -397,7 +397,7 @@ public class Downloader implements Runnable {
                 resolveFileCallback.onFail(e.getCause().getMessage());
             } else {
                 logger.warn("Warn: Can not get here");
-                resolveFileCallback.onFail(GenaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                resolveFileCallback.onFail(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
             return;
         }
@@ -416,7 +416,7 @@ public class Downloader implements Runnable {
             downFileChannel.truncate(fileSize);
         } catch (IOException e) {
             stop();
-            resolveFileCallback.onFail(GenaroStrError(GENARO_FILE_RESIZE_ERROR));
+            resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RESIZE_ERROR));
             return;
         }
 
@@ -469,7 +469,7 @@ public class Downloader implements Runnable {
             }
         } catch (IOException e) {
             stop();
-            resolveFileCallback.onFail(GenaroStrError(GENARO_FILE_DECRYPTION_ERROR));
+            resolveFileCallback.onFail(genaroStrError(GENARO_FILE_DECRYPTION_ERROR));
             return;
         }
 
