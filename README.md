@@ -41,6 +41,7 @@ This library use Java Future/Execution framework, and the following 3rd party li
 Initialize:
 
 ```java
+String bridgeUrl = "http://192.168.50.206:8080";
 String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"crypto\": { \"cipher\": \"aes-128-ctr\",
         \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\",
@@ -50,14 +51,12 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
         \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
 String passwd = "xxxxxx";
-String bridgeUrl = "http://192.168.50.206:8080";
-GenaroWallet gw;
+GenaroWallet api;
 try {
-    gw = new GenaroWallet(V3JSON, passwd);
+    api = new Genaro(bridgeUrl, V3JSON, passwd);
 } catch (Exception e) {
     return;
 }
-Genaro api = new Genaro(bridgeUrl, gw);
 ```
 
 List buckets:
