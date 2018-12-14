@@ -3,7 +3,19 @@ package network.genaro.storage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
-public class Pointer {
+class Pointer {
+    public enum PointerStatus
+    {
+        POINTER_BEING_REPLACED,
+        POINTER_ERROR_REPORTED,
+        POINTER_ERROR,
+        POINTER_CREATED,
+        POINTER_BEING_DOWNLOADED,
+        POINTER_DOWNLOADED,
+        POINTER_MISSING,
+        POINTER_FINISHED
+    }
+
     private int index;
     private String hash;
     private long size;
@@ -13,12 +25,7 @@ public class Pointer {
     private String token;
     private String operation;
     private Farmer farmer;
-
     private long downloadedSize;
-
-    private boolean isMissing;
-
-    // extra
     private PointerStatus status;
 
     public PointerStatus getStatus() {
@@ -107,17 +114,8 @@ public class Pointer {
                 '}';
     }
 
-    //
-    public boolean isPointCreated() {
-        return token != null && farmer != null;
-    }
-
     public boolean isMissing() {
-        return isMissing;
-    }
-
-    public void setMissing(boolean missing) {
-        isMissing = missing;
+        return status == PointerStatus.POINTER_MISSING;
     }
 
     public long getDownloadedSize() {
@@ -126,18 +124,6 @@ public class Pointer {
 
     public void setDownloadedSize(long downloadedSize) {
         this.downloadedSize = downloadedSize;
-    }
-
-    public enum PointerStatus
-    {
-        POINTER_BEING_REPLACED,
-        POINTER_ERROR_REPORTED,
-        POINTER_ERROR,
-        POINTER_CREATED,
-        POINTER_BEING_DOWNLOADED,
-        POINTER_DOWNLOADED,
-        POINTER_MISSING,
-        POINTER_FINISHED
     }
 
 }

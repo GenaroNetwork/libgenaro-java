@@ -583,7 +583,7 @@ public class Uploader implements Runnable {
     }
 
     private CompletableFuture<Void> createBucketEntryFuture(final List<ShardTracker> shards) {
-        return BasicUtil.supplyAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             try {
                 hmacId = getBucketEntryHmac(fileKey, shards);
             } catch (NoSuchAlgorithmException | InvalidKeyException e) {
@@ -839,8 +839,8 @@ public class Uploader implements Runnable {
         CompletableFuture[] upFutures = shards
                 .stream()
                 .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
-                .map(future -> future.thenApply(this::pushFrame))
-                .map(future -> future.thenApply(this::pushShard))
+                .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
                 .toArray(CompletableFuture[]::new);
 
         futureAllFromPrepareFrame = CompletableFuture.allOf(upFutures);

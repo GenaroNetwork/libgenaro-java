@@ -3,7 +3,7 @@ package network.genaro.storage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class File {
+class File {
 
     public class Hmac {
         String value;

@@ -28,6 +28,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import static network.genaro.storage.Parameters.*;
+import static network.genaro.storage.Pointer.PointerStatus.*;
 
 class ShardMeta {
     private String hash;
@@ -839,7 +840,11 @@ public class Genaro {
                 }
 
                 List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
-                pointers.stream().forEach(pointer -> pointer.setMissing(pointer.getToken() == null || pointer.getFarmer() == null));
+                pointers.stream().forEach(pointer -> {
+                    if (pointer.getToken() == null || pointer.getFarmer() == null) {
+                        pointer.setStatus(POINTER_MISSING);
+                    }
+                });
 
                 return pointers;
             } catch (IOException e) {

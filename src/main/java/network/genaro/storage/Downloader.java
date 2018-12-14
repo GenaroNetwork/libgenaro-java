@@ -39,6 +39,8 @@ import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Genaro.GenaroStrError;
 
 public class Downloader implements Runnable {
+    // each shard has GENARO_DEFAULT_MIRRORS mirrors(not include the first uploaded shard) at most
+    public static final int GENARO_DEFAULT_MIRRORS = 5;
     public static final int GENARO_MAX_REPORT_TRIES = 2;
     public static final int GENARO_MAX_GET_POINTERS = 3;
     public static final int GENARO_MAX_GET_FILE_INFO = 3;

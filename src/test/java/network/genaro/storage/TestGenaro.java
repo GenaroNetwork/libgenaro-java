@@ -305,7 +305,7 @@ public class TestGenaro {
         GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
         Genaro api = new Genaro(TestBridgeUrl, gw);
 
-        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "7.data", TestbucketId, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "8.data", TestbucketId, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
@@ -371,7 +371,7 @@ public class TestGenaro {
         List<Uploader> uploaders = new ArrayList<>();
 
         for (int i = 0; i < 5; i++) {
-            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam13" + i + ".txt", TestbucketId, new StoreFileCallback() {
+            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam14" + i + ".txt", TestbucketId, new StoreFileCallback() {
                 @Override
                 public void onBegin(long fileSize) {
                     System.out.println("Upload started");
