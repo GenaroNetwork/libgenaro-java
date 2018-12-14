@@ -1,72 +1,85 @@
 package network.genaro.storage;
 
-interface GetBucketsCallback {
-    void onFinish(Bucket[] buckets);
-    void onFail(String error);
-}
+public interface GenaroCallback {
+    interface GetBucketsCallback {
+        void onFinish(Bucket[] buckets);
 
-interface DeleteBucketCallback {
-    void onFinish();
-    void onFail(String error);
-}
-
-interface RenameBucketCallback {
-    void onFinish();
-    void onFail(String error);
-}
-
-interface ListFilesCallback {
-    void onFinish(File[] files);
-    void onFail(String error);
-}
-
-interface DeleteFileCallback {
-    void onFinish();
-    void onFail(String error);
-}
-
-interface ResolveFileCallback {
-    default void onBegin() {
-//        System.out.println("Download started");
+        void onFail(String error);
     }
 
-    default void onFinish() {
-//        System.out.println("Download finished");
+    interface DeleteBucketCallback {
+        void onFinish();
+
+        void onFail(String error);
     }
 
-    default void onFail(String error) {
-//        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+    interface RenameBucketCallback {
+        void onFinish();
+
+        void onFail(String error);
     }
 
-    // after Uploader::cancel is called
-    default void onCancel() { }
+    interface ListFilesCallback {
+        void onFinish(File[] files);
 
-    /**
-     * called when progress update
-     * @param progress range from 0 to 1
-     */
-    default void onProgress(float progress) { }
-}
-
-interface StoreFileCallback {
-    default void onBegin(long fileSize) {
-//        System.out.println("Upload started");
+        void onFail(String error);
     }
 
-    default void onFinish(String fileId) {
-//        System.out.println("Upload finished, fileId: " + fileId);
+    interface DeleteFileCallback {
+        void onFinish();
+
+        void onFail(String error);
     }
 
-    default void onFail(String error) {
-//        System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+    interface ResolveFileCallback {
+        default void onBegin() {
+            //        System.out.println("Download started");
+        }
+
+        default void onFinish() {
+            //        System.out.println("Download finished");
+        }
+
+        default void onFail(String error) {
+            //        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+        }
+
+        // after Uploader::cancel is called
+        default void onCancel() {
+        }
+
+        /**
+         * called when progress update
+         *
+         * @param progress range from 0 to 1
+         */
+        default void onProgress(float progress) {
+        }
     }
 
-    // after Uploader::cancel is called
-    default void onCancel() { }
+    interface StoreFileCallback {
+        default void onBegin(long fileSize) {
+            //        System.out.println("Upload started");
+        }
 
-    /**
-     * called when progress update
-     * @param progress range from 0 to 1
-     */
-    default void onProgress(float progress) { }
+        default void onFinish(String fileId) {
+            //        System.out.println("Upload finished, fileId: " + fileId);
+        }
+
+        default void onFail(String error) {
+            //        System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+        }
+
+        // after Uploader::cancel is called
+        default void onCancel() {
+        }
+
+        /**
+         * called when progress update
+         *
+         * @param progress range from 0 to 1
+         */
+        default void onProgress(float progress) {
+        }
+    }
 }

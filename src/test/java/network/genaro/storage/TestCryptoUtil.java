@@ -213,8 +213,7 @@ public class TestCryptoUtil {
     }
 
     public void testGetPrivateKey() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(null, gw);
+        Genaro api = new Genaro(null, V3JSON, "lgygn_9982");
 
         byte[] key = api.getPrivateKey();
         String keyStr = Hex.toHexString(key);

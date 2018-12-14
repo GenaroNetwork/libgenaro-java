@@ -14,6 +14,8 @@ import org.bouncycastle.util.encoders.Hex;
 import javax.crypto.CipherInputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.Mac;
+import static javax.crypto.Cipher.ENCRYPT_MODE;
 
 import java.io.*;
 import java.io.File;
@@ -30,16 +32,12 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static javax.crypto.Cipher.ENCRYPT_MODE;
-
 import org.xbill.DNS.utils.base16;
 
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
-
-import javax.crypto.Mac;
-
 import static network.genaro.storage.Genaro.genaroStrError;
+import network.genaro.storage.GenaroCallback.*;
 
 public class Uploader implements Runnable {
     public static final int GENARO_MAX_REPORT_TRIES = 2;

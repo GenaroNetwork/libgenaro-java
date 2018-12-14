@@ -32,8 +32,8 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import network.genaro.storage.GenaroCallback.*;
 import static network.genaro.storage.Parameters.*;
-
 import static network.genaro.storage.Genaro.genaroStrError;
 
 public class Downloader implements Runnable {

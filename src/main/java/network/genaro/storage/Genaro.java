@@ -22,13 +22,14 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.*;
 
-import static network.genaro.storage.CryptoUtil.*;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.web3j.crypto.CipherException;
 
+import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Pointer.PointerStatus.*;
+import network.genaro.storage.GenaroCallback.*;
 
 class ShardMeta {
     private String hash;
@@ -180,13 +181,21 @@ public class Genaro {
 
     public Genaro() {}
 
-    public Genaro(final String bridgeUrl, final GenaroWallet wallet) {
-        this.bridgeUrl = bridgeUrl;
-        this.wallet = wallet;
+    public Genaro(final String bridgeUrl) {
+        init(bridgeUrl);
     }
 
-    public void init(final String bridgeUrl, final GenaroWallet wallet) {
+    public Genaro(final String bridgeUrl, final String privKey, final String passwd) throws CipherException, IOException {
+        init(bridgeUrl, privKey, passwd);
+    }
+
+    public void init(final String bridgeUrl) {
         this.bridgeUrl = bridgeUrl;
+    }
+
+    public void init(final String bridgeUrl, final String privKey, final String passwd) throws CipherException, IOException {
+        this.bridgeUrl = bridgeUrl;
+        GenaroWallet wallet = new GenaroWallet(privKey, passwd);
         this.wallet = wallet;
     }
 
@@ -433,7 +442,7 @@ public class Genaro {
                     // decrypt
                     for (Bucket b : buckets) {
                         if (b.getNameIsEncrypted()) {
-                            b.setName(CryptoUtil.decryptMetaHmacSha512(b.getName(), wallet.getPrivateKey(), BUCKET_NAME_MAGIC));
+                            b.setName(CryptoUtil.decryptMetaHmacSha512(b.getName(), getPrivateKey(), BUCKET_NAME_MAGIC));
                             b.setNameIsEncrypted(false);
                         }
                     }
@@ -505,7 +514,7 @@ public class Genaro {
             checkInit(true);
             String encryptedName;
             try {
-                encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), wallet.getPrivateKey(), BUCKET_NAME_MAGIC);
+                encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), getPrivateKey(), BUCKET_NAME_MAGIC);
             } catch (Exception e) {
                 callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
                 return null;
@@ -603,7 +612,7 @@ public class Genaro {
                 String realName;
                 try {
                     file = om.readValue(responseBody, File.class);
-                    realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+                    realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), getPrivateKey(), Hex.decode(bucketId));
                 } catch (Exception e) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_FILEINFO_ERROR));
                 }
@@ -684,7 +693,7 @@ public class Genaro {
                 try {
                     // decrypt
                     for (File f : files) {
-                        String realName = CryptoUtil.decryptMetaHmacSha512(f.getFilename(), wallet.getPrivateKey(), Hex.decode(bucketId));
+                        String realName = CryptoUtil.decryptMetaHmacSha512(f.getFilename(), getPrivateKey(), Hex.decode(bucketId));
                         f.setFilename(realName);
                     }
                 } catch (Exception e) {

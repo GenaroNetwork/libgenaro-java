@@ -12,7 +12,7 @@ import java.security.NoSuchAlgorithmException;
 
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 
-class GenaroWallet {
+public class GenaroWallet {
     private ECKeyPair ecKeyPair;
 
     public GenaroWallet(String v3Json, String password) throws CipherException, IOException {
