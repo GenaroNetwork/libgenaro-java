@@ -51,7 +51,7 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
         \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
 String passwd = "xxxxxx";
-GenaroWallet api;
+Genaro api;
 try {
     api = new Genaro(bridgeUrl, V3JSON, passwd);
 } catch (Exception e) {
