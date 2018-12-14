@@ -24,9 +24,7 @@ import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -459,7 +457,11 @@ public class Downloader implements Runnable {
         try (InputStream in = Channels.newInputStream(downFileChannel);
              InputStream cypherIn = new CipherInputStream(in, cipher)) {
             try {
-                Files.copy(cypherIn, Paths.get(path));
+                if (overwrite) {
+                    Files.copy(cypherIn, Paths.get(path), StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.copy(cypherIn, Paths.get(path));
+                }
             } catch (IOException e) {
                 stop();
                 resolveFileCallback.onFail("Create file error");
