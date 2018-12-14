@@ -26,6 +26,7 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 This library use Java Future/Execution framework, and the following 3rd party libs.
 
 - [Bouncy Castle](https://www.bouncycastle.org/java.html) for crypto algorithms.
+- [dnsjava](http://www.xbill.org/dnsjava/) for base16 encoding.
 - [web3j](https://github.com/web3j/web3j) for wallet managment, BIP39 and Interaction with blockchain.
 - [JavaReedSolomon](https://github.com/Backblaze/JavaReedSolomon) for reed solomon algorithm.
 - [jackson](https://github.com/FasterXML/jackson) for JSON parse/compose.
@@ -40,6 +41,7 @@ This library use Java Future/Execution framework, and the following 3rd party li
 Initialize:
 
 ```java
+String bridgeUrl = "http://192.168.50.206:8080";
 String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"crypto\": { \"cipher\": \"aes-128-ctr\",
         \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\",
@@ -49,97 +51,105 @@ String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
         \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
         \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
 String passwd = "xxxxxx";
-String bridgeUrl = "http://192.168.50.206:8080";
-GenaroWallet gw;
+GenaroWallet api;
 try {
-    gw = new GenaroWallet(V3JSON, passwd);
+    api = new Genaro(bridgeUrl, V3JSON, passwd);
 } catch (Exception e) {
     return;
 }
-Genaro api = new Genaro(bridgeUrl, gw);
 ```
 
 List buckets:
 
 ```java
-try {
-    Bucket[] bs = api.getBuckets();
-} catch (Exception e) {
-    return;
-}
+CompletableFuture<Void> fu = api.getBuckets(new GetBucketsCallback() {
+    @Override
+    public void onFinish(Bucket[] buckets) { }
+    @Override
+    public void onFail(String error) { }
+});
+
+// getBuckets is Non-Blocking, if you want to wait until it is finished, call fu.join()
 ```
 
 Delete bucket:
 
 ```java
-String bucketId = "5bfcf4ea7991d267f4eb53b4";
-try {
-    boolean success = api.deleteBucket(bucketId);
-} catch (Exception e) {
-    return;
-}
+String bucketId = "5bfcf77cea9b6322c5abd929";
+CompletableFuture<Void> fu = api.deleteBucket(bucketId, new DeleteBucketCallback() {
+    @Override
+    public void onFinish() { }
+    @Override
+    public void onFail(String error) { }
+}));
+
+// deleteBucket is Non-Blocking, if you want to wait until it is finished, call fu.join()
 ```
 
 Rename bucket:
 
 ```java
+String bucketId = "5bfcf77cea9b6322c5abd929";
 String newName = "abc";
-try {
-    boolean success = api.renameBucket(bucketId, newName);
-} catch (Exception e) {
-    return;
+CompletableFuture<Void> fu = api.renameBucket(bucketId, newName, new RenameBucketCallback() {
+    @Override
+    public void onFinish() { }
+    @Override
+    public void onFail(String error) { }
 }
+
+// renameBucket is Non-Blocking, if you want to wait until it is finished, call fu.join()
 ```
 
 List files:
 
 ```java
-String bucketId = "5bfcf4ea7991d267f4eb53b4";
-try {
-    File[] bs = api.listFiles(bucketId);
-} catch (Exception e) {
-    return;
+String bucketId = "5bfcf77cea9b6322c5abd929";
+CompletableFuture<Void> fu = api.listFiles(bucketId, new ListFilesCallback() {
+    @Override
+    public void onFinish(File[] files) { }
+    @Override
+    public void onFail(String error) { }
 }
+
+// listFiles is Non-Blocking, if you want to wait until it is finished, call fu.join()
 ```
 
 Delete file:
 
 ```java
-String bucketId = "5bfcf4ea7991d267f4eb53b4";
-String fileId = "2c5b84e3d682afdce73dcdfd";
-try {
-    boolean success = api.deleteFile(bucketId, fileId);
-} catch (Exception e) {
-    return;
+String bucketId = "5bfcf77cea9b6322c5abd929";
+String fileId = "5c0e1289bbdd6f2d157dd8b2";
+CompletableFuture<Void> fu = api.deleteFile(bucketId, fileId, new DeleteFileCallback() {
+    @Override
+    public void onFinish() { }
+    @Override
+    public void onFail(String error) { }
 }
+
+// deleteFile is Non-Blocking, if you want to wait until it is finished, call fu.join()
 ```
 
 Upload file:
 
 ```java
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
-String filePath = "xxxxxxxxx";
-String fileName = "xxx";
+String filePath = "xxxxxx";
+String fileName = "abc.txt";
 boolean rs = false;
-Uploader uploader = new Uploader(api, rs, filePath, fileName, bucketId, new UploadCallback() {
+Uploader uploader = api.storeFile(rs, filePath, fileName, bucketId, new StoreFileCallback() {
     @Override
     public void onBegin(long fileSize) { }
     @Override
-    public void onFail(String error) {
-        System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
-    }
+    public void onFail(String error) { }
     @Override
-    public void onFinish(String fileId) {
-        System.out.println("Upload finished, fileId: " + fileId);
-    }
+    public void onFinish(String fileId) { }
     @Override
     public void onProgress(float progress) { }
 });
 
-Thread thread = new Thread(uploader);
-thread.start();
-
-// if you want to cancel upload, call uploader.cancel()
+// storeFile is Non-Blocking, if you want to wait until it is finished, call uploader.join()
+// if you want to cancel it, call uploader.cancel()
 ```
 
 Download file:
@@ -147,24 +157,18 @@ Download file:
 ```java
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String fileId = "5c0103fd5a158a5612e67461";
-String filePath = "xxxxxxxxx";
-Downloader downloader = new Downloader(api, bucketId, fileId, filePath, new DownloadCallback() {
+String filePath = "xxxxxx";
+Downloader downloader = api.resolveFile(bucketId, fileId, filePath, new ResolveFileCallback() {
     @Override
     public void onBegin() { }
     @Override
-    public void onFail(String error) {
-        System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
-    }
+    public void onFail(String error) { }
     @Override
-    public void onFinish() {
-        System.out.println("Download finished");
-    }
+    public void onFinish() { }
     @Override
     public void onProgress(float progress) { }
 });
 
-Thread thread = new Thread(downloader);
-thread.start();
-
-// if you want to cancel download, call downloader.cancel()
+// resolveFile is Non-Blocking, if you want to wait until it is finished, call downloader.join()
+// if you want to cancel it, call downloader.cancel()
 ```

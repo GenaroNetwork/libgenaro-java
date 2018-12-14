@@ -4,9 +4,8 @@ import okhttp3.Call;
 import okhttp3.OkHttpClient;
 
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+//import java.util.concurrent.Callable;
+//import java.util.concurrent.CompletableFuture;
 
 public class BasicUtil {
     public static byte[] string2Bytes(final String input) {
@@ -16,23 +15,24 @@ public class BasicUtil {
     public static String bytes2String(final byte[] input) {
         return new String(input, StandardCharsets.UTF_8);
     }
-    // This is basically doing the same as the CompletableFuture::supplyAsync(Supplier<U> supplier), but allowing checked exceptions
-    public static <T> CompletableFuture<T> supplyAsync(Callable<T> c) {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
-            try { f.complete(c.call()); } catch(Throwable t) { f.completeExceptionally(t); }
-        });
-        return f;
-    }
 
-    // This is basically doing the same as the CompletableFuture::supplyAsync(Supplier<U> supplier, Executor executor), but allowing checked exceptions
-    public static <T> CompletableFuture<T> supplyAsync(Callable<T> c, Executor executor) {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
-            try { f.complete(c.call()); } catch(Throwable t) { f.completeExceptionally(t); }
-        }, executor);
-        return f;
-    }
+//    // This is basically doing the same as the CompletableFuture::supplyAsync(Supplier<U> supplier), but allowing checked exceptions
+//    public static <T> CompletableFuture<T> supplyAsync(Callable<T> c) {
+//        CompletableFuture<T> f = new CompletableFuture<>();
+//        CompletableFuture.runAsync(() -> {
+//            try { f.complete(c.call()); } catch(Throwable t) { f.completeExceptionally(t); }
+//        });
+//        return f;
+//    }
+
+//    // This is basically doing the same as the CompletableFuture::supplyAsync(Supplier<U> supplier, Executor executor), but allowing checked exceptions
+//    public static <T> CompletableFuture<T> supplyAsync(Callable<T> c, Executor executor) {
+//        CompletableFuture<T> f = new CompletableFuture<>();
+//        CompletableFuture.runAsync(() -> {
+//            try { f.complete(c.call()); } catch(Throwable t) { f.completeExceptionally(t); }
+//        }, executor);
+//        return f;
+//    }
 
     public static void cancelOkHttpCallWithTag(OkHttpClient client, Object tag) {
         for(Call call: client.dispatcher().queuedCalls()) {

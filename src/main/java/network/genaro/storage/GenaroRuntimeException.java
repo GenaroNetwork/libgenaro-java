@@ -1,6 +1,6 @@
 package network.genaro.storage;
 
-public class GenaroRuntimeException extends RuntimeException {
+class GenaroRuntimeException extends RuntimeException {
     public GenaroRuntimeException(){
         super();
     }

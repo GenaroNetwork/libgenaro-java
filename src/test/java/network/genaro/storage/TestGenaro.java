@@ -2,10 +2,12 @@ package network.genaro.storage;
 
 import org.bouncycastle.util.encoders.Hex;
 import org.testng.annotations.Test;
-import org.web3j.crypto.CipherException;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
+import network.genaro.storage.GenaroCallback.*;
 
 @Test()
 public class TestGenaro {
@@ -22,54 +24,72 @@ public class TestGenaro {
 //    private static final String TestbucketId = "5c0e5a8b312cfa12ae9f5bf3";
 
     public void testGetInfo() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, null);
-        String info = api.getInfo();
-        System.out.println(info);
+       Genaro api = new Genaro(TestBridgeUrl);
+       String info = api.getInfo();
+       System.out.println(info);
     }
 
     public void testGetBuckets() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, null);
-        Bucket[] bs = api.getBuckets();
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(bs == null) {
-            System.out.println("Error!");
-        } else if(bs.length == 0) {
-            System.out.println("No buckets.");
-        } else {
-            for (Bucket b : bs) {
-                System.out.println(b);
+        CompletableFuture<Void> fu = api.getBuckets(new GetBucketsCallback() {
+            @Override
+            public void onFinish(Bucket[] buckets) {
+                if(buckets.length == 0) {
+                    System.out.println("No buckets.");
+                } else {
+                    for (Bucket b : buckets) {
+                        System.out.println(b);
+                    }
+                }
             }
-        }
+            @Override
+            public void onFail(String error) {
+                System.out.println("List buckets failed, reason: " + error + ".");
+            }
+        });
+
+        fu.join();
     }
 
     public void testDeleteBucket() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        boolean success = api.deleteBucket("99bcb3bd3d9884905ccd3d62");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(success) {
-            System.out.println("Delete success.");
-        } else {
-            System.out.println("Delete failed.");
-        }
+        CompletableFuture<Void> fu = api.deleteBucket("5bfcf77cea9b6322c5abd929", new DeleteBucketCallback() {
+            @Override
+            public void onFinish() {
+                System.out.println("Delete bucket success.");
+            }
+
+            @Override
+            public void onFail(String error) {
+                System.out.println("Delete bucket failed, reason: " + error + ".");
+            }
+        });
+
+        fu.join();
     }
 
     public void testRenameBucket() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        boolean success = api.renameBucket(TestbucketId, "呵呵");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(success) {
-            System.out.println("Rename success.");
-        } else {
-            System.out.println("Rename failed.");
-        }
+        CompletableFuture<Void> fu = api.renameBucket(TestbucketId, "呵呵", new RenameBucketCallback() {
+            @Override
+            public void onFinish() {
+                System.out.println("Rename bucket success.");
+            }
+            @Override
+            public void onFail(String error) {
+                System.out.println("Rename bucket failed, reason: " + error + ".");
+            }
+        });
+
+        fu.join();
     }
 
     public void testGetBucket() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+
         Bucket b = api.getBucket(null, TestbucketId);
 
         if(b == null) {
@@ -80,27 +100,33 @@ public class TestGenaro {
     }
 
     public void testListFiles() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        File[] bs = api.listFiles(TestbucketId);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(bs == null) {
-            System.out.println("Error!");
-        } else if(bs.length == 0) {
-            System.out.println("No files.");
-        } else {
-            for (File b : bs) {
-                System.out.println(b.toBriefString());
+        CompletableFuture<Void> fu = api.listFiles(TestbucketId, new ListFilesCallback() {
+            @Override
+            public void onFinish(File[] files) {
+                if(files.length == 0) {
+                    System.out.println("No files.");
+                } else {
+                    for (File b : files) {
+                        System.out.println(b.toBriefString());
+                    }
+                }
             }
-        }
+            @Override
+            public void onFail(String error) {
+                System.out.println("List files failed, reason: " + error + ".");
+            }
+        });
+
+        fu.join();
     }
 
     public void testIsFileExist() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        String fileName = "2049k.data";
-        String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), gw.getPrivateKey(), Hex.decode(TestbucketId));
+        String fileName = "spam.txt";
+        String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), api.getPrivateKey(), Hex.decode(TestbucketId));
 
         boolean exist = api.isFileExist(null, TestbucketId, encryptedFileName);
         if(exist) {
@@ -111,38 +137,50 @@ public class TestGenaro {
     }
 
     public void testDeleteFile() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        boolean success = api.deleteFile(TestbucketId, "2c5b84e3d682afdce73dcdfd");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(success) {
-            System.out.println("Delete success.");
-        } else {
-            System.out.println("Delete failed.");
-        }
+        CompletableFuture<Void> fu = api.deleteFile(TestbucketId, "5c10ee10bbdd6f2d157de097", new DeleteFileCallback() {
+            @Override
+            public void onFinish() {
+                System.out.println("Delete file success.");
+            }
+            @Override
+            public void onFail(String error) {
+                System.out.println("Delete file failed, reason: " + error + ".");
+            }
+        });
+
+        fu.join();
     }
 
     public void testGetFileInfo() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        File file = api.getFileInfo(null, TestbucketId, "5c0e6872a72fc61208285155");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        File file;
 
-        if(file == null) {
-            System.out.println("Get file info failed.");
-        } else {
-            System.out.println(file);
+        try {
+            file = api.getFileInfo(null, TestbucketId, "5c0e6872a72fc61208285155");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
         }
+
+        System.out.println(file);
     }
 
     public void testGetPointers() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        List<Pointer> psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(psa == null) {
-            System.out.println("Error!");
-        } else if(psa.size() == 0) {
-            System.out.println("No such file or pointer invalid.");
+        List<Pointer> psa;
+
+        try {
+            psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
+        }
+
+        if(psa.size() == 0) {
+            System.out.println("No pointers.");
         } else {
             for (Pointer p : psa) {
                 System.out.println(p);
@@ -151,34 +189,36 @@ public class TestGenaro {
     }
 
     public void testRequestFrameId() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
-        Frame frame = api.requestNewFrame(null);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        if(frame == null) {
-            System.out.println("Error!");
-        } else {
-            System.out.println(frame);
+        Frame frame;
+        try {
+            frame = api.requestNewFrame(null);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return;
         }
+
+        System.out.println(frame);
     }
 
     public void testDownload() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-//            Downloader downloader = new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadCallback() {
-        Downloader downloader = new Downloader(api, TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadCallback() {
+//        Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
+//        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", true, new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                System.out.printf("Download progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -190,29 +230,25 @@ public class TestGenaro {
             }
         });
 
-        Thread thread = new Thread(downloader);
-        thread.start();
-
-        thread.join();
+        downloader.join();
     }
 
     public void testDownloadCancel() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-//            Downloader downloader = new Downloader(api, TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new DownloadCallback() {
-        Downloader downloader = new Downloader(api, TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new DownloadCallback() {
+//            Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", true, new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                System.out.printf("Download progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -224,24 +260,19 @@ public class TestGenaro {
             }
         });
 
-        Thread thread = new Thread(downloader);
-        thread.start();
-
         Thread.sleep(5000);
         downloader.cancel();
-
-        thread.join();
+        downloader.join();
     }
 
     public void testDownloadParallel() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        List<Thread> threads = new ArrayList<>();
+        List<Downloader> downloaders = new ArrayList<>();
 
         try {
-            for(int i = 0; i < 10; i++) {
-                Downloader downloader = new Downloader(api, TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", new DownloadCallback() {
+            for(int i = 0; i < 5; i++) {
+                Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", true, new ResolveFileCallback() {
                     @Override
                     public void onBegin() {
                         System.out.println("Download started");
@@ -252,7 +283,7 @@ public class TestGenaro {
                     }
                     @Override
                     public void onFail(String error) {
-                        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
+                        System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
                     }
                     @Override
                     public void onCancel() {
@@ -264,42 +295,32 @@ public class TestGenaro {
                     }
                 });
 
-                Thread thread = new Thread(downloader);
-                thread.start();
-
-                threads.add(thread);
+                downloaders.add(downloader);
             }
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw e;
         }
 
-        threads.stream().forEach(thread -> {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-
-            }
-        });
+        downloaders.stream().forEach(downloader -> downloader.join());
     }
 
     public void testUpload() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-//        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadCallback() {
-        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "22.zip", TestbucketId, new UploadCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "9.data", TestbucketId, new StoreFileCallback() {
+//        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -311,29 +332,24 @@ public class TestGenaro {
             }
         });
 
-        Thread thread = new Thread(uploader);
-        thread.start();
-
-        thread.join();
+        uploader.join();
     }
 
     public void testUploadCancel() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-//        Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/2097152.data", "5.data", TestbucketId, new UploadCallback() {
-        Uploader uploader = new Uploader(api, false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "24.zip", TestbucketId, new UploadCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "26.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");
             }
             @Override
             public void onProgress(float progress) {
-//                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
             }
             @Override
             public void onFail(String error) {
-                System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
+                System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
             }
             @Override
             public void onCancel() {
@@ -345,62 +361,47 @@ public class TestGenaro {
             }
         });
 
-        Thread thread = new Thread(uploader);
-        thread.start();
-
-        Thread.sleep(4000);
+        Thread.sleep(5000);
         uploader.cancel();
-
-        thread.join();
+        uploader.join();
     }
 
     public void testUploadParallel() throws Exception {
-        GenaroWallet gw = new GenaroWallet(V3JSON, "lgygn_9982");
-        Genaro api = new Genaro(TestBridgeUrl, gw);
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        List<Thread> threads = new ArrayList<>();
+        List<Uploader> uploaders = new ArrayList<>();
 
-        try {
-            for(int i = 0; i < 5; i++) {
-                Uploader uploader = new Uploader(api, false, "/Users/dingyi/test/spam.txt", "spam10" + i + ".txt", TestbucketId, new UploadCallback() {
-                    @Override
-                    public void onBegin(long fileSize) {
-                        System.out.println("Upload started");
-                    }
-                    @Override
-                    public void onProgress(float progress) {
+        for (int i = 0; i < 5; i++) {
+            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam14" + i + ".txt", TestbucketId, new StoreFileCallback() {
+                @Override
+                public void onBegin(long fileSize) {
+                    System.out.println("Upload started");
+                }
+
+                @Override
+                public void onProgress(float progress) {
 //                        System.out.printf("Upload progress: %.1f%%\n", progress * 100);
-                    }
-                    @Override
-                    public void onFail(String error) {
-                        System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
-                    }
-                    @Override
-                    public void onCancel() {
-                        System.out.println("Upload is cancelled");
-                    }
-                    @Override
-                    public void onFinish(String fileId) {
-                        System.out.println("Upload finished, fileId: " + fileId);
-                    }
-                });
+                }
 
-                Thread thread = new Thread(uploader);
-                thread.start();
+                @Override
+                public void onFail(String error) {
+                    System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
+                }
 
-                threads.add(thread);
-            }
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            throw e;
+                @Override
+                public void onCancel() {
+                    System.out.println("Upload is cancelled");
+                }
+
+                @Override
+                public void onFinish(String fileId) {
+                    System.out.println("Upload finished, fileId: " + fileId);
+                }
+            });
+
+            uploaders.add(uploader);
         }
 
-        threads.stream().forEach(thread -> {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-
-            }
-        });
+        uploaders.stream().forEach(uploader -> uploader.join());
     }
 }
