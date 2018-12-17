@@ -24,6 +24,7 @@ import java.util.concurrent.*;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import org.web3j.crypto.CipherException;
 
 import static network.genaro.storage.CryptoUtil.*;
@@ -31,7 +32,7 @@ import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Pointer.PointerStatus.*;
 import network.genaro.storage.GenaroCallback.*;
 
-class ShardMeta {
+final class ShardMeta {
     private String hash;
     private byte[][] challenges;    // [GENARO_SHARD_CHALLENGES][32]
     private String[] challengesAsStr;  // [GENARO_SHARD_CHALLENGES]
@@ -100,7 +101,7 @@ class ShardMeta {
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-class FarmerPointer {
+final class FarmerPointer {
     private String token;
     private Farmer farmer;
 
@@ -121,7 +122,7 @@ class FarmerPointer {
     }
 }
 
-class ShardTracker {
+final class ShardTracker {
     //    int progress;
     private int index;
     private FarmerPointer pointer;
@@ -166,7 +167,7 @@ class ShardTracker {
     public void setShardFile(String shardFile) { this.shardFile = shardFile; }
 }
 
-public class Genaro {
+public final class Genaro {
     private final Logger logger = LogManager.getLogger(Genaro.class);
     private static final int POINT_PAGE_COUNT = 3;
 

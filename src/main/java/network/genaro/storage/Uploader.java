@@ -37,9 +37,9 @@ import org.xbill.DNS.utils.base16;
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Genaro.genaroStrError;
-import network.genaro.storage.GenaroCallback.*;
+import network.genaro.storage.GenaroCallback.StoreFileCallback;
 
-public class Uploader implements Runnable {
+public final class Uploader implements Runnable {
     public static final int GENARO_MAX_REPORT_TRIES = 2;
     public static final int GENARO_MAX_PUSH_FRAME = 3;
     public static final int GENARO_MAX_CREATE_BUCKET_ENTRY = 3;

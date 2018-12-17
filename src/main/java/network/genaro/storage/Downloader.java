@@ -32,11 +32,11 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-import network.genaro.storage.GenaroCallback.*;
+import network.genaro.storage.GenaroCallback.ResolveFileCallback;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Genaro.genaroStrError;
 
-public class Downloader implements Runnable {
+public final class Downloader implements Runnable {
     // each shard has GENARO_DEFAULT_MIRRORS mirrors(not include the first uploaded shard) at most
     public static final int GENARO_DEFAULT_MIRRORS = 5;
     public static final int GENARO_MAX_REPORT_TRIES = 2;
@@ -130,7 +130,7 @@ public class Downloader implements Runnable {
         this.futureBelongsTo = futureBelongsTo;
     }
 
-    private class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
+    private final class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
 
         public RequestShardCallbackFuture(Pointer pointer) {
             this.pointer = pointer;
