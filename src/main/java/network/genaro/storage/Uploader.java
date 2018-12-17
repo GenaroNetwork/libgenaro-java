@@ -95,7 +95,6 @@ public final class Uploader implements Runnable {
     private CompletableFuture<Boolean> futureIsFileExists;
     private CompletableFuture<Frame> futureRequestNewFrame;
     private CompletableFuture<Void> futureAllFromPrepareFrame;
-    private CompletableFuture<Void> futureCreateBucketEntry;
 
     // the CompletableFuture that runs this Uploader
     private CompletableFuture<Void> futureBelongsTo;
@@ -380,10 +379,6 @@ public final class Uploader implements Runnable {
     }
 
     private ShardTracker pushFrame(final ShardTracker shard) {
-        //        if(shard.getPointer().getToken() == null) {
-        //          logger.error("Token error");
-        //          System.exit(1);
-        //        }
 
         ShardMeta shardMeta = shard.getMeta();
 
@@ -427,15 +422,19 @@ public final class Uploader implements Runnable {
                 .header("x-pubkey", pubKey)
                 .put(body)
                 .build();
+
+        if (isCanceled) {
+            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+        }
+
         for (int i = 0; i < GENARO_MAX_PUSH_FRAME; i++) {
             logger.info(String.format("Pushing frame for shard index %d(retry: %d) - JSON body: %s", shard.getIndex(), i, jsonStrBody));
             try {
                 try (Response response = upHttpClient.newCall(request).execute()) {
+                    int code = response.code();
                     String responseBody = response.body().string();
 
                     logger.info(String.format("Push frame finished for shard index %d(retry: %d) - JSON Response: %s", shard.getIndex(), i, responseBody));
-
-                    int code = response.code();
 
                     if (code == 429 || code == 420) {
                         throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_RATE_ERROR));
@@ -447,7 +446,9 @@ public final class Uploader implements Runnable {
                     shard.setPointer(fp);
                 } catch (IOException e) {
                     // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame") will cause an SocketException
-                    if (e instanceof SocketException) {
+                    if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                        // if it's canceled, do not try again
+                        i = GENARO_MAX_PUSH_SHARD - 1;
                         throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                     } else if (e instanceof SocketTimeoutException) {
                         throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
@@ -526,7 +527,6 @@ public final class Uploader implements Runnable {
         });
 
         String url = String.format("http://%s:%s/shards/%s?token=%s", farmerAddress, farmerPort, metaHash, token);
-//        String url = String.format("http://192.168.50.206:9999/");
         Request request = new Request.Builder()
                 .tag("pushShard")
                 .url(url)
@@ -534,17 +534,22 @@ public final class Uploader implements Runnable {
                 .post(uploadRequestBody)
                 .build();
 
+        if (isCanceled) {
+            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+        }
+
         for (int i = 0; i < GENARO_MAX_PUSH_SHARD; i++) {
             logger.info(String.format("Transferring Shard index %d...(retry: %d)", shard.getIndex(), i));
             try {
                 try (Response response = upHttpClient.newCall(request).execute()) {
                     int code = response.code();
+                    response.close();
 
                     if (code == 200 || code == 201 || code == 304) {
                         long uploaded = shard.getUploadedSize();
                         long total = shard.getMeta().getSize();
                         if (uploaded != total) {
-                            logger.error("Shard index %d, uploaded bytes: %d, total bytes: %d", shard.getIndex(), uploaded, total);
+                            logger.error(String.format("Shard index %d, uploaded bytes: %d, total bytes: %d", shard.getIndex(), uploaded, total));
                             throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
                         }
                         logger.info(String.format("Successfully transferred shard index %d", shard.getIndex()));
@@ -554,7 +559,9 @@ public final class Uploader implements Runnable {
                 } catch (IOException e) {
                     uploadedBytes.addAndGet(-shard.getUploadedSize());
                     shard.setUploadedSize(0);
-                    if (e instanceof SocketException) {
+                    if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                        // if it's canceled, do not try again
+                        i = GENARO_MAX_PUSH_SHARD - 1;
                         throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                     } else if (e instanceof SocketTimeoutException) {
                         throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
@@ -609,7 +616,6 @@ public final class Uploader implements Runnable {
 
         String pubKey = bridge.getPublicKeyHexString();
         Request request = new Request.Builder()
-                .tag("createBucketEntry")
                 .url(bridge.getBridgeUrl() + path)
                 .header("x-signature", signature)
                 .header("x-pubkey", pubKey)
@@ -619,13 +625,12 @@ public final class Uploader implements Runnable {
         for (int i = 0; i < GENARO_MAX_CREATE_BUCKET_ENTRY; i++) {
             logger.info(String.format("Create bucket entry(retry: %d) - JSON body: %s", i, jsonStrBody));
             try (Response response = upHttpClient.newCall(request).execute()) {
-                ObjectMapper om = new ObjectMapper();
+                int code = response.code();
                 String responseBody = response.body().string();
+                ObjectMapper om = new ObjectMapper();
                 JsonNode bodyNode = om.readTree(responseBody);
 
                 logger.info(String.format("Create bucket entry(retry: %d) - JSON Response: %s", i, responseBody));
-
-                int code = response.code();
 
                 if (code != 200 && code != 201) {
                     String error = bodyNode.get("error").asText();
@@ -877,6 +882,7 @@ public final class Uploader implements Runnable {
         // cancel getBucket
         if (futureGetBucket != null && !futureGetBucket.isDone()) {
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "getBucket");
+
             // will cause a CancellationException, and will be caught on bridge.getBucket
             futureGetBucket.cancel(true);
         }
@@ -884,6 +890,7 @@ public final class Uploader implements Runnable {
         // cancel isFileExists
         if (futureIsFileExists != null && !futureIsFileExists.isDone()) {
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "isFileExist");
+
             // will cause a CancellationException, and will be caught on bridge.isFileExists
             futureIsFileExists.cancel(true);
         }
@@ -891,6 +898,7 @@ public final class Uploader implements Runnable {
         // cancel requestNewFrame
         if (futureRequestNewFrame != null && !futureRequestNewFrame.isDone()) {
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "requestNewFrame");
+
             // will cause a CancellationException, and will be caught on bridge.requestNewFrame
             futureRequestNewFrame.cancel(true);
         }
@@ -898,17 +906,11 @@ public final class Uploader implements Runnable {
         if (futureAllFromPrepareFrame != null && !futureAllFromPrepareFrame.isDone()) {
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushFrame");
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushShard");
+
             // will cause a CancellationException, and will be caught on futureAllFromPrepareFrame.get()
             // this call will only terminate pushShard, prepareFrame and pushFrame will not be terminated,
             // but uploaderExecutor.shutdown() can terminate them
             futureAllFromPrepareFrame.cancel(true);
-        }
-
-        // cancel createBucketEntry
-        if (futureCreateBucketEntry != null && !futureCreateBucketEntry.isDone()) {
-            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "createBucketEntry");
-            // will cause a CancellationException, and will be caught on this.createBucketEntry
-            futureCreateBucketEntry.cancel(true);
         }
 
         uploaderExecutor.shutdown();

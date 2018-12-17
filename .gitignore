@@ -15,6 +15,7 @@ target/genaro-sdk-0.1.jar
 .settings
 Todo
 genaro-sdk-0.1.jar
-original-genaro-sdk-0.1.jar
+genaro-sdk-0.1-pkg.jar
+genaro-sdk-0.1-pkg
 genaro-sdk.iml
 dependency-reduced-pom.xml

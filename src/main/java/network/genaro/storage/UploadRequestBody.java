@@ -18,9 +18,9 @@ final class UploadRequestBody extends RequestBody {
 
     private static final int SEGMENT_SIZE = 2 * 1024;
 
-    protected InputStream input;
-    protected ProgressListener listener;
-    protected String contentType;
+    private InputStream input;
+    private ProgressListener listener;
+    private String contentType;
 
     public UploadRequestBody(InputStream input, String contentType, ProgressListener listener) {
         this.input = input;
