@@ -418,7 +418,7 @@ public final class Downloader implements Runnable {
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                 resolveFileCallback.onFail(e.getCause().getMessage());
             } else {
-                logger.warn("Warn: Can not get here");
+                logger.warn("Warn: Would not get here");
                 resolveFileCallback.onFail(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
             return;

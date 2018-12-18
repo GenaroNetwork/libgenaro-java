@@ -58,128 +58,38 @@
             </plugin>
 
             <plugin>
-                <groupId>de.ntcomputer</groupId>
-                <artifactId>executable-packer-maven-plugin</artifactId>
-                <version>1.0.1</version>
-                <configuration>
-                    <mainClass>network.genaro.storage.Cli</mainClass>
-                </configuration>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
+                        <phase>package</phase>
                         <goals>
-                            <goal>pack-executable-jar</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <!-- org.bouncycastle can't be packaged, otherwise the signature will be broken, and it will not work,
+                                 it must be imported as another 3rd party package when you use the Genaro lib. -->
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>org.bouncycastle</exclude>
+                                </excludes>
+                            </artifactSet>
+
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
-
-            <!--<plugin>-->
-                <!--<groupId>com.jolira</groupId>-->
-                <!--<artifactId>onejar-maven-plugin</artifactId>-->
-                <!--<version>1.4.4</version>-->
-                <!--<executions>-->
-                    <!--<execution>-->
-                        <!--<configuration>-->
-                            <!--<attachToBuild>true</attachToBuild>-->
-                            <!--<classifier>onejar</classifier>-->
-                            <!--<filename>genaro-sdk-0.1.jar</filename>-->
-                        <!--</configuration>-->
-                        <!--<goals>-->
-                            <!--<goal>one-jar</goal>-->
-                        <!--</goals>-->
-                    <!--</execution>-->
-                <!--</executions>-->
-            <!--</plugin>-->
-
-            <!--<plugin>-->
-                <!--<groupId>com.github.chrisdchristo</groupId>-->
-                <!--<artifactId>capsule-maven-plugin</artifactId>-->
-                <!--<version>1.5.1</version>-->
-                <!--<executions>-->
-                    <!--<execution>-->
-                        <!--<goals>-->
-                            <!--<goal>build</goal>-->
-                        <!--</goals>-->
-                        <!--<configuration>-->
-                            <!--<appClass>network.genaro.storage.Cli</appClass>-->
-                            <!--<type>fat</type>-->
-                        <!--</configuration>-->
-                    <!--</execution>-->
-                <!--</executions>-->
-            <!--</plugin>-->
-
-            <!--<plugin>-->
-                <!--<groupId>org.apache.maven.plugins</groupId>-->
-                <!--<artifactId>maven-shade-plugin</artifactId>-->
-                <!--<version>3.2.1</version>-->
-                <!--<configuration>-->
-                    <!--&lt;!&ndash; put your configurations here &ndash;&gt;-->
-                <!--</configuration>-->
-                <!--<executions>-->
-                    <!--<execution>-->
-                        <!--<phase>package</phase>-->
-                        <!--<goals>-->
-                            <!--<goal>shade</goal>-->
-                        <!--</goals>-->
-                        <!--<configuration>-->
-                            <!--&lt;!&ndash; exclude depending Jars &ndash;&gt;-->
-                            <!--<artifactSet>-->
-                                <!--<excludes>-->
-                                <!--</excludes>-->
-                            <!--</artifactSet>-->
-
-                            <!--<filters>-->
-                                <!--<filter>-->
-                                    <!--<artifact>*:*</artifact>-->
-                                    <!--<excludes>-->
-                                        <!--<exclude>META-INF/*.SF</exclude>-->
-                                        <!--<exclude>META-INF/*.DSA</exclude>-->
-                                        <!--<exclude>META-INF/*.RSA</exclude>-->
-                                    <!--</excludes>-->
-                                <!--</filter>-->
-                            <!--</filters>-->
-
-                            <!--&lt;!&ndash;-->
-                            <!--<transformers>-->
-                                <!--<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
-                                    <!--<mainClass>your.class.here</mainClass>-->
-                                <!--</transformer>-->
-                            <!--</transformers>-->
-                            <!--<shadedArtifactAttached>true</shadedArtifactAttached>-->
-                            <!--&ndash;&gt;-->
-
-                            <!--&lt;!&ndash; exclude all unused classes &ndash;&gt;-->
-                            <!--&lt;!&ndash;<minimizeJar>true</minimizeJar>&ndash;&gt;-->
-                        <!--</configuration>-->
-                    <!--</execution>-->
-                <!--</executions>-->
-            <!--</plugin>-->
-
-            <!--<plugin>-->
-                <!--<groupId>org.apache.maven.plugins</groupId>-->
-                <!--<artifactId>maven-jarsigner-plugin</artifactId>-->
-                <!--<version>3.0.0</version>-->
-                <!--<executions>-->
-                    <!--<execution>-->
-                        <!--<id>sign</id>-->
-                        <!--<goals>-->
-                            <!--<goal>sign</goal>-->
-                        <!--</goals>-->
-                    <!--</execution>-->
-                    <!--<execution>-->
-                        <!--<id>verify</id>-->
-                        <!--<goals>-->
-                            <!--<goal>verify</goal>-->
-                        <!--</goals>-->
-                    <!--</execution>-->
-                <!--</executions>-->
-                <!--<configuration>-->
-                    <!--<keystore>/path/to/myKeystore</keystore>-->
-                    <!--<alias>myfirstkey</alias>-->
-                    <!--<storepass>111111</storepass>-->
-                    <!--<keypass>111111</keypass>-->
-                <!--</configuration>-->
-            <!--</plugin>-->
 
         </plugins>
     </build>

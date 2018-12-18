@@ -11,13 +11,13 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - File encryption with AES-256-CTR
 - File name and bucket name encryption with AES-256-GCM
 - Asynchronous progress updates
+- Retry many times when uploading/downloading fail
 - Seed based file encryption key for portability between devices
 - File integrity and authenticity verified with HMAC-SHA512
 
 ## Feature Todo
 
 - Erasure encoding with reed solomon for data reliability
-- Retry when fail
 - Exchange reports with bridge
 - Cli interface
 
@@ -35,6 +35,18 @@ This library use Java Future/Execution framework, and the following 3rd party li
 - [log4j](https://logging.apache.org/log4j) for logging.
 - [testng](https://testng.org/doc/index.html) for testing.
 - [maven](https://maven.apache.org/) for dependency managment.
+
+## Package
+
+```shell
+mvn clean package
+```
+
+PS: Will not package org.bouncycastle for signature issue.
+
+## How to use
+
+Add Genaro package(genaro-sdk-x.xx.jar) and org.bouncycastle package(bcprov-jdk15on-1.60.jar) to your classpath.
 
 ## Example Usage
 

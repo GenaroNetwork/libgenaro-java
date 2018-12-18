@@ -828,7 +828,7 @@ public final class Uploader implements Runnable {
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else {
-                logger.warn("Warn: Can not get here");
+                logger.warn("Warn: Would not get here");
                 storeFileCallback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
             return;
