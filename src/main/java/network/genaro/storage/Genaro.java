@@ -101,6 +101,276 @@ final class ShardMeta {
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+final class Farmer {
+    private String userAgent;
+    private String protocol;
+    private String address;
+    private String port;
+    private String nodeID;
+    private String lastSeen;
+
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public String getProtocol() {
+        return protocol;
+    }
+
+    public void setProtocol(String protocol) {
+        this.protocol = protocol;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getPort() {
+        return port;
+    }
+
+    public void setPort(String port) {
+        this.port = port;
+    }
+
+    public String getNodeID() { return nodeID; }
+
+    public void setNodeID(String nodeID) {
+        this.nodeID = nodeID;
+    }
+
+    public String getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(String lastSeen) {
+        this.lastSeen = lastSeen;
+    }
+
+    @Override
+    public String toString() {
+        return "Farmer{" +
+                "userAgent='" + userAgent + '\'' +
+                ", protocol='" + protocol + '\'' +
+                ", address='" + address + '\'' +
+                ", port='" + port + '\'' +
+                ", nodeID='" + nodeID + '\'' +
+                ", lastSeen='" + lastSeen + '\'' +
+                '}';
+    }
+
+    public String toBriefString() {
+        return "Farmer{" +
+                "address='" + address + '\'' +
+                ", port='" + port + '\'' +
+                '}';
+    }
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+final class Frame {
+    private String user;
+    private long storageSize;
+    private long size;
+    private boolean locked;
+    private String created;
+    private String id;
+
+    public String getUser() {
+        return user;
+    }
+
+    public void setUser(String user) {
+        this.user = user;
+    }
+
+    public long getStorageSize() {
+        return storageSize;
+    }
+
+    public void setStorageSize(long storageSize) {
+        this.storageSize = storageSize;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public void setSize(long size) {
+        this.size = size;
+    }
+
+    public boolean isLocked() {
+        return locked;
+    }
+
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+    }
+
+    public String getCreated() {
+        return created;
+    }
+
+    public void setCreated(String created) {
+        this.created = created;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    @Override
+    public String toString() {
+        return "Frame{" +
+                "user='" + user + '\'' +
+                ", storageSize=" + storageSize +
+                ", size=" + size +
+                ", locked=" + locked +
+                ", created='" + created + '\'' +
+                ", id='" + id + '\'' +
+                '}';
+    }
+}
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+final class Pointer {
+    public enum PointerStatus
+    {
+        POINTER_BEING_REPLACED,
+        POINTER_ERROR_REPORTED,
+        POINTER_ERROR,
+        POINTER_CREATED,
+        POINTER_BEING_DOWNLOADED,
+        POINTER_DOWNLOADED,
+        POINTER_MISSING,
+        POINTER_FINISHED
+    }
+
+    private int index;
+    private String hash;
+    private long size;
+    boolean parity;
+
+    // token & operation & Farmer will be null if no farmer found
+    private String token;
+    private String operation;
+    private Farmer farmer;
+    private long downloadedSize;
+    private PointerStatus status;
+
+    public PointerStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(PointerStatus status) {
+        this.status = status;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public String getOperation() {
+        return operation;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
+    public Farmer getFarmer() {
+        return farmer;
+    }
+
+    public void setFarmer(Farmer farmer) {
+        this.farmer = farmer;
+    }
+
+    public String getHash() {
+        return hash;
+    }
+
+    public void setHash(String hash) {
+        this.hash = hash;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public void setSize(long size) {
+        this.size = size;
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
+    }
+
+    public boolean isParity() {
+        return parity;
+    }
+
+    public void setParity(boolean parity) {
+        this.parity = parity;
+    }
+
+    @Override
+    public String toString() {
+        return "Pointer{" +
+                "index=" + index +
+                ", hash='" + hash + '\'' +
+                ", size=" + size +
+                ", parity=" + parity +
+                ", token='" + token + '\'' +
+                ", operation='" + operation + '\'' +
+                ", farmer=" + farmer +
+                '}';
+    }
+
+    public String toBriefString() {
+        return "Pointer{" +
+                "index=" + index +
+                ", size=" + size +
+                ", parity=" + parity +
+                ", farmer=" + farmer.toBriefString() +
+                '}';
+    }
+
+    public boolean isMissing() {
+        return status == PointerStatus.POINTER_MISSING;
+    }
+
+    public long getDownloadedSize() {
+        return downloadedSize;
+    }
+
+    public void setDownloadedSize(long downloadedSize) {
+        this.downloadedSize = downloadedSize;
+    }
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 final class FarmerPointer {
     private String token;
     private Farmer farmer;
