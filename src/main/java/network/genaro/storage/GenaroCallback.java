@@ -3,31 +3,26 @@ package network.genaro.storage;
 public interface GenaroCallback {
     interface GetBucketsCallback {
         void onFinish(Bucket[] buckets);
-
         void onFail(String error);
     }
 
     interface DeleteBucketCallback {
         void onFinish();
-
         void onFail(String error);
     }
 
     interface RenameBucketCallback {
         void onFinish();
-
         void onFail(String error);
     }
 
     interface ListFilesCallback {
         void onFinish(File[] files);
-
         void onFail(String error);
     }
 
     interface DeleteFileCallback {
         void onFinish();
-
         void onFail(String error);
     }
 
@@ -45,16 +40,14 @@ public interface GenaroCallback {
         }
 
         // after Uploader::cancel is called
-        default void onCancel() {
-        }
+        default void onCancel() { }
 
         /**
          * called when progress update
          *
          * @param progress range from 0 to 1
          */
-        default void onProgress(float progress) {
-        }
+        default void onProgress(float progress) { }
     }
 
     interface StoreFileCallback {
@@ -71,15 +64,13 @@ public interface GenaroCallback {
         }
 
         // after Uploader::cancel is called
-        default void onCancel() {
-        }
+        default void onCancel() { }
 
         /**
          * called when progress update
          *
          * @param progress range from 0 to 1
          */
-        default void onProgress(float progress) {
-        }
+        default void onProgress(float progress) { }
     }
 }

@@ -3,9 +3,9 @@ package network.genaro.storage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class File {
+public final class File {
 
-    public class Hmac {
+    public final class Hmac {
         String value;
         String type;
 
@@ -34,7 +34,7 @@ public class File {
         }
     }
 
-    public class Erasure {
+    public final class Erasure {
         String type;
 
         public String getType() {

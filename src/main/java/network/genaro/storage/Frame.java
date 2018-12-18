@@ -3,7 +3,7 @@ package network.genaro.storage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
-class Frame {
+final class Frame {
     private String user;
     private long storageSize;
     private long size;

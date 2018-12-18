@@ -49,6 +49,10 @@
                 <configuration>
                     <archive>
                         <manifestFile>${project.basedir}/src/main/java/META-INF/MANIFEST.MF</manifestFile>
+                        <manifestEntries>
+                            <Manifest-Version>0.1</Manifest-Version>
+                            <Created-By>GENARO NETWORK</Created-By>
+                        </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
@@ -57,9 +61,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.2.1</version>
-                <configuration>
-                    <!-- put your configurations here -->
-                </configuration>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -67,9 +68,11 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <!-- exclude depending Jars -->
+                            <!-- org.bouncycastle can't be packaged, otherwise the signature will be broken, and it will not work,
+                                 it must be imported as another 3rd party package when you use the Genaro lib. -->
                             <artifactSet>
                                 <excludes>
+                                    <exclude>org.bouncycastle</exclude>
                                 </excludes>
                             </artifactSet>
 
@@ -83,12 +86,11 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                            <!-- exclude all unused classes -->
-                            <!--<minimizeJar>true</minimizeJar>-->
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
     </build>
 

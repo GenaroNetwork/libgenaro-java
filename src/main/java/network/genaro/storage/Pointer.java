@@ -3,7 +3,7 @@ package network.genaro.storage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
-class Pointer {
+final class Pointer {
     public enum PointerStatus
     {
         POINTER_BEING_REPLACED,

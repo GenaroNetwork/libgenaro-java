@@ -13,7 +13,7 @@ package network.genaro.storage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-class Farmer {
+final class Farmer {
     private String userAgent;
     private String protocol;
     private String address;

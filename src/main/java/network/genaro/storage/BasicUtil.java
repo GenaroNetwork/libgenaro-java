@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 //import java.util.concurrent.Callable;
 //import java.util.concurrent.CompletableFuture;
 
-public class BasicUtil {
+public final class BasicUtil {
     public static byte[] string2Bytes(final String input) {
         return input.getBytes(StandardCharsets.UTF_8);
     }
