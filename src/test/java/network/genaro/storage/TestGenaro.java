@@ -173,7 +173,7 @@ public final class TestGenaro {
         List<Pointer> psa;
 
         try {
-            psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
+            psa = api.requestPointers(null, TestbucketId, "f40da862c00494bb0430e012");
         } catch (Exception e) {
             System.out.println(e.getMessage());
             return;
