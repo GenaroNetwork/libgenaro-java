@@ -11,16 +11,15 @@ import network.genaro.storage.GenaroCallback.*;
 
 @Test()
 public final class TestGenaro {
-//    private static final String V3JSON = "{ \"address\": \"5d14313c94f1b26d23f4ce3a49a2e136a88a584b\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"12d3a710778aa884d32140466ce6c3932629d922fa1cd6b64996dff9b368743a\", \"cipherparams\": { \"iv\": \"f0eface44a93bac55857d74740912d13\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"62dd6d60fb04429fc8cf32fd39ea5e886d7f84eae258866c14905fa202dbc43d\" }, \"mac\": \"632e92cb1de1a708b2d349b9ae558a4d655c691d3e793fca501a857c7f0c3b1c\" }, \"id\": \"b12b56a5-7eaa-4d90-87b5-cc616e6694d0\", \"version\": 3 }";
-    private static final String V3JSON = "{ \"address\": \"fbad65391d2d2eafda9b27326d1e81d52a6a3dc8\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\", \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" }, \"mac\": \"cdb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" }, \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
+    private static final String V3JSON = "{ \"address\": \"0000000000000000000000000000000000000000\", \"crypto\": { \"cipher\": \"aes-128-ctr\", \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\", \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\", \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\": \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" }, \"mac\": \"cdb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" }, \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
 
-//    private static String TestBridgeUrl = "http://118.31.61.119:8080";
-//        private static String TestBridgeUrl = "http://127.0.0.1:8080";
-    private static String TestBridgeUrl = "http://120.77.247.10:8080";
+    private static String TestBridgeUrl = "http://118.31.61.119:8080";
+//    private static String TestBridgeUrl = "http://127.0.0.1:8080";
+//    private static String TestBridgeUrl = "http://120.77.247.10:8080";
 //    private static String TestBridgeUrl = "http://47.100.33.60:8080";
-//        private static final String TestbucketId = "5bfcf4ea7991d267f4eb53b4";
+    private static final String TestbucketId = "5c0e433cdaa4e03fe1b5b287";
 //    private static final String TestbucketId = "b5e9bd5fd6f571beee9b035f";
-    private static final String TestbucketId = "5ba341402e49103d8787e52d";
+//    private static final String TestbucketId = "5ba341402e49103d8787e52d";
 //    private static final String TestbucketId = "5c0e5a8b312cfa12ae9f5bf3";
 
     public void testGetInfo() throws Exception {
@@ -30,7 +29,7 @@ public final class TestGenaro {
     }
 
     public void testGetBuckets() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         CompletableFuture<Void> fu = api.getBuckets(new GetBucketsCallback() {
             @Override
@@ -53,7 +52,7 @@ public final class TestGenaro {
     }
 
     public void testDeleteBucket() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         CompletableFuture<Void> fu = api.deleteBucket("5bfcf77cea9b6322c5abd929", new DeleteBucketCallback() {
             @Override
@@ -71,7 +70,7 @@ public final class TestGenaro {
     }
 
     public void testRenameBucket() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         CompletableFuture<Void> fu = api.renameBucket(TestbucketId, "呵呵", new RenameBucketCallback() {
             @Override
@@ -88,7 +87,7 @@ public final class TestGenaro {
     }
 
     public void testGetBucket() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         Bucket b = api.getBucket(null, TestbucketId);
 
@@ -100,7 +99,7 @@ public final class TestGenaro {
     }
 
     public void testListFiles() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         CompletableFuture<Void> fu = api.listFiles(TestbucketId, new ListFilesCallback() {
             @Override
@@ -123,7 +122,7 @@ public final class TestGenaro {
     }
 
     public void testIsFileExist() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         String fileName = "spam.txt";
         String encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), api.getPrivateKey(), Hex.decode(TestbucketId));
@@ -137,7 +136,7 @@ public final class TestGenaro {
     }
 
     public void testDeleteFile() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         CompletableFuture<Void> fu = api.deleteFile(TestbucketId, "5c10ee10bbdd6f2d157de097", new DeleteFileCallback() {
             @Override
@@ -154,7 +153,7 @@ public final class TestGenaro {
     }
 
     public void testGetFileInfo() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
         File file;
 
         try {
@@ -168,7 +167,7 @@ public final class TestGenaro {
     }
 
     public void testGetPointers() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         List<Pointer> psa;
 
@@ -189,7 +188,7 @@ public final class TestGenaro {
     }
 
     public void testRequestFrameId() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         Frame frame;
         try {
@@ -203,11 +202,12 @@ public final class TestGenaro {
     }
 
     public void testDownload() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
 //        Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
 //        Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", new ResolveFileCallback() {
-        Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", true, new ResolveFileCallback() {
+//        Downloader downloader = api.resolveFile(TestbucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + ".txt", true, new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(TestbucketId, "5c0e4c4f6eea1f3f98ff279a", "/Users/dingyi/Genaro/test/download/aaa", true, new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
@@ -234,7 +234,7 @@ public final class TestGenaro {
     }
 
     public void testDownloadCancel() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
 //            Downloader downloader = api.resolveFile(TestbucketId, "5c0a3006bbdd6f2d157dcedb", "/Users/dingyi/Genaro/test/download/cpor-genaro", new ResolveFileCallback() {
         Downloader downloader = api.resolveFile(TestbucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", true, new ResolveFileCallback() {
@@ -266,7 +266,7 @@ public final class TestGenaro {
     }
 
     public void testDownloadParallel() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         List<Downloader> downloaders = new ArrayList<>();
 
@@ -306,9 +306,9 @@ public final class TestGenaro {
     }
 
     public void testUpload() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
-        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "24.data", TestbucketId, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "1.data", TestbucketId, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
@@ -336,7 +336,7 @@ public final class TestGenaro {
     }
 
     public void testUploadCancel() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "26.zip", TestbucketId, new StoreFileCallback() {
             @Override
@@ -367,12 +367,12 @@ public final class TestGenaro {
     }
 
     public void testUploadParallel() throws Exception {
-        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
+        Genaro api = new Genaro(TestBridgeUrl, V3JSON, "111111");
 
         List<Uploader> uploaders = new ArrayList<>();
 
         for (int i = 0; i < 5; i++) {
-            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam14" + i + ".txt", TestbucketId, new StoreFileCallback() {
+            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam15" + i + ".txt", TestbucketId, new StoreFileCallback() {
                 @Override
                 public void onBegin(long fileSize) {
                     System.out.println("Upload started");
