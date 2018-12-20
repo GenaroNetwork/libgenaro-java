@@ -2,7 +2,7 @@ package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties(ignoreUnknown=true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public final class Bucket {
 
     private String id;

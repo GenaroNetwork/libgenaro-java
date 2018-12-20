@@ -44,7 +44,7 @@ mvn clean package
 
 PS: Will not package org.bouncycastle for signature issue.
 
-## Use as 3rd party package
+## Used as 3rd party package
 
 Add Genaro package(genaro-sdk-x.xx.jar) and org.bouncycastle package(bcprov-jdk15on-1.60.jar) to your classpath.
 

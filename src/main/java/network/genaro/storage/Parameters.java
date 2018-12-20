@@ -53,7 +53,17 @@ final class Parameters {
     // algorithm error
     public static final int GENARO_ALGORITHM_ERROR = 4000;
 
+    // unknown error
+    public static final int GENARO_UNKNOWN_ERROR = 9000;
+
     // Exchange report codes
     public static final int GENARO_REPORT_SUCCESS = 1000;
     public static final int GENARO_REPORT_FAILURE = 1100;
+
+    // Exchange report messages
+    public static final String GENARO_REPORT_FAILED_INTEGRITY = "FAILED_INTEGRITY";
+    public static final String GENARO_REPORT_SHARD_DOWNLOADED = "SHARD_DOWNLOADED";
+    public static final String GENARO_REPORT_SHARD_UPLOADED = "SHARD_UPLOADED";
+    public static final String GENARO_REPORT_DOWNLOAD_ERROR = "DOWNLOAD_ERROR";
+    public static final String GENARO_REPORT_UPLOAD_ERROR = "TRANSFER_FAILED";
 }

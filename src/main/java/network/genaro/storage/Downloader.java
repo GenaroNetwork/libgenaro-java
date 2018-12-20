@@ -1,10 +1,9 @@
 package network.genaro.storage;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.Callback;
-import okhttp3.Call;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.*;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,12 +34,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import network.genaro.storage.GenaroCallback.ResolveFileCallback;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Genaro.genaroStrError;
+import static network.genaro.storage.Pointer.PointerStatus.*;
 
 public final class Downloader implements Runnable {
     // each shard has GENARO_DEFAULT_MIRRORS mirrors(not include the first uploaded shard) at most
     public static final int GENARO_DEFAULT_MIRRORS = 5;
     public static final int GENARO_MAX_REPORT_TRIES = 2;
-    public static final int GENARO_MAX_GET_POINTERS = 3;
+    public static final int GENARO_MAX_REQUEST_POINTERS = 3;
     public static final int GENARO_MAX_GET_FILE_INFO = 3;
 
     private static final Logger logger = LogManager.getLogger(Genaro.class);
@@ -58,13 +58,17 @@ public final class Downloader implements Runnable {
     // increased uploaded bytes since last onProgress Call
     private AtomicLong deltaDownloaded = new AtomicLong();
 
+    File file;
+    List<Pointer> pointers;
+
     private long shardSize;
+    private int totalParityPointers;
 
     private FileChannel downFileChannel;
 
     private CompletableFuture<File> futureGetFileInfo;
     private CompletableFuture<List<Pointer>> futureGetPointers;
-    private CompletableFuture<Void> futureAllRequestShard;
+    private CompletableFuture<Void> futureAllFromRequestShard;
 
     // the CompletableFuture that runs this Downloader
     private CompletableFuture<Void> futureBelongsTo;
@@ -75,6 +79,8 @@ public final class Downloader implements Runnable {
     private boolean isStopping = false;
 
     private ResolveFileCallback resolveFileCallback;
+
+    private String excludedFarmerIds;
 
     // 使用CachedThreadPool比较耗内存，并发高的时候会造成内存溢出
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
@@ -88,13 +94,13 @@ public final class Downloader implements Runnable {
             .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
             .build();
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite, final ResolveFileCallback resolveFileCallback) {
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String filePath, final boolean overwrite, final ResolveFileCallback resolveFileCallback) {
         this.bridge = bridge;
         this.fileId = fileId;
         this.bucketId = bucketId;
-        this.path = path;
+        this.path = filePath;
         this.overwrite = overwrite;
-        this.tempPath = path + ".genarotemp";
+        this.tempPath = filePath + ".genarotemp";
         this.resolveFileCallback = resolveFileCallback;
     }
 
@@ -239,8 +245,11 @@ public final class Downloader implements Runnable {
         }
     }
 
-    // Void not void, because it will be used as a supplier of Completable.supplyAsync
-    private Void requestShard(final Pointer pointer) {
+    private Pointer requestShard(final Pointer pointer) {
+        if (pointer.getStatus() == POINTER_ERROR_REPORTED || pointer.getStatus() == POINTER_MISSING) {
+            return pointer;
+        }
+
         Farmer farmer = pointer.getFarmer();
         String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
         Request request = new Request.Builder()
@@ -259,21 +268,224 @@ public final class Downloader implements Runnable {
         RequestShardCallbackFuture future = new RequestShardCallbackFuture(this, pointer);
         downHttpClient.newCall(request).enqueue(future);
 
+        // save the start time of downloading
+        pointer.getReport().setStart(System.currentTimeMillis());
+
         try {
             future.get();
         } catch (Exception e) {
+            pointer.setStatus(POINTER_ERROR);
+            pointer.getReport().setCode(GENARO_REPORT_FAILURE);
+            pointer.getReport().setMessage(GENARO_REPORT_DOWNLOAD_ERROR);
+
             if(e instanceof ExecutionException) {
                 Throwable cause = e.getCause();
                 if (cause instanceof SocketTimeoutException) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
                 } else if (cause instanceof GenaroRuntimeException) {
+                    if (cause.getMessage().equals(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR))) {
+                        pointer.getReport().setMessage(GENARO_REPORT_FAILED_INTEGRITY);
+                    }
                     throw new GenaroRuntimeException(cause.getMessage());
                 }
             } else {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
             }
+        } finally {
+            // save the end time of downloading
+            pointer.getReport().setEnd(System.currentTimeMillis());
         }
-        return null;
+
+        pointer.getReport().setCode(GENARO_REPORT_SUCCESS);
+        pointer.getReport().setMessage(GENARO_REPORT_SHARD_DOWNLOADED);
+
+        return pointer;
+    }
+
+    private Pointer sendExchangeReport(final Pointer pointer) {
+        if (isCanceled) {
+            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+        }
+
+        if (pointer.getReport().getStart() > 0 && pointer.getReport().getEnd() > 0) {
+            String jsonStrBody = String.format("{\"dataHash\": \"%s\", \"farmerId\": \"%s\", \"exchangeStart\": \"%d\"," +
+                            "\"exchangeEnd\": \"%d\", \"exchangeResultCode\": \"%d\", \"exchangeResultMessage\": \"%s\"}",
+                    pointer.getHash(), pointer.getFarmer().getNodeID(), pointer.getReport().getStart(),
+                    pointer.getReport().getEnd(), pointer.getReport().getCode(), pointer.getReport().getMessage());
+
+            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+            RequestBody body = RequestBody.create(JSON, jsonStrBody);
+            String path = "/reports/exchanges";
+
+            String signature;
+            try {
+                signature = bridge.signRequest("POST", path, jsonStrBody);
+            } catch (NoSuchAlgorithmException e) {
+                return pointer;
+            }
+
+            String pubKey = bridge.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .tag("sendExchangeReport")
+                    .url(bridge.getBridgeUrl() + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .post(body)
+                    .build();
+
+            for (int i = 0; i < GENARO_MAX_REPORT_TRIES; i++) {
+                try (Response response = downHttpClient.newCall(request).execute()) {
+                    int code = response.code();
+                    String responseBody = response.body().string();
+                    ObjectMapper om = new ObjectMapper();
+                    JsonNode bodyNode = om.readTree(responseBody);
+
+                    if (code == 201) {
+                        // set status so that this pointer can be replaced
+                        if (pointer.getStatus() == POINTER_ERROR) {
+                            pointer.setStatus(POINTER_ERROR_REPORTED);
+                        }
+
+                        // success
+                        break;
+                    } else {
+                        if (bodyNode.has("error")) {
+                            logger.warn(bodyNode.get("error").asText());
+                        }
+                    }
+                } catch (IOException e) {
+                    if(i == GENARO_MAX_REPORT_TRIES - 1) {
+                        // failed
+                        break;
+                    }
+                }
+            }
+        }
+
+        return pointer;
+    }
+
+    private Pointer requestReplacePointer(final Pointer pointer) {
+        if (isCanceled) {
+            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+        }
+
+        Pointer newPointer = pointer;
+        if (newPointer.getStatus() == POINTER_ERROR_REPORTED) {
+            for (int i = 0; i < GENARO_MAX_REQUEST_POINTERS; i++) {
+                if (newPointer.getReplaceCount() >= GENARO_DEFAULT_MIRRORS) {
+                    // TODO: need?
+                    newPointer.setReplaceCount(0);
+                    newPointer.setStatus(POINTER_MISSING);
+
+                    break;
+                }
+
+                String farmerId = newPointer.getFarmer().getNodeID();
+                if (excludedFarmerIds == null) {
+                    excludedFarmerIds = farmerId;
+                } else if (!excludedFarmerIds.contains(farmerId)) {
+                    excludedFarmerIds += "," + farmerId;
+                }
+
+                logger.info(String.format("Requesting replacement pointer at index: %d", newPointer.getIndex()));
+
+                newPointer.setReplaceCount(newPointer.getReplaceCount() + 1);
+
+                String queryArgs = String.format("limit=1&skip=%d&exclude=%s", newPointer.getIndex(), excludedFarmerIds);
+                String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
+                String path = String.format("%s?%s", url, queryArgs);
+                String signature;
+                try {
+                    signature = bridge.signRequest("GET", url, queryArgs);
+                } catch (Exception e) {
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_ALGORITHM_ERROR));
+                }
+
+                String pubKey = bridge.getPublicKeyHexString();
+                Request request = new Request.Builder()
+                        .tag("requestReplacePointer")
+                        .url(bridge.getBridgeUrl() + path)
+                        .header("x-signature", signature)
+                        .header("x-pubkey", pubKey)
+                        .get()
+                        .build();
+
+                try {
+                    try (Response response = downHttpClient.newCall(request).execute()) {
+                        int code = response.code();
+                        String responseBody = response.body().string();
+                        ObjectMapper om = new ObjectMapper();
+                        JsonNode bodyNode = om.readTree(responseBody);
+
+                        logger.info(String.format("Finished request replace pointer %d - JSON Response: %s", newPointer.getIndex(), responseBody));
+
+                        if (code == 429 || code == 420) {
+                            if (bodyNode.has("error")) {
+                                logger.error(bodyNode.get("error").asText());
+                            }
+                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_RATE_ERROR));
+                        } else if (code != 200) {
+                            if (bodyNode.has("error")) {
+                                logger.error(bodyNode.get("error").asText());
+                            }
+                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_POINTER_ERROR));
+                        }
+
+                        List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
+                        newPointer = pointers.get(0);
+                        newPointer.setReport(new GenaroExchangeReport());
+                        if (newPointer.getToken() != null && newPointer.getFarmer() != null) {
+                            newPointer.setStatus(POINTER_REPLACED);
+                        } else {
+                            newPointer.setStatus(POINTER_MISSING);
+                        }
+                    } catch (IOException e) {
+                        if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                            // if it's canceled, do not try again
+                            i = GENARO_MAX_REQUEST_POINTERS - 1;
+                            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+                        } else if (e instanceof SocketTimeoutException) {
+                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                        } else {
+                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                        }
+                    }
+                } catch (GenaroRuntimeException e) {
+                    if(i == GENARO_MAX_REQUEST_POINTERS - 1) {
+                        newPointer.setStatus(POINTER_MISSING);
+                        break;
+                    }
+                    // try again
+                    continue;
+                }
+                break;
+            }
+
+            // replace the pointer in pointers
+            pointers.set(pointers.indexOf(pointer), newPointer);
+        }
+
+        return newPointer;
+    }
+
+    // verify if the file can be recovered.
+    private void verifyRecover() {
+        // TODO: isRs() is not the
+        boolean canRecoverShards = true;
+
+        int missingPointers = (int) pointers.stream().filter(pointer -> pointer.getStatus() == POINTER_MISSING).count();
+        if(file.isRs()) {
+            if(missingPointers > totalParityPointers) {
+                canRecoverShards = false;
+            }
+        } else {
+            canRecoverShards = false;
+        }
+
+        if(pointers.size() == 0 || !canRecoverShards) {
+            throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+        }
     }
 
     public void start() {
@@ -285,8 +497,6 @@ public final class Downloader implements Runnable {
         resolveFileCallback.onBegin();
 
         // request info
-        File file = null;
-
         for (int i = 0; i < GENARO_MAX_GET_FILE_INFO; i++) {
             try {
                 file = bridge.getFileInfo(this, bucketId, fileId);
@@ -318,13 +528,11 @@ public final class Downloader implements Runnable {
         }
 
         // request pointers
-        List<Pointer> pointers = null;
-
-        for (int i = 0; i < GENARO_MAX_GET_POINTERS; i++) {
+        for (int i = 0; i < GENARO_MAX_REQUEST_POINTERS; i++) {
             try {
-                pointers = bridge.getPointers(this, bucketId, fileId);
+                pointers = bridge.requestPointers(this, bucketId, fileId);
             } catch (Exception e) {
-                if (i == GENARO_MAX_GET_POINTERS - 1) {
+                if (i == GENARO_MAX_REQUEST_POINTERS - 1) {
                     stop();
                     if (e instanceof CancellationException) {
                         resolveFileCallback.onCancel();
@@ -350,31 +558,6 @@ public final class Downloader implements Runnable {
             return;
         }
 
-        boolean hasMissingShard = pointers.stream().anyMatch(pointer -> pointer.isMissing());
-
-        // TODO: isRs() is not the
-//        boolean canRecoverShards = file.isRs();
-        boolean canRecoverShards = false;
-
-        if(file.isRs()) {
-            int missingPointers = (int) pointers.stream().filter(pointer -> pointer.isMissing()).count();
-
-            // TODO:
-//            if(missingPointers <= total_parity_pointers) {
-//                canRecoverShards = true;
-//            }
-        }
-
-        if(pointers.size() == 0 || (hasMissingShard && !canRecoverShards)) {
-            stop();
-            resolveFileCallback.onFail(genaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
-            return;
-        }
-
-        if(hasMissingShard) {
-            //TODO: queue_recover_shards
-        }
-
         // set shard size to the size of the first shard
         shardSize = pointers.get(0).getSize();
 
@@ -385,6 +568,8 @@ public final class Downloader implements Runnable {
             totalBytes += size;
             if(!pointer.isParity()) {
                 fileSize += size;
+            } else {
+                totalParityPointers += 1;
             }
         }
 
@@ -402,15 +587,23 @@ public final class Downloader implements Runnable {
         // downloading
         CompletableFuture<Void>[] downFutures = pointers
             .stream()
-            // TODO: not only download none parity shards
-//            .filter(pointer -> !pointer.isParity())
             .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
+            .map(future -> future.thenApplyAsync(this::sendExchangeReport, downloaderExecutor))
+            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                // download replaced pointer
+                if (pointer.getStatus() == POINTER_REPLACED) {
+                    requestShard(pointer);
+                }
+                return null;
+            }, downloaderExecutor))
+            .map(future -> future.thenAcceptAsync((obj) -> verifyRecover(), downloaderExecutor))
             .toArray(CompletableFuture[]::new);
 
-        futureAllRequestShard = CompletableFuture.allOf(downFutures);
+        futureAllFromRequestShard = CompletableFuture.allOf(downFutures);
 
         try {
-            futureAllRequestShard.get();
+            futureAllFromRequestShard.get();
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
@@ -419,7 +612,7 @@ public final class Downloader implements Runnable {
                 resolveFileCallback.onFail(e.getCause().getMessage());
             } else {
                 logger.warn("Warn: Would not get here");
-                resolveFileCallback.onFail(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                resolveFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
             }
             return;
         }
@@ -429,6 +622,10 @@ public final class Downloader implements Runnable {
             resolveFileCallback.onCancel();
             return;
         }
+
+//        if(hasMissingShard) {
+//            //TODO: queue_recover_shards
+//        }
 
         if(downloadedBytes.get() != totalBytes) {
             logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
@@ -524,22 +721,24 @@ public final class Downloader implements Runnable {
             futureGetFileInfo.cancel(true);
         }
 
-        // cancel getPointers
+        // cancel requestPointers
         if(futureGetPointers != null && !futureGetPointers.isDone()) {
             // cancel the okhttp3 transfer
-            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "getPointersRaw");
+            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "requestPointersRaw");
 
-            // will cause a CancellationException, and will be caught on bridge.getPointers
+            // will cause a CancellationException, and will be caught on bridge.requestPointers
             futureGetPointers.cancel(true);
         }
 
         // cancel requestShard
-        if(futureAllRequestShard != null && !futureAllRequestShard.isDone()) {
+        if(futureAllFromRequestShard != null && !futureAllFromRequestShard.isDone()) {
             // cancel the okhttp3 transfer
             BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "requestShard");
+            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "sendExchangeReport");
+            BasicUtil.cancelOkHttpCallWithTag(downHttpClient, "requestReplacePointer");
 
-            // will cause a CancellationException, and will be caught on futureAllRequestShard.get
-            futureAllRequestShard.cancel(true);
+            // will cause a CancellationException, and will be caught on futureAllFromRequestShard.get
+            futureAllFromRequestShard.cancel(true);
         }
 
         downloaderExecutor.shutdown();

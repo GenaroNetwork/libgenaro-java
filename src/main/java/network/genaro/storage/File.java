@@ -157,8 +157,6 @@ public final class File {
                 ", bucket='" + bucket + '\'' +
                 ", index='" + index + '\'' +
                 ", created='" + created + '\'' +
-                ", rsaKey='" + rsaKey + '\'' +
-                ", rsaCtr='" + rsaCtr + '\'' +
                 ", isShareFile=" + isShareFile +
                 '}';
     }

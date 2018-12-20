@@ -270,10 +270,6 @@ public final class Uploader implements Runnable {
         shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
         for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
             byte[] challenge = randomBuff(32);
-            //                        byte[] challenge ={99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-            //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-            //                                99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-            //                                99, 99};
             shardMeta.getChallenges()[i] = challenge;
             shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
         }
@@ -510,7 +506,6 @@ public final class Uploader implements Runnable {
             throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
         }
 
-//        RequestBody requestBody = RequestBody.create(MediaType.parse("application/octet-stream; charset=utf-8"), mBlock);
         UploadRequestBody uploadRequestBody = new UploadRequestBody(new ByteArrayInputStream(mBlock),
                 "application/octet-stream; charset=utf-8", new UploadRequestBody.ProgressListener() {
             @Override
@@ -537,6 +532,12 @@ public final class Uploader implements Runnable {
         if (isCanceled) {
             throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
         }
+
+        shard.getReport().setCode(GENARO_REPORT_FAILURE);
+        shard.getReport().setMessage(GENARO_REPORT_UPLOAD_ERROR);
+
+        // save the start time of downloading
+        shard.getReport().setStart(System.currentTimeMillis());
 
         for (int i = 0; i < GENARO_MAX_PUSH_SHARD; i++) {
             logger.info(String.format("Transferring Shard index %d...(retry: %d)", shard.getIndex(), i));
@@ -575,9 +576,72 @@ public final class Uploader implements Runnable {
                 }
                 // fail
                 continue;
+            } finally {
+                // save the end time of downloading
+                shard.getReport().setEnd(System.currentTimeMillis());
             }
+            shard.getReport().setCode(GENARO_REPORT_SUCCESS);
+            shard.getReport().setMessage(GENARO_REPORT_SHARD_UPLOADED);
             // success
             break;
+        }
+
+        return shard;
+    }
+
+    private ShardTracker sendExchangeReport(final ShardTracker shard) {
+        if (isCanceled) {
+            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+        }
+
+        if (shard.getReport().getStart() > 0 && shard.getReport().getEnd() > 0) {
+            String jsonStrBody = String.format("{\"dataHash\": \"%s\", \"farmerId\": \"%s\", \"exchangeStart\": \"%d\"," +
+                            "\"exchangeEnd\": \"%d\", \"exchangeResultCode\": \"%d\", \"exchangeResultMessage\": \"%s\"}",
+                    shard.getMeta().getHash(), shard.getPointer().getFarmer().getNodeID(), shard.getReport().getStart(),
+                    shard.getReport().getEnd(), shard.getReport().getCode(), shard.getReport().getMessage());
+
+            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+            RequestBody body = RequestBody.create(JSON, jsonStrBody);
+            String path = "/reports/exchanges";
+
+            String signature;
+            try {
+                signature = bridge.signRequest("POST", path, jsonStrBody);
+            } catch (NoSuchAlgorithmException e) {
+                return shard;
+            }
+
+            String pubKey = bridge.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .tag("sendExchangeReport")
+                    .url(bridge.getBridgeUrl() + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .post(body)
+                    .build();
+
+            for (int i = 0; i < GENARO_MAX_REPORT_TRIES; i++) {
+                try (Response response = upHttpClient.newCall(request).execute()) {
+                    int code = response.code();
+                    String responseBody = response.body().string();
+                    ObjectMapper om = new ObjectMapper();
+                    JsonNode bodyNode = om.readTree(responseBody);
+
+                    if (code == 201) {
+                        // success
+                        break;
+                    } else {
+                        if (bodyNode.has("error")) {
+                            logger.warn(bodyNode.get("error").asText());
+                        }
+                    }
+                } catch (IOException e) {
+                    if(i == GENARO_MAX_REPORT_TRIES - 1) {
+                        // failed
+                        break;
+                    }
+                }
+            }
         }
 
         return shard;
@@ -624,25 +688,38 @@ public final class Uploader implements Runnable {
 
         for (int i = 0; i < GENARO_MAX_CREATE_BUCKET_ENTRY; i++) {
             logger.info(String.format("Create bucket entry(retry: %d) - JSON body: %s", i, jsonStrBody));
-            try (Response response = upHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                String responseBody = response.body().string();
-                ObjectMapper om = new ObjectMapper();
-                JsonNode bodyNode = om.readTree(responseBody);
+            try {
+                try (Response response = upHttpClient.newCall(request).execute()) {
+                    int code = response.code();
+                    String responseBody = response.body().string();
+                    ObjectMapper om = new ObjectMapper();
+                    JsonNode bodyNode = om.readTree(responseBody);
 
-                logger.info(String.format("Create bucket entry(retry: %d) - JSON Response: %s", i, responseBody));
+                    logger.info(String.format("Create bucket entry(retry: %d) - JSON Response: %s", i, responseBody));
 
-                if (code != 200 && code != 201) {
-                    String error = bodyNode.get("error").asText();
-                    logger.error(error);
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    if (code != 200 && code != 201) {
+                        if (bodyNode.has("error")) {
+                            logger.error(bodyNode.get("error").asText());
+                        }
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    }
+
+                    logger.info("Successfully Added bucket entry");
+
+                    fileId = bodyNode.get("id").asText();
+                } catch (IOException e) {
+                    if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                        // if it's canceled, do not try again
+                        i = GENARO_MAX_CREATE_BUCKET_ENTRY - 1;
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+                    } else if (e instanceof SocketTimeoutException) {
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                    } else {
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    }
                 }
-
-                logger.info("Successfully Added bucket entry");
-
-                fileId = bodyNode.get("id").asText();
-            } catch (IOException | GenaroRuntimeException e) {
-                if(i == GENARO_MAX_CREATE_BUCKET_ENTRY - 1) {
+            } catch (GenaroRuntimeException e) {
+                if (i == GENARO_MAX_CREATE_BUCKET_ENTRY - 1) {
                     throw e;
                 }
                 // try again
@@ -711,7 +788,7 @@ public final class Uploader implements Runnable {
             encryptedFileName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(fileName), bridge.getPrivateKey(), Hex.decode(bucketId));
         } catch (Exception e) {
             stop();
-            storeFileCallback.onFail("Encrypt error");
+            storeFileCallback.onFail("Encrypt file name error");
             return;
         }
 
@@ -805,6 +882,7 @@ public final class Uploader implements Runnable {
             shard.getMeta().setParity(i + 1 > totalDataShards);
             //TODO: no effect yet
             shard.setUploadedSize(0);
+            shard.setReport(new GenaroExchangeReport());
             shards.add(shard);
         }
 
@@ -815,6 +893,7 @@ public final class Uploader implements Runnable {
                 .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
                 .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
                 .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::sendExchangeReport, uploaderExecutor))
                 .toArray(CompletableFuture[]::new);
 
         futureAllFromPrepareFrame = CompletableFuture.allOf(upFutures);
@@ -829,7 +908,7 @@ public final class Uploader implements Runnable {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else {
                 logger.warn("Warn: Would not get here");
-                storeFileCallback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                storeFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
             }
             return;
         }
@@ -855,7 +934,7 @@ public final class Uploader implements Runnable {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else if(e instanceof NoSuchAlgorithmException) {
                 storeFileCallback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-            } else if (e instanceof SocketException) {
+            } else if (e instanceof SocketException || e.getMessage() == "Canceled") {
                 storeFileCallback.onFail(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else if (e instanceof SocketTimeoutException) {
                 storeFileCallback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
@@ -865,7 +944,6 @@ public final class Uploader implements Runnable {
             return;
         }
 
-        storeFileCallback.onProgress(1.0f);
         storeFileCallback.onFinish(fileId);
 
         // TODO: send exchange report
@@ -906,6 +984,7 @@ public final class Uploader implements Runnable {
         if (futureAllFromPrepareFrame != null && !futureAllFromPrepareFrame.isDone()) {
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushFrame");
             BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "pushShard");
+            BasicUtil.cancelOkHttpCallWithTag(upHttpClient, "sendExchangeReport");
 
             // will cause a CancellationException, and will be caught on futureAllFromPrepareFrame.get()
             // this call will only terminate pushShard, prepareFrame and pushFrame will not be terminated,

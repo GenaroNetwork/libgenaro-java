@@ -245,18 +245,71 @@ final class Frame {
     }
 }
 
-@JsonIgnoreProperties(ignoreUnknown=true)
+final class GenaroExchangeReport {
+    private long start;
+    private long end;
+    private int code;
+    private String message;
+
+    public long getStart() {
+        return start;
+    }
+
+    public void setStart(long start) {
+        this.start = start;
+    }
+
+    public long getEnd() {
+        return end;
+    }
+
+    public void setEnd(long end) {
+        this.end = end;
+    }
+
+    public int getCode() {
+        return code;
+    }
+
+    public void setCode(int code) {
+        this.code = code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+}
+
+/** @brief A structure that represents a pointer to a shard
+ *
+ * A shard is an encrypted piece of a file, a pointer holds all necessary
+ * information to retrieve a shard from a farmer, including the IP address
+ * and port of the farmer, as well as a token indicating a transfer has been
+ * authorized. Other necessary information such as the expected hash of the
+ * data, and the index position in the file is also included.
+ *
+ * The data can be replaced with new farmer contact, in case of failure, and the
+ * total number of replacements can be tracked.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 final class Pointer {
-    public enum PointerStatus
+    /** @brief Enumerable that defines that status of a pointer
+     *
+     * A pointer will begin as created, and move forward until an error
+     * occurs, in which case it will start moving backwards from the error
+     * state until it has been replaced and reset back to created. This process
+     * can continue until success.
+     */
+    enum PointerStatus
     {
-        POINTER_BEING_REPLACED,
         POINTER_ERROR_REPORTED,
         POINTER_ERROR,
-        POINTER_CREATED,
-        POINTER_BEING_DOWNLOADED,
-        POINTER_DOWNLOADED,
         POINTER_MISSING,
-        POINTER_FINISHED
+        POINTER_REPLACED
     }
 
     private int index;
@@ -270,6 +323,11 @@ final class Pointer {
     private Farmer farmer;
     private long downloadedSize;
     private PointerStatus status;
+
+    private int replaceCount;
+
+    // exchange report with bridge
+    private GenaroExchangeReport report;
 
     public PointerStatus getStatus() {
         return status;
@@ -335,6 +393,22 @@ final class Pointer {
         this.parity = parity;
     }
 
+    public int getReplaceCount() {
+        return replaceCount;
+    }
+
+    public void setReplaceCount(int replaceCount) {
+        this.replaceCount = replaceCount;
+    }
+
+    public GenaroExchangeReport getReport() {
+        return report;
+    }
+
+    public void setReport(GenaroExchangeReport report) {
+        this.report = report;
+    }
+
     @Override
     public String toString() {
         return "Pointer{" +
@@ -355,10 +429,6 @@ final class Pointer {
                 ", parity=" + parity +
                 ", farmer=" + farmer.toBriefString() +
                 '}';
-    }
-
-    public boolean isMissing() {
-        return status == PointerStatus.POINTER_MISSING;
     }
 
     public long getDownloadedSize() {
@@ -400,6 +470,9 @@ final class ShardTracker {
     private long uploadedSize;
     private String shardFile;
 
+    // exchange report with bridge
+    private GenaroExchangeReport report;
+
     public int getIndex() {
         return index;
     }
@@ -435,6 +508,14 @@ final class ShardTracker {
     public String getShardFile() { return shardFile; }
 
     public void setShardFile(String shardFile) { this.shardFile = shardFile; }
+
+    public GenaroExchangeReport getReport() {
+        return report;
+    }
+
+    public void setReport(GenaroExchangeReport report) {
+        this.report = report;
+    }
 }
 
 public final class Genaro {
@@ -470,7 +551,7 @@ public final class Genaro {
         this.wallet = wallet;
     }
 
-    private void checkInit(boolean checkWallet) {
+    private void verifyInit(boolean checkWallet) {
         if (bridgeUrl == null || (checkWallet && wallet == null)) {
             throw new GenaroRuntimeException("Bridge url or wallet has not been initialized!");
         }
@@ -559,6 +640,7 @@ public final class Genaro {
                 return "No errors";
             case GENARO_ALGORITHM_ERROR:
                 return "Algorithm error";
+            case GENARO_UNKNOWN_ERROR:
             default:
                 return "Unknown error";
         }
@@ -578,7 +660,7 @@ public final class Genaro {
     public CompletableFuture<String> getInfoFuture() {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(false);
+            verifyInit(false);
             Request request = new Request.Builder()
                     .url(bridgeUrl)
                     .get()
@@ -621,7 +703,7 @@ public final class Genaro {
     CompletableFuture<Bucket> getBucketFuture(final Uploader uploader, final String bucketId) {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(true);
+            verifyInit(true);
             String signature;
             try {
                 signature = signRequest("GET", "/buckets/" + bucketId, "");
@@ -676,9 +758,15 @@ public final class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
+    /**
+     * @brief List available buckets for a user.
+     *
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
     public CompletableFuture<Void> getBuckets(final GetBucketsCallback callback) {
         return CompletableFuture.supplyAsync(() -> {
-            checkInit(true);
+            verifyInit(true);
             String signature;
             try {
                 signature = signRequest("GET", "/buckets", "");
@@ -735,9 +823,16 @@ public final class Genaro {
         });
     }
 
+    /**
+     * @brief Delete a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
     public CompletableFuture<Void> deleteBucket(final String bucketId, final DeleteBucketCallback callback) {
         return CompletableFuture.supplyAsync(() -> {
-            checkInit(true);
+            verifyInit(true);
             String signature;
             try {
                 signature = signRequest("DELETE", "/buckets/" + bucketId, "");
@@ -781,9 +876,16 @@ public final class Genaro {
         });
     }
 
+    /**
+     * @brief Rename a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
     public CompletableFuture<Void> renameBucket(final String bucketId, final String name, final RenameBucketCallback callback) {
         return CompletableFuture.supplyAsync(() -> {
-            checkInit(true);
+            verifyInit(true);
             String encryptedName;
             try {
                 encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), getPrivateKey(), BUCKET_NAME_MAGIC);
@@ -841,7 +943,7 @@ public final class Genaro {
     CompletableFuture<File> getFileInfoFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(true);
+            verifyInit(true);
             String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
             String signature;
             try {
@@ -921,9 +1023,16 @@ public final class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
+    /**
+     * @brief Get a list of all files in a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
     public CompletableFuture<Void> listFiles(final String bucketId, final ListFilesCallback callback) {
         return CompletableFuture.supplyAsync(() -> {
-            checkInit(true);
+            verifyInit(true);
             String path = String.format("/buckets/%s/files", bucketId);
             String signature;
             try {
@@ -987,9 +1096,17 @@ public final class Genaro {
         });
     }
 
+    /**
+     * @brief Delete a file in a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] fileId The file id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
     public CompletableFuture<Void> deleteFile(final String bucketId, final String fileId, final DeleteFileCallback callback) {
         return CompletableFuture.supplyAsync(() -> {
-            checkInit(true);
+            verifyInit(true);
             String path = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String signature;
             try {
@@ -1034,10 +1151,10 @@ public final class Genaro {
         });
     }
 
-    CompletableFuture<List<Pointer>> getPointersFuture(final Downloader downloader, final String bucketId, final String fileId) {
+    CompletableFuture<List<Pointer>> requestPointersFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(true);
+            verifyInit(true);
             List<Pointer> ps= new ArrayList<>();
 
             int skipCount = 0;
@@ -1046,7 +1163,7 @@ public final class Genaro {
 
                 List<Pointer> psr;
                 try {
-                    psr = this.getPointersRaw(downloader, bucketId, fileId, POINT_PAGE_COUNT, skipCount);
+                    psr = this.requestPointersRaw(downloader, bucketId, fileId, POINT_PAGE_COUNT, skipCount);
                 } catch (Exception e) {
                     // TODO: it's not properly
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
@@ -1065,8 +1182,8 @@ public final class Genaro {
         });
     }
 
-    List<Pointer> getPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<List<Pointer>> fu = getPointersFuture(downloader, bucketId, fileId);
+    List<Pointer> requestPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<List<Pointer>> fu = requestPointersFuture(downloader, bucketId, fileId);
         if(downloader != null) {
             downloader.setFutureGetPointers(fu);
         }
@@ -1075,10 +1192,10 @@ public final class Genaro {
         return fu.get(2 * GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    private CompletableFuture<List<Pointer>> getPointersRawFuture(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) {
+    private CompletableFuture<List<Pointer>> requestPointersRawFuture(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(true);
+            verifyInit(true);
             String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
             String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
             String path = String.format("%s?%s", url, queryArgs);
@@ -1090,7 +1207,7 @@ public final class Genaro {
             }
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
-                    .tag("getPointersRaw")
+                    .tag("requestPointersRaw")
                     .url(bridgeUrl + path)
                     .header("x-signature", signature)
                     .header("x-pubkey", pubKey)
@@ -1107,31 +1224,36 @@ public final class Genaro {
             try (Response response = okHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
-
                 ObjectMapper om = new ObjectMapper();
+                JsonNode bodyNode = om.readTree(responseBody);
 
                 logger.info(String.format("Finished request pointers - JSON Response %s", responseBody));
 
-                JsonNode bodyNode = om.readTree(responseBody);
-
                 if (code == 429 || code == 420) {
-                    logger.error(bodyNode.get("error").asText());
+                    if (bodyNode.has("error")) {
+                        logger.error(bodyNode.get("error").asText());
+                    }
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_RATE_ERROR));
                 } else if (code != 200) {
-                    logger.error(bodyNode.get("error").asText());
+                    if (bodyNode.has("error")) {
+                        logger.error(bodyNode.get("error").asText());
+                    }
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_POINTER_ERROR));
                 }
 
                 List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
                 pointers.stream().forEach(pointer -> {
                     if (pointer.getToken() == null || pointer.getFarmer() == null) {
-                        pointer.setStatus(POINTER_MISSING);
+                        // Update status so that it will be retried, do not set to POINTER_MISSING, because it can be replaced
+                        pointer.setStatus(POINTER_ERROR_REPORTED);
                     }
+
+                    pointer.setReport(new GenaroExchangeReport());
                 });
 
                 return pointers;
             } catch (IOException e) {
-                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getPointersRaw") will cause an SocketException
+                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestPointersRaw") will cause an SocketException
                 if (e instanceof SocketException || e.getMessage() == "Canceled") {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 } else {
@@ -1141,15 +1263,15 @@ public final class Genaro {
         });
     }
 
-    private List<Pointer> getPointersRaw(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<List<Pointer>> fu = getPointersRawFuture(downloader, bucketId, fileId, limit, skipCount);
+    private List<Pointer> requestPointersRaw(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<List<Pointer>> fu = requestPointersRawFuture(downloader, bucketId, fileId, limit, skipCount);
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
     CompletableFuture<Boolean> isFileExistFuture(final Uploader uploader, final String bucketId, final String encryptedFileName) {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(true);
+            verifyInit(true);
             String escapedName;
             String path;
             String signature;
@@ -1210,7 +1332,7 @@ public final class Genaro {
     CompletableFuture<Frame> requestNewFrameFuture(final Uploader uploader) {
         return CompletableFuture.supplyAsync(() -> {
 
-            checkInit(true);
+            verifyInit(true);
             String jsonStrBody = "{}";
 
             MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -1272,14 +1394,34 @@ public final class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    public Downloader resolveFile(final String bucketId, final String fileId, final String path, final boolean overwrite, final ResolveFileCallback callback) {
-        Downloader downloader = new Downloader(this, bucketId, fileId, path, overwrite, callback);
+    /**
+     * @brief Download a file
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] fileId The file id
+     * @param[in] filePath The file path
+     * @param[in] overwrite Whether to overwrite if exists
+     * @param[in] callback The callback on progress or when complete
+     * @return A Downloader.
+     */
+    public Downloader resolveFile(final String bucketId, final String fileId, final String filePath, final boolean overwrite, final ResolveFileCallback callback) {
+        Downloader downloader = new Downloader(this, bucketId, fileId, filePath, overwrite, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(downloader);
         downloader.setFutureBelongsTo(fu);
 
         return downloader;
     }
 
+    /**
+     * @brief Upload a file
+     *
+     * @param[in] rs Whether to use Reed-Solomon to generate parity shards
+     * @param[in] filePath The file path
+     * @param[in] fileName The file name
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback on progress or when complete
+     * @return A Uploader.
+     */
     public Uploader storeFile(final boolean rs, final String filePath, final String fileName, final String bucketId, final StoreFileCallback callback) {
         Uploader uploader = new Uploader(this, rs, filePath, fileName, bucketId, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(uploader);
