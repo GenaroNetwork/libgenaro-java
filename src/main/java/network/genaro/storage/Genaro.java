@@ -322,6 +322,8 @@ final class Pointer {
     private String operation;
     private Farmer farmer;
     private long downloadedSize;
+
+    private boolean isReplaced = false;
     private PointerStatus status;
 
     private int replaceCount;
@@ -335,6 +337,14 @@ final class Pointer {
 
     public void setStatus(PointerStatus status) {
         this.status = status;
+    }
+
+    public boolean isReplaced() {
+        return isReplaced;
+    }
+
+    public void setReplaced(boolean replaced) {
+        isReplaced = replaced;
     }
 
     public String getToken() {

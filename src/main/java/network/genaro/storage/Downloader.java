@@ -371,6 +371,7 @@ public final class Downloader implements Runnable {
         }
 
         Pointer newPointer = pointer;
+        newPointer.setReplaced(false);
         if (newPointer.getStatus() == POINTER_ERROR_REPORTED) {
             for (int i = 0; i < GENARO_MAX_REQUEST_POINTERS; i++) {
                 if (newPointer.getReplaceCount() >= GENARO_DEFAULT_MIRRORS) {
@@ -436,6 +437,7 @@ public final class Downloader implements Runnable {
                         newPointer = pointers.get(0);
                         newPointer.setReport(new GenaroExchangeReport());
                         if (newPointer.getToken() != null && newPointer.getFarmer() != null) {
+                            newPointer.setReplaced(true);
                             newPointer.setStatus(POINTER_REPLACED);
                         } else {
                             newPointer.setStatus(POINTER_MISSING);
@@ -584,20 +586,89 @@ public final class Downloader implements Runnable {
             return;
         }
 
+        resolveFileCallback.onProgress(0.0f);
+
         // downloading
         CompletableFuture<Void>[] downFutures = pointers
             .parallelStream()
             .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
             .map(future -> future.thenApplyAsync(this::sendExchangeReport, downloaderExecutor))
+            // 1st requestReplacePointer
             .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
             .map(future -> future.thenApplyAsync((pointer) -> {
                 // download replaced pointer
-                if (pointer.getStatus() == POINTER_REPLACED) {
+                if (pointer.isReplaced()) {
                     requestShard(pointer);
                 }
-                return null;
+                return pointer;
             }, downloaderExecutor))
-            .map(future -> future.thenAcceptAsync((obj) -> verifyRecover(), downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                if (pointer.isReplaced()) {
+                    sendExchangeReport(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            // 2nd requestReplacePointer
+            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                // download replaced pointer
+                if (pointer.isReplaced()) {
+                    requestShard(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                if (pointer.isReplaced()) {
+                    sendExchangeReport(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            // 3rd requestReplacePointer
+            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                // download replaced pointer
+                if (pointer.isReplaced()) {
+                    requestShard(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                if (pointer.isReplaced()) {
+                    sendExchangeReport(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            // 4th requestReplacePointer
+            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                // download replaced pointer
+                if (pointer.isReplaced()) {
+                    requestShard(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                if (pointer.isReplaced()) {
+                    sendExchangeReport(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            // 5th requestReplacePointer
+            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                // download replaced pointer
+                if (pointer.isReplaced()) {
+                    requestShard(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            .map(future -> future.thenApplyAsync((pointer) -> {
+                if (pointer.isReplaced()) {
+                    sendExchangeReport(pointer);
+                }
+                return pointer;
+            }, downloaderExecutor))
+            .map(future -> future.thenAcceptAsync((pointer) -> verifyRecover(), downloaderExecutor))
             .toArray(CompletableFuture[]::new);
 
         futureAllFromRequestShard = CompletableFuture.allOf(downFutures);
