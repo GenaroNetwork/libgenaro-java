@@ -482,7 +482,9 @@ public final class Downloader implements Runnable {
                 canRecoverShards = false;
             }
         } else {
-            canRecoverShards = false;
+            if (missingPointers != 0) {
+                canRecoverShards = false;
+            }
         }
 
         if(pointers.size() == 0 || !canRecoverShards) {
