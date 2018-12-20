@@ -326,6 +326,9 @@ final class Pointer {
     private boolean isReplaced = false;
     private PointerStatus status;
 
+    // the count of requestShard
+    private int requestCount;
+    // the count of requestReplacePointer
     private int replaceCount;
 
     // exchange report with bridge
@@ -401,6 +404,14 @@ final class Pointer {
 
     public void setParity(boolean parity) {
         this.parity = parity;
+    }
+
+    public int getRequestCount() {
+        return requestCount;
+    }
+
+    public void setRequestCount(int requestCount) {
+        this.requestCount = requestCount;
     }
 
     public int getReplaceCount() {
@@ -491,7 +502,7 @@ final class ShardTracker {
     // the count of pushShard
     private int pushCount;
     // whether the last pushShard call tried to push the shard
-    private boolean hasTryToPush = false;
+    private boolean hasTriedToPush = false;
     private ShardStatus status;
 
     public int getIndex() {
@@ -546,12 +557,12 @@ final class ShardTracker {
         this.pushCount = pushCount;
     }
 
-    public boolean isHasTryToPush() {
-        return hasTryToPush;
+    public boolean getHasTriedToPush() {
+        return hasTriedToPush;
     }
 
-    public void setHasTryToPush(boolean hasTryToPush) {
-        this.hasTryToPush = hasTryToPush;
+    public void setHasTriedToPush(boolean hasTriedToPush) {
+        this.hasTriedToPush = hasTriedToPush;
     }
 
     public ShardStatus getStatus() {
@@ -1210,8 +1221,11 @@ public final class Genaro {
                 try {
                     psr = this.requestPointersRaw(downloader, bucketId, fileId, POINT_PAGE_COUNT, skipCount);
                 } catch (Exception e) {
-                    // TODO: it's not properly
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+                        throw new GenaroRuntimeException(e.getCause().getMessage());
+                    } else {
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    }
                 }
 
                 if(psr.size() == 0) {

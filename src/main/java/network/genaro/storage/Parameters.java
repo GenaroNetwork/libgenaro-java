@@ -1,9 +1,9 @@
 package network.genaro.storage;
 
 final class Parameters {
-    public static final int GENARO_OKHTTP_CONNECT_TIMEOUT = 40;
-    public static final int GENARO_OKHTTP_WRITE_TIMEOUT = 40;
-    public static final int GENARO_OKHTTP_READ_TIMEOUT = 80;
+    public static final int GENARO_OKHTTP_CONNECT_TIMEOUT = 20;
+    public static final int GENARO_OKHTTP_WRITE_TIMEOUT = 20;
+    public static final int GENARO_OKHTTP_READ_TIMEOUT = 20;
 
     public static final int GENARO_HTTP_TIMEOUT = 40;
 

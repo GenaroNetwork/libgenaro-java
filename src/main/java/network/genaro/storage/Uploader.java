@@ -44,7 +44,7 @@ public final class Uploader implements Runnable {
     public static final int GENARO_MAX_REPORT_TRIES = 2;
     public static final int GENARO_MAX_PUSH_FRAME = 3;
     public static final int GENARO_MAX_CREATE_BUCKET_ENTRY = 3;
-    public static final int GENARO_MAX_PUSH_SHARD = 3;
+    public static final int GENARO_MAX_PUSH_SHARD = 5;
     public static final int GENARO_MAX_REQUEST_NEW_FRAME = 3;
     public static final int GENARO_MAX_VERIFY_BUCKET_ID = 3;
     public static final int GENARO_MAX_VERIFY_FILE_NAME = 3;
@@ -486,11 +486,12 @@ public final class Uploader implements Runnable {
 //                      req->shard_file = state->original_file;
 //                  }
         if (shard.getStatus() == SHARD_PUSH_SUCCESS) {
-            shard.setHasTryToPush(false);
+            shard.setHasTriedToPush(false);
             return shard;
         }
 
-        shard.setHasTryToPush(true);
+        shard.setHasTriedToPush(true);
+        shard.setPushCount(shard.getPushCount() + 1);
 
         ShardMeta shardMeta = shard.getMeta();
 
@@ -906,9 +907,7 @@ public final class Uploader implements Runnable {
             shard.setPointer(new FarmerPointer());
             shard.setMeta(new ShardMeta(i));
             shard.getMeta().setParity(i + 1 > totalDataShards);
-            shard.setUploadedSize(0);
             shard.setReport(new GenaroExchangeReport());
-            shard.setPushCount(0);
             shards.add(shard);
         }
 
@@ -926,7 +925,7 @@ public final class Uploader implements Runnable {
             .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
             .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
             .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.isHasTryToPush()) {
+                if (shard.getHasTriedToPush()) {
                     sendExchangeReport(shard);
                 }
                 return shard;
@@ -935,7 +934,7 @@ public final class Uploader implements Runnable {
             .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
             .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
             .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.isHasTryToPush()) {
+                if (shard.getHasTriedToPush()) {
                     sendExchangeReport(shard);
                 }
                 return shard;
@@ -944,7 +943,7 @@ public final class Uploader implements Runnable {
             .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
             .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
             .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.isHasTryToPush()) {
+                if (shard.getHasTriedToPush()) {
                     sendExchangeReport(shard);
                 }
                 return shard;
@@ -953,7 +952,7 @@ public final class Uploader implements Runnable {
             .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
             .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
             .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.isHasTryToPush()) {
+                if (shard.getHasTriedToPush()) {
                     sendExchangeReport(shard);
                 }
                 return shard;

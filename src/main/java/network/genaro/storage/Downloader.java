@@ -251,6 +251,8 @@ public final class Downloader implements Runnable {
             return pointer;
         }
 
+        pointer.setRequestCount(pointer.getRequestCount() + 1);
+
         Farmer farmer = pointer.getFarmer();
         String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
         Request request = new Request.Builder()
@@ -282,15 +284,21 @@ public final class Downloader implements Runnable {
             if(e instanceof ExecutionException) {
                 Throwable cause = e.getCause();
                 if (cause instanceof SocketTimeoutException) {
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+                    if (pointer.getRequestCount() >= (GENARO_DEFAULT_MIRRORS + 1)) {
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+                    }
                 } else if (cause instanceof GenaroRuntimeException) {
                     if (cause.getMessage().equals(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR))) {
                         pointer.getReport().setMessage(GENARO_REPORT_FAILED_INTEGRITY);
                     }
-                    throw new GenaroRuntimeException(cause.getMessage());
+                    if (pointer.getRequestCount() >= (GENARO_DEFAULT_MIRRORS + 1)) {
+                        throw new GenaroRuntimeException(cause.getMessage());
+                    }
                 }
             } else {
-                throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                if (pointer.getRequestCount() >= (GENARO_DEFAULT_MIRRORS + 1)) {
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                }
             }
         } finally {
             // save the end time of downloading
@@ -342,11 +350,6 @@ public final class Downloader implements Runnable {
                     JsonNode bodyNode = om.readTree(responseBody);
 
                     if (code == 201) {
-                        // set status so that this pointer can be replaced
-                        if (pointer.getStatus() == POINTER_ERROR) {
-                            pointer.setStatus(POINTER_ERROR_REPORTED);
-                        }
-
                         // success
                         break;
                     } else {
@@ -360,6 +363,11 @@ public final class Downloader implements Runnable {
                         break;
                     }
                 }
+            }
+
+            // set status so that this pointer can be replaced
+            if (pointer.getStatus() == POINTER_ERROR) {
+                pointer.setStatus(POINTER_ERROR_REPORTED);
             }
         }
 
@@ -376,8 +384,6 @@ public final class Downloader implements Runnable {
         if (newPointer.getStatus() == POINTER_ERROR_REPORTED) {
             for (int i = 0; i < GENARO_MAX_REQUEST_POINTERS; i++) {
                 if (newPointer.getReplaceCount() >= GENARO_DEFAULT_MIRRORS) {
-                    // TODO: need?
-                    newPointer.setReplaceCount(0);
                     newPointer.setStatus(POINTER_MISSING);
 
                     break;
@@ -474,7 +480,6 @@ public final class Downloader implements Runnable {
 
     // verify if the file can be recovered.
     private void verifyRecover() {
-        // TODO: isRs() is not the
         boolean canRecoverShards = true;
 
         int missingPointers = (int) pointers.stream().filter(pointer -> pointer.getStatus() == POINTER_MISSING).count();
@@ -578,8 +583,6 @@ public final class Downloader implements Runnable {
             }
         }
 
-        // TODO: check for replace pointer
-
         try {
             downFileChannel = FileChannel.open(Paths.get(tempPath), StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
@@ -656,7 +659,7 @@ public final class Downloader implements Runnable {
                 }
                 return pointer;
             }, downloaderExecutor))
-            // 5th requestReplacePointer
+            // 5th requestReplacePointer, try request replace pointer for 5 times because GENARO_DEFAULT_MIRRORS = 5
             .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
             .map(future -> future.thenApplyAsync((pointer) -> {
                 // download replaced pointer
