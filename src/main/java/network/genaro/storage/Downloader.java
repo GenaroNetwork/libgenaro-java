@@ -586,7 +586,7 @@ public final class Downloader implements Runnable {
 
         // downloading
         CompletableFuture<Void>[] downFutures = pointers
-            .stream()
+            .parallelStream()
             .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
             .map(future -> future.thenApplyAsync(this::sendExchangeReport, downloaderExecutor))
             .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))

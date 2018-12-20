@@ -889,7 +889,7 @@ public final class Uploader implements Runnable {
         storeFileCallback.onProgress(0.0f);
 
         CompletableFuture[] upFutures = shards
-                .stream()
+                .parallelStream()
                 .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
                 .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
                 .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))

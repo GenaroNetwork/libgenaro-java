@@ -173,7 +173,7 @@ public final class TestGenaro {
         List<Pointer> psa;
 
         try {
-            psa = api.getPointers(null, TestbucketId, "f40da862c00494bb0430e012");
+            psa = api.requestPointers(null, TestbucketId, "f40da862c00494bb0430e012");
         } catch (Exception e) {
             System.out.println(e.getMessage());
             return;
@@ -308,7 +308,7 @@ public final class TestGenaro {
     public void testUpload() throws Exception {
         Genaro api = new Genaro(TestBridgeUrl, V3JSON, "lgygn_9982");
 
-        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "24.data", TestbucketId, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(false, "/Users/dingyi/test/2097152.data", "29.data", TestbucketId, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", TestbucketId, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
@@ -372,7 +372,7 @@ public final class TestGenaro {
         List<Uploader> uploaders = new ArrayList<>();
 
         for (int i = 0; i < 5; i++) {
-            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam14" + i + ".txt", TestbucketId, new StoreFileCallback() {
+            Uploader uploader = api.storeFile(false, "/Users/dingyi/test/spam.txt", "spam15" + i + ".txt", TestbucketId, new StoreFileCallback() {
                 @Override
                 public void onBegin(long fileSize) {
                     System.out.println("Upload started");
