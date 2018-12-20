@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 final class UploadRequestBody extends RequestBody {
-
     public interface ProgressListener {
         void transferred(long delta);
     }

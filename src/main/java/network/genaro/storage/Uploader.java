@@ -37,6 +37,7 @@ import org.xbill.DNS.utils.base16;
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Genaro.genaroStrError;
+import static network.genaro.storage.ShardTracker.ShardStatus.*;
 import network.genaro.storage.GenaroCallback.StoreFileCallback;
 
 public final class Uploader implements Runnable {
@@ -71,25 +72,25 @@ public final class Uploader implements Runnable {
     private int totalDataShards;
     private int totalParityShards;
     private int totalShards;
-
     private long shardSize;
 
+    // the total uploaded bytes
+    private AtomicLong uploadedBytes = new AtomicLong();
+    // increased uploaded bytes since last onProgress Call
+    private AtomicLong deltaUploaded = new AtomicLong();
+    private long totalBytes;
+
     private String frameId;
+    private String hmacId;
+    private String fileId;
 
     private byte[] index;
     private byte[] fileKey;
 
-    private String hmacId;
-
     private int errorStatus;
 
-    private String fileId;
-
-    private AtomicLong uploadedBytes = new AtomicLong();
-    private long totalBytes;
-
-    // increased uploaded bytes since last onProgress Call
-    private AtomicLong deltaUploaded = new AtomicLong();
+    // not try to upload to these farmers
+    private List<String> excludedFarmerIds = new ArrayList<>();
 
     private CompletableFuture<Bucket> futureGetBucket;
     private CompletableFuture<Boolean> futureIsFileExists;
@@ -375,6 +376,9 @@ public final class Uploader implements Runnable {
     }
 
     private ShardTracker pushFrame(final ShardTracker shard) {
+        if (shard.getStatus() == SHARD_PUSH_SUCCESS) {
+            return shard;
+        }
 
         ShardMeta shardMeta = shard.getMeta();
 
@@ -385,19 +389,20 @@ public final class Uploader implements Runnable {
         String[] challengesAsStr = shardMeta.getChallengesAsStr();
         String[] tree = shardMeta.getTree();
 
-        // TODO: exclude is empty for now
         ObjectMapper om = new ObjectMapper();
         String challengesJsonStr;
         String treeJsonStr;
+        String excludeStr;
         try {
             challengesJsonStr = om.writeValueAsString(challengesAsStr);
             treeJsonStr = om.writeValueAsString(tree);
+            excludeStr = om.writeValueAsString(excludedFarmerIds);
         } catch (JsonProcessingException e) {
             throw new GenaroRuntimeException(genaroStrError(GENARO_ALGORITHM_ERROR));
         }
         String jsonStrBody = String.format("{\"hash\":\"%s\",\"size\":%d,\"index\":%d,\"parity\":%b," +
-                        "\"challenges\":%s,\"tree\":%s,\"exclude\":[]}",
-                shardMeta.getHash(), shardMeta.getSize(), shard.getIndex(), parityShard, challengesJsonStr, treeJsonStr);
+                        "\"challenges\":%s,\"tree\":%s,\"exclude\":%s}",
+                shardMeta.getHash(), shardMeta.getSize(), shard.getIndex(), parityShard, challengesJsonStr, treeJsonStr, excludeStr);
 
         MediaType JSON = MediaType.parse("application/json; charset=utf-8");
         RequestBody body = RequestBody.create(JSON, jsonStrBody);
@@ -480,6 +485,12 @@ public final class Uploader implements Runnable {
 //                  } else {
 //                      req->shard_file = state->original_file;
 //                  }
+        if (shard.getStatus() == SHARD_PUSH_SUCCESS) {
+            shard.setHasTryToPush(false);
+            return shard;
+        }
+
+        shard.setHasTryToPush(true);
 
         ShardMeta shardMeta = shard.getMeta();
 
@@ -499,11 +510,17 @@ public final class Uploader implements Runnable {
         try {
             mBlock = FileUtils.getBlock(filePosition, shardFile, (int)metaSize);
         } catch (IOException e) {
-            throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
+            if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
+                throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
+            }
+            return shard;
         }
 
         if (mBlock == null) {
-            throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
+            if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
+                throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
+            }
+            return shard;
         }
 
         UploadRequestBody uploadRequestBody = new UploadRequestBody(new ByteArrayInputStream(mBlock),
@@ -539,52 +556,61 @@ public final class Uploader implements Runnable {
         // save the start time of downloading
         shard.getReport().setStart(System.currentTimeMillis());
 
-        for (int i = 0; i < GENARO_MAX_PUSH_SHARD; i++) {
-            logger.info(String.format("Transferring Shard index %d...(retry: %d)", shard.getIndex(), i));
-            try {
-                try (Response response = upHttpClient.newCall(request).execute()) {
-                    int code = response.code();
-                    response.close();
+        logger.info(String.format("Transferring Shard index %d...", shard.getIndex()));
+        try (Response response = upHttpClient.newCall(request).execute()) {
+            int code = response.code();
+            response.close();
 
-                    if (code == 200 || code == 201 || code == 304) {
-                        long uploaded = shard.getUploadedSize();
-                        long total = shard.getMeta().getSize();
-                        if (uploaded != total) {
-                            logger.error(String.format("Shard index %d, uploaded bytes: %d, total bytes: %d", shard.getIndex(), uploaded, total));
-                            throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
-                        }
-                        logger.info(String.format("Successfully transferred shard index %d", shard.getIndex()));
-                    } else {
-                        throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
+            if (code == 200 || code == 201 || code == 304) {
+                long uploaded = shard.getUploadedSize();
+                long total = shard.getMeta().getSize();
+                if (uploaded != total) {
+                    logger.error(String.format("Shard index %d, uploaded bytes: %d, total bytes: %d", shard.getIndex(), uploaded, total));
+                    if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
+                        throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
                     }
-                } catch (IOException e) {
-                    uploadedBytes.addAndGet(-shard.getUploadedSize());
-                    shard.setUploadedSize(0);
-                    if (e instanceof SocketException || e.getMessage() == "Canceled") {
-                        // if it's canceled, do not try again
-                        i = GENARO_MAX_PUSH_SHARD - 1;
-                        throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
-                    } else if (e instanceof SocketTimeoutException) {
-                        throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
-                    } else {
-                        throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
-                    }
+                    return shard;
                 }
-            } catch (GenaroRuntimeException e) {
-                if (i == GENARO_MAX_PUSH_SHARD - 1) {
-                    throw e;
+                shard.setStatus(SHARD_PUSH_SUCCESS);
+            } else {
+                if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
                 }
-                // fail
-                continue;
-            } finally {
-                // save the end time of downloading
-                shard.getReport().setEnd(System.currentTimeMillis());
+                return shard;
             }
-            shard.getReport().setCode(GENARO_REPORT_SUCCESS);
-            shard.getReport().setMessage(GENARO_REPORT_SHARD_UPLOADED);
-            // success
-            break;
+        } catch (IOException e) {
+            uploadedBytes.addAndGet(-shard.getUploadedSize());
+            shard.setUploadedSize(0);
+            if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+            } else if (e instanceof SocketTimeoutException) {
+                if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
+                }
+                return shard;
+            } else {
+                if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
+                }
+                return shard;
+            }
+        } finally {
+            if (shard.getStatus() != SHARD_PUSH_SUCCESS) {
+                // Add pointer to exclude for future calls
+                String farmerId = shard.getPointer().getFarmer().getNodeID();
+                if (!excludedFarmerIds.contains(farmerId)) {
+                    excludedFarmerIds.add(farmerId);
+                }
+
+                logger.info(String.format("Failed to transfer shard index %d", shard.getIndex()));
+            } else {
+                logger.info(String.format("Successfully transferred shard index %d", shard.getIndex()));
+            }
         }
+
+        shard.getReport().setEnd(System.currentTimeMillis());
+        shard.getReport().setCode(GENARO_REPORT_SUCCESS);
+        shard.getReport().setMessage(GENARO_REPORT_SHARD_UPLOADED);
 
         return shard;
     }
@@ -880,20 +906,58 @@ public final class Uploader implements Runnable {
             shard.setPointer(new FarmerPointer());
             shard.setMeta(new ShardMeta(i));
             shard.getMeta().setParity(i + 1 > totalDataShards);
-            //TODO: no effect yet
             shard.setUploadedSize(0);
             shard.setReport(new GenaroExchangeReport());
+            shard.setPushCount(0);
             shards.add(shard);
         }
 
         storeFileCallback.onProgress(0.0f);
 
+        // TODO: seems terrible for so many duplicate codes
         CompletableFuture[] upFutures = shards
             .parallelStream()
             .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
+            // 1st pushFrame
             .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
             .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
             .map(future -> future.thenApplyAsync(this::sendExchangeReport, uploaderExecutor))
+            // 2nd pushFrame
+            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(shard -> {
+                if (shard.isHasTryToPush()) {
+                    sendExchangeReport(shard);
+                }
+                return shard;
+            }, uploaderExecutor))
+            // 3rd pushFrame
+            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(shard -> {
+                if (shard.isHasTryToPush()) {
+                    sendExchangeReport(shard);
+                }
+                return shard;
+            }, uploaderExecutor))
+            // 4th pushFrame
+            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(shard -> {
+                if (shard.isHasTryToPush()) {
+                    sendExchangeReport(shard);
+                }
+                return shard;
+            }, uploaderExecutor))
+            // 5th pushFrame
+            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+            .map(future -> future.thenApplyAsync(shard -> {
+                if (shard.isHasTryToPush()) {
+                    sendExchangeReport(shard);
+                }
+                return shard;
+            }, uploaderExecutor))
             .toArray(CompletableFuture[]::new);
 
         futureAllFromPrepareFrame = CompletableFuture.allOf(upFutures);
@@ -945,9 +1009,6 @@ public final class Uploader implements Runnable {
         }
 
         storeFileCallback.onFinish(fileId);
-
-        // TODO: send exchange report
-        //
     }
 
     private void stop() {

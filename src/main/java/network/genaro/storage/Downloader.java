@@ -80,6 +80,7 @@ public final class Downloader implements Runnable {
 
     private ResolveFileCallback resolveFileCallback;
 
+    // not try to download from these farmers
     private String excludedFarmerIds;
 
     // 使用CachedThreadPool比较耗内存，并发高的时候会造成内存溢出
@@ -590,7 +591,7 @@ public final class Downloader implements Runnable {
 
         resolveFileCallback.onProgress(0.0f);
 
-        // downloading
+        // TODO: seems terrible for so many duplicate codes
         CompletableFuture<Void>[] downFutures = pointers
             .parallelStream()
             .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))

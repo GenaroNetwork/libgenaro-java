@@ -473,6 +473,11 @@ final class FarmerPointer {
 }
 
 final class ShardTracker {
+    enum ShardStatus
+    {
+        SHARD_PUSH_SUCCESS
+    }
+
     //    int progress;
     private int index;
     private FarmerPointer pointer;
@@ -482,6 +487,12 @@ final class ShardTracker {
 
     // exchange report with bridge
     private GenaroExchangeReport report;
+
+    // the count of pushShard
+    private int pushCount;
+    // whether the last pushShard call tried to push the shard
+    private boolean hasTryToPush = false;
+    private ShardStatus status;
 
     public int getIndex() {
         return index;
@@ -525,6 +536,30 @@ final class ShardTracker {
 
     public void setReport(GenaroExchangeReport report) {
         this.report = report;
+    }
+
+    public int getPushCount() {
+        return pushCount;
+    }
+
+    public void setPushCount(int pushCount) {
+        this.pushCount = pushCount;
+    }
+
+    public boolean isHasTryToPush() {
+        return hasTryToPush;
+    }
+
+    public void setHasTryToPush(boolean hasTryToPush) {
+        this.hasTryToPush = hasTryToPush;
+    }
+
+    public ShardStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ShardStatus status) {
+        this.status = status;
     }
 }
 
