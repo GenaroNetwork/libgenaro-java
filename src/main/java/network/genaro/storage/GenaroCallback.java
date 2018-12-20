@@ -17,7 +17,7 @@ public interface GenaroCallback {
     }
 
     interface ListFilesCallback {
-        void onFinish(File[] files);
+        void onFinish(GenaroFile[] files);
         void onFail(String error);
     }
 

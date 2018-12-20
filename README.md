@@ -31,6 +31,7 @@ This library use Java Future/Execution framework, and the following 3rd party li
 - [JavaReedSolomon](https://github.com/Backblaze/JavaReedSolomon) for reed solomon algorithm.
 - [jackson](https://github.com/FasterXML/jackson) for JSON parse/compose.
 - [okhttp3](https://github.com/square/okhttp) as HTTP client.
+- [java-getopt](https://www.urbanophile.com/arenn/hacking/download.html) a Java command line option parser that is compatible with GNU getopt.
 - [guava](https://github.com/google/guava) and [apache.commons](https://commons.apache.org/) as utility.
 - [log4j](https://logging.apache.org/log4j) for logging.
 - [testng](https://testng.org/doc/index.html) for testing.
@@ -119,7 +120,7 @@ List files:
 String bucketId = "5bfcf77cea9b6322c5abd929";
 CompletableFuture<Void> fu = api.listFiles(bucketId, new ListFilesCallback() {
     @Override
-    public void onFinish(File[] files) { }
+    public void onFinish(GenaroFile[] files) { }
     @Override
     public void onFail(String error) { }
 }

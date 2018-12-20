@@ -996,7 +996,7 @@ public final class Genaro {
         });
     }
 
-    CompletableFuture<File> getFileInfoFuture(final Downloader downloader, final String bucketId, final String fileId) {
+    CompletableFuture<GenaroFile> getFileInfoFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return CompletableFuture.supplyAsync(() -> {
 
             verifyInit(true);
@@ -1039,10 +1039,10 @@ public final class Genaro {
 
                 ObjectMapper om = new ObjectMapper();
 
-                File file;
+                GenaroFile file;
                 String realName;
                 try {
-                    file = om.readValue(responseBody, File.class);
+                    file = om.readValue(responseBody, GenaroFile.class);
                     realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), getPrivateKey(), Hex.decode(bucketId));
                 } catch (Exception e) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_FILEINFO_ERROR));
@@ -1071,8 +1071,8 @@ public final class Genaro {
         });
     }
 
-    File getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<File> fu = getFileInfoFuture(downloader, bucketId, fileId);
+    GenaroFile getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<GenaroFile> fu = getFileInfoFuture(downloader, bucketId, fileId);
         if(downloader != null) {
             downloader.setFutureGetFileInfo(fu);
         }
@@ -1126,11 +1126,11 @@ public final class Genaro {
                     return null;
                 }
 
-                File[] files = om.readValue(responseBody, File[].class);
+                GenaroFile[] files = om.readValue(responseBody, GenaroFile[].class);
 
                 try {
                     // decrypt
-                    for (File f : files) {
+                    for (GenaroFile f : files) {
                         String realName = CryptoUtil.decryptMetaHmacSha512(f.getFilename(), getPrivateKey(), Hex.decode(bucketId));
                         f.setFilename(realName);
                     }

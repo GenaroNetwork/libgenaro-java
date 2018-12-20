@@ -15,9 +15,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import static javax.crypto.Cipher.DECRYPT_MODE;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
@@ -58,7 +56,7 @@ public final class Downloader implements Runnable {
     // increased uploaded bytes since last onProgress Call
     private AtomicLong deltaDownloaded = new AtomicLong();
 
-    File file;
+    GenaroFile file;
     List<Pointer> pointers;
 
     private long shardSize;
@@ -66,7 +64,7 @@ public final class Downloader implements Runnable {
 
     private FileChannel downFileChannel;
 
-    private CompletableFuture<File> futureGetFileInfo;
+    private CompletableFuture<GenaroFile> futureGetFileInfo;
     private CompletableFuture<List<Pointer>> futureGetPointers;
     private CompletableFuture<Void> futureAllFromRequestShard;
 
@@ -109,11 +107,11 @@ public final class Downloader implements Runnable {
         this(bridge, bucketId, fileId, path, overwrite, new ResolveFileCallback() {});
     }
 
-    CompletableFuture<File> getFutureGetFileInfo() {
+    CompletableFuture<GenaroFile> getFutureGetFileInfo() {
         return futureGetFileInfo;
     }
 
-    void setFutureGetFileInfo(CompletableFuture<File> futureGetFileInfo) {
+    void setFutureGetFileInfo(CompletableFuture<GenaroFile> futureGetFileInfo) {
         this.futureGetFileInfo = futureGetFileInfo;
     }
 

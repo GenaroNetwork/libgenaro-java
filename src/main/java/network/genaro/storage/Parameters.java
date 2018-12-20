@@ -3,9 +3,9 @@ package network.genaro.storage;
 final class Parameters {
     public static final int GENARO_OKHTTP_CONNECT_TIMEOUT = 20;
     public static final int GENARO_OKHTTP_WRITE_TIMEOUT = 20;
-    public static final int GENARO_OKHTTP_READ_TIMEOUT = 20;
+    public static final int GENARO_OKHTTP_READ_TIMEOUT = 60;
 
-    public static final int GENARO_HTTP_TIMEOUT = 40;
+    public static final int GENARO_HTTP_TIMEOUT = 60;
 
     // File transfer success
     public static final int GENARO_TRANSFER_OK = 0;
