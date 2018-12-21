@@ -1,11 +1,9 @@
 package network.genaro.storage;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.web3j.crypto.CipherException;
-import org.web3j.crypto.ECKeyPair;
-import org.web3j.crypto.Wallet;
-import org.web3j.crypto.WalletFile;
+import org.web3j.crypto.*;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -17,6 +15,7 @@ public final class GenaroWallet {
 
     public GenaroWallet(String v3Json, String password) throws CipherException, IOException {
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         WalletFile walletFile;
         try {
             walletFile = objectMapper.readValue(v3Json, WalletFile.class);

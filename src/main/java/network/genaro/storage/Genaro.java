@@ -751,9 +751,15 @@ public final class Genaro {
         });
     }
 
-    public String getInfo() throws InterruptedException, ExecutionException, TimeoutException {
+    public String getInfo() {
         CompletableFuture<String> fu = getInfoFuture();
-        return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        String info;
+        try {
+            info = fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        }  catch (Exception e) {
+            return null;
+        }
+        return info;
     }
 
     CompletableFuture<Bucket> getBucketFuture(final Uploader uploader, final String bucketId) {

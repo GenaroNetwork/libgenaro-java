@@ -52,6 +52,7 @@
                         <manifestEntries>
                             <Manifest-Version>0.1</Manifest-Version>
                             <Created-By>GENARO NETWORK</Created-By>
+                            <Main-Class>network.genaro.storage.Cli</Main-Class>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -166,6 +167,12 @@
             <groupId>org.xbill</groupId>
             <artifactId>dns</artifactId>
             <version>2.0.8</version>
+        </dependency>
+
+        <dependency>
+            <groupId>gnu.getopt</groupId>
+            <artifactId>java-getopt</artifactId>
+            <version>1.0.13</version>
         </dependency>
 
     </dependencies>
