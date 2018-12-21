@@ -19,9 +19,6 @@ public final class Cli {
     public final static String  HELP_TEXT =
             "usage: genaro [<options>] <command> [<args>]\n\n" +
             "These are common Genaro commands for various situations:\n\n" +
-            "setting up users profiles\n" +
-            "  import-keys [<file-path>]    import existing JSON keystore file\n" +
-            "  export-keys                  export JSON keystore file to stdout\n" +
             "working with buckets and files\n" +
             "  list-buckets\n" +
             "  list-files <bucket-id>\n" +
@@ -37,13 +34,13 @@ public final class Cli {
             "options:\n" +
             "  -h, --help                output usage information\n" +
             "  -v, --version             output the version number\n" +
-            "  -u, --url <url>           set the base url for the api\n" +
-            "  -p, --proxy <url>         set the socks proxy " +
-            "(e.g. <[protocol://][user:password@]proxyhost[:port]>)\n" +
+            "  -u, --url <url>           set the bridge host\n" +
+            "  -w, --wallet <path>       set the path of wallet file\n" +
             "  -l, --log <level>         set the log level (default 0)\n" +
             "  -d, --debug               set the debug log level\n\n" +
             "environment variables:\n" +
-            "  GENARO_BRIDGE                  the bridge host ";
+            "  GENARO_BRIDGE             the bridge host\n" +
+            "  GENARO_WALLET             the path of wallet file";
 
     public static void main(String[] args) {
         String genaroBridge = System.getenv("GENARO_BRIDGE");
@@ -51,16 +48,15 @@ public final class Cli {
         int c;
         int logLevel = 0;
 
-        LongOpt [] longopts = new LongOpt[7];
+        LongOpt [] longopts = new LongOpt[6];
         longopts[0] = new LongOpt("url", LongOpt.NO_ARGUMENT, null, 'u');
         longopts[1] = new LongOpt("wallet", LongOpt.REQUIRED_ARGUMENT, null, 'w');
         longopts[2] = new LongOpt("version", LongOpt.REQUIRED_ARGUMENT, null, 'v');
-        longopts[3] = new LongOpt("proxy", LongOpt.REQUIRED_ARGUMENT, null, 'p');
-        longopts[4] = new LongOpt("log", LongOpt.REQUIRED_ARGUMENT, null, 'l');
-        longopts[5] = new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd');
-        longopts[6] = new LongOpt("help", LongOpt.REQUIRED_ARGUMENT, null, 'h');
+        longopts[3] = new LongOpt("log", LongOpt.REQUIRED_ARGUMENT, null, 'l');
+        longopts[4] = new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd');
+        longopts[5] = new LongOpt("help", LongOpt.REQUIRED_ARGUMENT, null, 'h');
 
-        Getopt g = new Getopt("libgenaro-java", args, "hdl:p:vwu:", longopts);
+        Getopt g = new Getopt("libgenaro-java", args, "u:w:l:dVvh", longopts);
 
         while ((c = g.getopt()) != -1)
         {
@@ -70,8 +66,6 @@ public final class Cli {
                     break;
                 case 'w':
                     genaroWallet = g.getOptarg();
-                    break;
-                case 'p':
                     break;
                 case 'l':
                     logLevel = Integer.parseInt(g.getOptarg());
