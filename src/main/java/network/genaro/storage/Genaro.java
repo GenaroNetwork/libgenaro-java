@@ -1085,6 +1085,81 @@ public final class Genaro {
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
+    public CompletableFuture<Void> listMirrors(final String bucketId, final String fileId, final ListMirrorsCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String path = String.format("/buckets/%s/files/%s/mirrors", bucketId, fileId);
+            String signature;
+            try {
+                signature = signRequest("GET", path, "");
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                String responseBody = response.body().string();
+
+                if(code == 403 || code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code == 404 || code == 400) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                    return null;
+                } else if(code == 500) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
+                    return null;
+                } else if (code != 200 && code != 304){
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                String retText = "";
+
+                ObjectMapper om = new ObjectMapper();
+                JsonNode bodyNode = om.readTree(responseBody);
+
+                int i = 0;
+                for (JsonNode itemNode: bodyNode) {
+                    JsonNode establishedNode = itemNode.get("established");
+
+                    int j = 0;
+                    for (JsonNode subNode: establishedNode) {
+                        if (j == 0) {
+                            retText += String.format("Shard %d: %s\n", i, subNode.get("shardHash").asText());
+                        }
+
+                        retText += String.format("\tnodeID: %s\n", subNode.get("contract").get("farmer_id").asText());
+                        j++;
+                    }
+                    i++;
+                }
+
+                if (retText == "") {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_JSON_ERROR));
+                } else {
+                    callback.onFinish(retText);
+                }
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
     /**
      * @brief Get a list of all files in a bucket.
      *
@@ -1115,7 +1190,6 @@ public final class Genaro {
             try (Response response = genaroHttpClient.newCall(request).execute()) {
                 int code = response.code();
                 String responseBody = response.body().string();
-
                 ObjectMapper om = new ObjectMapper();
 
                 if (code == 404) {

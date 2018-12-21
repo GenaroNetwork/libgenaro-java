@@ -26,6 +26,11 @@ public interface GenaroCallback {
         void onFail(String error);
     }
 
+    interface ListMirrorsCallback {
+        void onFinish(String text);
+        void onFail(String error);
+    }
+
     interface ResolveFileCallback {
         default void onBegin() {
             //        System.out.println("Download started");

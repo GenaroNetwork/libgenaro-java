@@ -364,7 +364,18 @@ public final class Cli {
             String bucketId = args[commandIndex + 1];
             String fileId = args[commandIndex + 2];
 
-            System.out.println("Not implemented yet");
+            CompletableFuture<Void> fu = api.listMirrors(bucketId, fileId, new ListMirrorsCallback() {
+                @Override
+                public void onFinish(String text) {
+                    System.out.println(text);
+                }
+                @Override
+                public void onFail(String error) {
+                    System.out.println("List mirrors failed, reason: " + error + ".");
+                }
+            });
+
+            fu.join();
             System.exit(0);
         } else if (command.equals("rename-bucket")) {
             if (args.length < commandIndex + 3) {
