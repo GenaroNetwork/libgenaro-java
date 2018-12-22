@@ -48,11 +48,12 @@
                 <version>3.1.1</version>
                 <configuration>
                     <archive>
-                        <manifestFile>${project.basedir}/src/main/java/META-INF/MANIFEST.MF</manifestFile>
+                        <!--<manifestFile>${project.basedir}/src/main/java/META-INF/MANIFEST.MF</manifestFile>-->
                         <manifestEntries>
                             <Manifest-Version>0.1</Manifest-Version>
                             <Created-By>GENARO NETWORK</Created-By>
                             <Main-Class>network.genaro.storage.Cli</Main-Class>
+                            <Class-Path>bcprov-jdk15on-1.60.jar</Class-Path>>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -87,6 +88,28 @@
                                     </excludes>
                                 </filter>
                             </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- copy dependencies -->
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <tasks>
+                                <copy todir="${project.build.directory}" overwrite="true" >
+                                    <fileset dir="${project.basedir}/lib" erroronmissingdir="false">
+                                        <include name="*.jar"/>
+                                    </fileset>
+                                </copy>
+                            </tasks>
                         </configuration>
                     </execution>
                 </executions>
