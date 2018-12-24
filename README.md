@@ -11,19 +11,19 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - File encryption with AES-256-CTR
 - File name and bucket name encryption with AES-256-GCM
 - Asynchronous progress updates
-- Retry many times when uploading/downloading fail
+- Retry several times when upload/download is failed
 - Seed based file encryption key for portability between devices
 - File integrity and authenticity verified with HMAC-SHA512
+- Exchange report with bridge
+- Command line interface
 
 ## Feature Todo
 
 - Erasure encoding with reed solomon for data reliability
-- Exchange reports with bridge
+
 - Cli interface
 
 ## 3rd party dependencies
-
-This library use Java Future/Execution framework, and the following 3rd party libs.
 
 - [Bouncy Castle](https://www.bouncycastle.org/java.html) for crypto algorithms.
 - [dnsjava](http://www.xbill.org/dnsjava/) for base16 encoding.
@@ -47,7 +47,7 @@ PS: Will not package org.bouncycastle for signature issue.
 
 ## Used as 3rd party package
 
-Add Genaro package(genaro-sdk-x.xx.jar) and org.bouncycastle package(bcprov-jdk15on-1.60.jar) to your classpath.
+Add Genaro package(genaro-sdk-x.xx.jar) to your classpath, and make sure org.bouncycastle package(bcprov-jdk15on-1.60.jar) is in the same directory with Genaro package.
 
 ## Example Usage
 
@@ -55,14 +55,14 @@ Initialize:
 
 ```java
 String bridgeUrl = "http://192.168.50.206:8080";
-String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b27326d1e81d52a6a3dc8\",
+String V3JSON = "{ \"address\": \"aaad65391d2d2eafda9b2732000001d52a6a3dc8\",
         \"crypto\": { \"cipher\": \"aes-128-ctr\",
-        \"ciphertext\": \"e968751f3d60827b6e62e3ff6c024ecc82f33a6c55428be33249c83edba444ca\",
-        \"cipherparams\": { \"iv\": \"e80d9ec9ba6241a143c756ec78066ad9\" }, \"kdf\": \"scrypt\",
+        \"ciphertext\": \"e968751f3d60827b6e6000006c024ecc82f33a6c55428be33249c83edba444ca\",
+        \"cipherparams\": { \"iv\": \"e80d9ec9b00000a143c756ec78066ad9\" }, \"kdf\": \"scrypt\",
         \"kdfparams\": { \"dklen\": 32, \"n\": 262144, \"p\": 1, \"r\": 8, \"salt\":
-        \"ea7cb2b004db67d3103b3790caced7a96b636762f280b243e794fb5bef8ef74b\" },
-        \"mac\": \"ceb3789e77be8f2a7ab4d205bf1b54e048ad3f5b080b96e07759de7442e050d2\" },
-        \"id\": \"e28f31b4-1f43-428b-9b12-ab586638d4b1\", \"version\": 3 }";
+        \"ea7cb2b004db67d000003790caced7a96b636762f280b243e794fb5bef8ef74b\" },
+        \"mac\": \"ceb3789e77be8f2a7ab4d000001b54e048ad3f5b080b96e07759de7442e050d2\" },
+        \"id\": \"e28f31b4-1f43-428b-9b12-ab58000004b1\", \"version\": 3 }";
 String passwd = "xxxxxx";
 Genaro api;
 try {
