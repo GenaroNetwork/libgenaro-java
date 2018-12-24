@@ -78,6 +78,8 @@ public final class Cli {
                     System.out.println(CLI_VERSION + "\n");
                     System.exit(0);
                 case 'h':
+                    // fall through
+                default:
                     System.out.println(HELP_TEXT);
                     System.exit(0);
             }

@@ -697,6 +697,7 @@ public final class Genaro {
             case GENARO_ALGORITHM_ERROR:
                 return "Algorithm error";
             case GENARO_UNKNOWN_ERROR:
+                // fall through
             default:
                 return "Unknown error";
         }
