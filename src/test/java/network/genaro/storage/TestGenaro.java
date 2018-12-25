@@ -22,7 +22,7 @@ public final class TestGenaro {
 //    private static final String testbucketId = "5ba341402e49103d8787e52d";
     private static final String testbucketId = "5c1b3c70a100262b970883a0";
 
-    public void testGetInfo() throws Exception {
+    public void testGetInfo() {
        Genaro api = new Genaro(testBridgeUrl);
        String info = api.getInfo();
        System.out.println(info);

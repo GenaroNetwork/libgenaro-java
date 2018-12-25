@@ -69,8 +69,8 @@ public final class Downloader implements Runnable {
     // increased uploaded bytes since last onProgress Call
     private AtomicLong deltaDownloaded = new AtomicLong();
 
-    GenaroFile file;
-    List<Pointer> pointers;
+    private GenaroFile file;
+    private List<Pointer> pointers;
 
     private long shardSize;
     private int totalParityPointers;
