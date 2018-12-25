@@ -7,12 +7,12 @@ import java.nio.charset.StandardCharsets;
 //import java.util.concurrent.Callable;
 //import java.util.concurrent.CompletableFuture;
 
-public final class BasicUtil {
-    public static byte[] string2Bytes(final String input) {
+final class BasicUtil {
+    static byte[] string2Bytes(final String input) {
         return input.getBytes(StandardCharsets.UTF_8);
     }
 
-    public static String bytes2String(final byte[] input) {
+    static String bytes2String(final byte[] input) {
         return new String(input, StandardCharsets.UTF_8);
     }
 
@@ -34,7 +34,7 @@ public final class BasicUtil {
 //        return f;
 //    }
 
-    public static void cancelOkHttpCallWithTag(OkHttpClient client, Object tag) {
+    static void cancelOkHttpCallWithTag(OkHttpClient client, Object tag) {
         for(Call call: client.dispatcher().queuedCalls()) {
             if(call.request().tag().equals(tag)) {
                 call.cancel();

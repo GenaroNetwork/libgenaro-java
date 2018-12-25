@@ -17,10 +17,10 @@ import java.util.regex.Pattern;
 
 import network.genaro.storage.GenaroCallback.*;
 
-public final class Cli {
-    public final static String CLI_VERSION = "libgenaro-java-1.0.0";
+final class Cli {
+    private final static String CLI_VERSION = "libgenaro-java-1.0.0";
 
-    public final static String  HELP_TEXT =
+    private final static String  HELP_TEXT =
             "usage: genaro [<options>] <command> [<args>]\n\n" +
             "These are common Genaro commands for various situations:\n\n" +
             "working with buckets and files\n" +

@@ -13,10 +13,10 @@ import java.security.NoSuchAlgorithmException;
 
 import static network.genaro.storage.CryptoUtil.sha256EscdaSign;
 
-public final class GenaroWallet {
+final class GenaroWallet {
     private ECKeyPair ecKeyPair;
 
-    public GenaroWallet(String v3Json, String password) throws CipherException, IOException {
+    GenaroWallet(String v3Json, String password) throws CipherException, IOException {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         WalletFile walletFile;
@@ -30,15 +30,15 @@ public final class GenaroWallet {
         }
     }
 
-    public String signMessage(String message) throws NoSuchAlgorithmException {
+    String signMessage(String message) throws NoSuchAlgorithmException {
         return sha256EscdaSign(ecKeyPair.getPrivateKey(), message);
     }
 
-    public String getPublicKeyHexString() {
+    String getPublicKeyHexString() {
         return "04" + ecKeyPair.getPublicKey().toString(16);
     }
 
-    public byte[] getPrivateKey() {
+    byte[] getPrivateKey() {
         return ecKeyPair.getPrivateKey().toByteArray();
     }
 }

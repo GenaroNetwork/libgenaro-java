@@ -4,8 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
-public final class FileUtils {
-    public static byte[] getBlock(long offset, File file, int blockSize) throws IOException {
+final class FileUtils {
+    static byte[] getBlock(long offset, File file, int blockSize) throws IOException {
         byte[] result = new byte[blockSize];
 
         try (RandomAccessFile accessFile = new RandomAccessFile(file, "r")) {

@@ -51,10 +51,10 @@ import static network.genaro.storage.Pointer.PointerStatus.*;
 
 public final class Downloader implements Runnable {
     // each shard has GENARO_DEFAULT_MIRRORS mirrors(not include the first uploaded shard) at most
-    public static final int GENARO_DEFAULT_MIRRORS = 5;
-    public static final int GENARO_MAX_REPORT_TRIES = 2;
-    public static final int GENARO_MAX_REQUEST_POINTERS = 3;
-    public static final int GENARO_MAX_GET_FILE_INFO = 3;
+    static final int GENARO_DEFAULT_MIRRORS = 5;
+    static final int GENARO_MAX_REPORT_TRIES = 2;
+    static final int GENARO_MAX_REQUEST_POINTERS = 3;
+    static final int GENARO_MAX_GET_FILE_INFO = 3;
 
     private String path;
     private String tempPath;
@@ -132,17 +132,16 @@ public final class Downloader implements Runnable {
         return downHttpClient;
     }
 
-    public void setFutureBelongsTo(CompletableFuture<Void> futureBelongsTo) {
+    void setFutureBelongsTo(CompletableFuture<Void> futureBelongsTo) {
         this.futureBelongsTo = futureBelongsTo;
     }
 
-    public boolean isCanceled() {
+    boolean isCanceled() {
         return isCanceled;
     }
 
     private final class RequestShardCallbackFuture extends CompletableFuture<Response> implements Callback {
-
-        public RequestShardCallbackFuture(Downloader downloader, Pointer pointer) {
+        RequestShardCallbackFuture(Downloader downloader, Pointer pointer) {
             this.downloader = downloader;
             this.pointer = pointer;
         }
@@ -472,7 +471,7 @@ public final class Downloader implements Runnable {
         }
     }
 
-    public void start() {
+    void start() {
         if(!overwrite && Files.exists(Paths.get(path))) {
             resolveFileCallback.onFail("File already exists");
             return;

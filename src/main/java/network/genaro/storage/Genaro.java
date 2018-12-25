@@ -54,59 +54,59 @@ final class ShardMeta {
     private boolean isParity;
     private long size;
 
-    public ShardMeta(int index) { this.setIndex(index); }
+    ShardMeta(int index) { this.setIndex(index); }
 
-    public String getHash() {
+    String getHash() {
         return hash;
     }
 
-    public void setHash(String hash) {
+    void setHash(String hash) {
         this.hash = hash;
     }
 
-    public byte[][] getChallenges() { return challenges; }
+    byte[][] getChallenges() { return challenges; }
 
-    public void setChallenges(byte[][] challenges) {
+    void setChallenges(byte[][] challenges) {
         this.challenges = challenges;
     }
 
-    public String[] getChallengesAsStr() {
+    String[] getChallengesAsStr() {
         return challengesAsStr;
     }
 
-    public void setChallengesAsStr(String[] challengesAsStr) {
+    void setChallengesAsStr(String[] challengesAsStr) {
         this.challengesAsStr = challengesAsStr;
     }
 
-    public String[] getTree() {
+    String[] getTree() {
         return tree;
     }
 
-    public void setTree(String[] tree) {
+    void setTree(String[] tree) {
         this.tree = tree;
     }
 
-    public int getIndex() {
+    int getIndex() {
         return index;
     }
 
-    public void setIndex(int index) {
+    void setIndex(int index) {
         this.index = index;
     }
 
-    public boolean getParity() {
+    boolean getParity() {
         return isParity;
     }
 
-    public void setParity(boolean parity) {
+    void setParity(boolean parity) {
         isParity = parity;
     }
 
-    public long getSize() {
+    long getSize() {
         return size;
     }
 
-    public void setSize(long size) {
+    void setSize(long size) {
         this.size = size;
     }
 }
@@ -121,37 +121,37 @@ final class Farmer {
     private String nodeID;
     private String lastSeen;
 
-    public void setUserAgent(String userAgent) {
+    void setUserAgent(String userAgent) {
         this.userAgent = userAgent;
     }
 
-    public void setProtocol(String protocol) {
+    void setProtocol(String protocol) {
         this.protocol = protocol;
     }
 
-    public String getAddress() {
+    String getAddress() {
         return address;
     }
 
-    public void setAddress(String address) {
+    void setAddress(String address) {
         this.address = address;
     }
 
-    public String getPort() {
+    String getPort() {
         return port;
     }
 
-    public void setPort(String port) {
+    void setPort(String port) {
         this.port = port;
     }
 
-    public String getNodeID() { return nodeID; }
+    String getNodeID() { return nodeID; }
 
-    public void setNodeID(String nodeID) {
+    void setNodeID(String nodeID) {
         this.nodeID = nodeID;
     }
 
-    public void setLastSeen(String lastSeen) {
+    void setLastSeen(String lastSeen) {
         this.lastSeen = lastSeen;
     }
 
@@ -167,7 +167,7 @@ final class Farmer {
                 '}';
     }
 
-    public String toBriefString() {
+    String toBriefString() {
         return "Farmer{" +
                 "address='" + address + '\'' +
                 ", port='" + port + '\'' +
@@ -185,31 +185,31 @@ final class Frame {
     private String created;
     private String id;
 
-    public void setUser(String user) {
+    void setUser(String user) {
         this.user = user;
     }
 
-    public void setStorageSize(long storageSize) {
+    void setStorageSize(long storageSize) {
         this.storageSize = storageSize;
     }
 
-    public void setSize(long size) {
+    void setSize(long size) {
         this.size = size;
     }
 
-    public void setLocked(boolean locked) {
+    void setLocked(boolean locked) {
         this.locked = locked;
     }
 
-    public void setCreated(String created) {
+    void setCreated(String created) {
         this.created = created;
     }
 
-    public String getId() {
+    String getId() {
         return id;
     }
 
-    public void setId(String id) {
+    void setId(String id) {
         this.id = id;
     }
 
@@ -232,35 +232,35 @@ final class GenaroExchangeReport {
     private int code;
     private String message;
 
-    public long getStart() {
+    long getStart() {
         return start;
     }
 
-    public void setStart(long start) {
+    void setStart(long start) {
         this.start = start;
     }
 
-    public long getEnd() {
+    long getEnd() {
         return end;
     }
 
-    public void setEnd(long end) {
+    void setEnd(long end) {
         this.end = end;
     }
 
-    public int getCode() {
+    int getCode() {
         return code;
     }
 
-    public void setCode(int code) {
+    void setCode(int code) {
         this.code = code;
     }
 
-    public String getMessage() {
+    String getMessage() {
         return message;
     }
 
-    public void setMessage(String message) {
+    void setMessage(String message) {
         this.message = message;
     }
 }
@@ -315,99 +315,99 @@ final class Pointer {
     // exchange report with bridge
     private GenaroExchangeReport report;
 
-    public PointerStatus getStatus() {
+    PointerStatus getStatus() {
         return status;
     }
 
-    public void setStatus(PointerStatus status) {
+    void setStatus(PointerStatus status) {
         this.status = status;
     }
 
-    public boolean isReplaced() {
+    boolean isReplaced() {
         return isReplaced;
     }
 
-    public void setReplaced(boolean replaced) {
+    void setReplaced(boolean replaced) {
         isReplaced = replaced;
     }
 
-    public String getToken() {
+    String getToken() {
         return token;
     }
 
-    public void setToken(String token) {
+    void setToken(String token) {
         this.token = token;
     }
 
-    public String getOperation() {
+    String getOperation() {
         return operation;
     }
 
-    public void setOperation(String operation) {
+    void setOperation(String operation) {
         this.operation = operation;
     }
 
-    public Farmer getFarmer() {
+    Farmer getFarmer() {
         return farmer;
     }
 
-    public void setFarmer(Farmer farmer) {
+    void setFarmer(Farmer farmer) {
         this.farmer = farmer;
     }
 
-    public String getHash() {
+    String getHash() {
         return hash;
     }
 
-    public void setHash(String hash) {
+    void setHash(String hash) {
         this.hash = hash;
     }
 
-    public long getSize() {
+    long getSize() {
         return size;
     }
 
-    public void setSize(long size) {
+    void setSize(long size) {
         this.size = size;
     }
 
-    public int getIndex() {
+    int getIndex() {
         return index;
     }
 
-    public void setIndex(int index) {
+    void setIndex(int index) {
         this.index = index;
     }
 
-    public boolean isParity() {
+    boolean isParity() {
         return parity;
     }
 
-    public void setParity(boolean parity) {
+    void setParity(boolean parity) {
         this.parity = parity;
     }
 
-    public int getRequestCount() {
+    int getRequestCount() {
         return requestCount;
     }
 
-    public void setRequestCount(int requestCount) {
+    void setRequestCount(int requestCount) {
         this.requestCount = requestCount;
     }
 
-    public int getReplaceCount() {
+    int getReplaceCount() {
         return replaceCount;
     }
 
-    public void setReplaceCount(int replaceCount) {
+    void setReplaceCount(int replaceCount) {
         this.replaceCount = replaceCount;
     }
 
-    public GenaroExchangeReport getReport() {
+    GenaroExchangeReport getReport() {
         return report;
     }
 
-    public void setReport(GenaroExchangeReport report) {
+    void setReport(GenaroExchangeReport report) {
         this.report = report;
     }
 
@@ -424,7 +424,7 @@ final class Pointer {
                 '}';
     }
 
-    public String toBriefString() {
+    String toBriefString() {
         return "Pointer{" +
                 "index=" + index +
                 ", size=" + size +
@@ -433,11 +433,11 @@ final class Pointer {
                 '}';
     }
 
-    public long getDownloadedSize() {
+    long getDownloadedSize() {
         return downloadedSize;
     }
 
-    public void setDownloadedSize(long downloadedSize) {
+    void setDownloadedSize(long downloadedSize) {
         this.downloadedSize = downloadedSize;
     }
 }
@@ -448,19 +448,19 @@ final class FarmerPointer {
     private String token;
     private Farmer farmer;
 
-    public String getToken() {
+    String getToken() {
         return token;
     }
 
-    public void setToken(String token) {
+    void setToken(String token) {
         this.token = token;
     }
 
-    public Farmer getFarmer() {
+    Farmer getFarmer() {
         return farmer;
     }
 
-    public void setFarmer(Farmer farmer) {
+    void setFarmer(Farmer farmer) {
         this.farmer = farmer;
     }
 }
@@ -487,77 +487,77 @@ final class ShardTracker {
     private boolean hasTriedToPush = false;
     private ShardStatus status;
 
-    public int getIndex() {
+    int getIndex() {
         return index;
     }
 
-    public void setIndex(int index) {
+    void setIndex(int index) {
         this.index = index;
     }
 
-    public FarmerPointer getPointer() {
+    FarmerPointer getPointer() {
         return pointer;
     }
 
-    public void setPointer(FarmerPointer pointer) {
+    void setPointer(FarmerPointer pointer) {
         this.pointer = pointer;
     }
 
-    public ShardMeta getMeta() {
+    ShardMeta getMeta() {
         return meta;
     }
 
-    public void setMeta(ShardMeta meta) {
+    void setMeta(ShardMeta meta) {
         this.meta = meta;
     }
 
-    public long getUploadedSize() {
+    long getUploadedSize() {
         return uploadedSize;
     }
 
-    public void setUploadedSize(long uploadedSize) {
+    void setUploadedSize(long uploadedSize) {
         this.uploadedSize = uploadedSize;
     }
 
-    public String getShardFile() { return shardFile; }
+    String getShardFile() { return shardFile; }
 
-    public void setShardFile(String shardFile) { this.shardFile = shardFile; }
+    void setShardFile(String shardFile) { this.shardFile = shardFile; }
 
-    public GenaroExchangeReport getReport() {
+    GenaroExchangeReport getReport() {
         return report;
     }
 
-    public void setReport(GenaroExchangeReport report) {
+    void setReport(GenaroExchangeReport report) {
         this.report = report;
     }
 
-    public int getPushCount() {
+    int getPushCount() {
         return pushCount;
     }
 
-    public void setPushCount(int pushCount) {
+    void setPushCount(int pushCount) {
         this.pushCount = pushCount;
     }
 
-    public boolean getHasTriedToPush() {
+    boolean getHasTriedToPush() {
         return hasTriedToPush;
     }
 
-    public void setHasTriedToPush(boolean hasTriedToPush) {
+    void setHasTriedToPush(boolean hasTriedToPush) {
         this.hasTriedToPush = hasTriedToPush;
     }
 
-    public ShardStatus getStatus() {
+    ShardStatus getStatus() {
         return status;
     }
 
-    public void setStatus(ShardStatus status) {
+    void setStatus(ShardStatus status) {
         this.status = status;
     }
 }
 
 public final class Genaro {
-    public static final Logger logger = LogManager.getLogger(Genaro.class);
+    static final Logger logger = LogManager.getLogger(Genaro.class);
     private static final int POINT_PAGE_COUNT = 3;
 
     private String bridgeUrl;
@@ -606,7 +606,7 @@ public final class Genaro {
     }
 
     // init log level fo log4j2
-    public static void initLog(final int logLevel) {
+    static void initLog(final int logLevel) {
         Level level;
         switch (logLevel) {
             case 4:
@@ -652,7 +652,7 @@ public final class Genaro {
         return bridgeUrl;
     }
 
-    public static String genaroStrError(final int error_code)
+    static String genaroStrError(final int error_code)
     {
         switch(error_code) {
             case GENARO_BRIDGE_REQUEST_ERROR:
@@ -745,9 +745,8 @@ public final class Genaro {
         return wallet.signMessage(msg);
     }
 
-    public CompletableFuture<String> getInfoFuture() {
-        return CompletableFuture.supplyAsync(() -> {
-
+    public String getInfo() {
+        CompletableFuture<String> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(false);
             Request request = new Request.Builder()
                     .url(bridgeUrl)
@@ -770,9 +769,9 @@ public final class Genaro {
                 String host = bodyNode.get("host").asText();
 
                 return "Title:       " + title + "\n" +
-                       "Description: " + description + "\n" +
-                       "Version:     " + version + "\n" +
-                       "Host:        " + host + "\n";
+                        "Description: " + description + "\n" +
+                        "Version:     " + version + "\n" +
+                        "Host:        " + host + "\n";
             } catch (IOException e) {
                 if (e instanceof SocketException || e.getMessage() == "Canceled") {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
@@ -781,10 +780,7 @@ public final class Genaro {
                 }
             }
         });
-    }
 
-    public String getInfo() {
-        CompletableFuture<String> fu = getInfoFuture();
         String info;
         try {
             info = fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
@@ -796,7 +792,6 @@ public final class Genaro {
 
     CompletableFuture<Bucket> getBucketFuture(final Uploader uploader, final String bucketId) {
         return CompletableFuture.supplyAsync(() -> {
-
             verifyInit(true);
             String signature;
             try {
@@ -1036,7 +1031,6 @@ public final class Genaro {
 
     CompletableFuture<GenaroFile> getFileInfoFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return CompletableFuture.supplyAsync(() -> {
-
             verifyInit(true);
             String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
             String signature;
@@ -1321,7 +1315,6 @@ public final class Genaro {
 
     CompletableFuture<List<Pointer>> requestPointersFuture(final Downloader downloader, final String bucketId, final String fileId) {
         return CompletableFuture.supplyAsync(() -> {
-
             verifyInit(true);
             List<Pointer> ps= new ArrayList<>();
 
@@ -1365,7 +1358,6 @@ public final class Genaro {
 
     private CompletableFuture<List<Pointer>> requestPointersRawFuture(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) {
         return CompletableFuture.supplyAsync(() -> {
-
             verifyInit(true);
             String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
             String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
@@ -1441,7 +1433,6 @@ public final class Genaro {
 
     CompletableFuture<Boolean> isFileExistFuture(final Uploader uploader, final String bucketId, final String encryptedFileName) {
         return CompletableFuture.supplyAsync(() -> {
-
             verifyInit(true);
             String escapedName;
             String path;
@@ -1502,7 +1493,6 @@ public final class Genaro {
 
     CompletableFuture<Frame> requestNewFrameFuture(final Uploader uploader) {
         return CompletableFuture.supplyAsync(() -> {
-
             verifyInit(true);
             String jsonStrBody = "{}";
 
