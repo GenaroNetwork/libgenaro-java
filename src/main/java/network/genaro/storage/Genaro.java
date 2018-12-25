@@ -111,6 +111,7 @@ final class ShardMeta {
     }
 }
 
+// do not delete the methods that are not called explicitly, the set methods is used when method readValue of ObjectMapper is called
 @JsonIgnoreProperties(ignoreUnknown = true)
 final class Farmer {
     private String userAgent;
@@ -120,16 +121,8 @@ final class Farmer {
     private String nodeID;
     private String lastSeen;
 
-    public String getUserAgent() {
-        return userAgent;
-    }
-
     public void setUserAgent(String userAgent) {
         this.userAgent = userAgent;
-    }
-
-    public String getProtocol() {
-        return protocol;
     }
 
     public void setProtocol(String protocol) {
@@ -158,10 +151,6 @@ final class Farmer {
         this.nodeID = nodeID;
     }
 
-    public String getLastSeen() {
-        return lastSeen;
-    }
-
     public void setLastSeen(String lastSeen) {
         this.lastSeen = lastSeen;
     }
@@ -186,6 +175,7 @@ final class Farmer {
     }
 }
 
+// do not delete the methods that are not called explicitly, the set methods is used when method readValue of ObjectMapper is called
 @JsonIgnoreProperties(ignoreUnknown = true)
 final class Frame {
     private String user;
@@ -195,40 +185,20 @@ final class Frame {
     private String created;
     private String id;
 
-    public String getUser() {
-        return user;
-    }
-
     public void setUser(String user) {
         this.user = user;
-    }
-
-    public long getStorageSize() {
-        return storageSize;
     }
 
     public void setStorageSize(long storageSize) {
         this.storageSize = storageSize;
     }
 
-    public long getSize() {
-        return size;
-    }
-
     public void setSize(long size) {
         this.size = size;
     }
 
-    public boolean isLocked() {
-        return locked;
-    }
-
     public void setLocked(boolean locked) {
         this.locked = locked;
-    }
-
-    public String getCreated() {
-        return created;
     }
 
     public void setCreated(String created) {
@@ -472,6 +442,7 @@ final class Pointer {
     }
 }
 
+// do not delete the methods that are not called explicitly, the set methods is used when method readValue of ObjectMapper is called
 @JsonIgnoreProperties(ignoreUnknown = true)
 final class FarmerPointer {
     private String token;
@@ -679,10 +650,6 @@ public final class Genaro {
 
     public String getBridgeUrl() {
         return bridgeUrl;
-    }
-
-    public void setBridgeUrl(String bridgeUrl) {
-        this.bridgeUrl = bridgeUrl;
     }
 
     public static String genaroStrError(final int error_code)

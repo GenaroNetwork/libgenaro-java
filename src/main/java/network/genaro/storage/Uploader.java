@@ -118,10 +118,10 @@ public final class Uploader implements Runnable {
 
     private StoreFileCallback storeFileCallback;
 
-    // 使用CachedThreadPool比较耗内存，并发高的时候会造成内存溢出
+    // CachedThreadPool takes up too much memory，and it will cause memory overflow when high concurrency
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
 
-    // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
+    // for CPU bound application，set the thread pool size to N+1 is suggested; for I/O bound application, set the thread pool size to 2N+1 is suggested
     private final ExecutorService uploaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
     private final OkHttpClient upHttpClient = new OkHttpClient.Builder()
@@ -140,32 +140,16 @@ public final class Uploader implements Runnable {
         this.storeFileCallback = storeFileCallback;
     }
 
-    CompletableFuture<Bucket> getFutureGetBucket() {
-        return futureGetBucket;
-    }
-
     void setFutureGetBucket(CompletableFuture<Bucket> futureGetBucket) {
         this.futureGetBucket = futureGetBucket;
-    }
-
-    CompletableFuture<Boolean> getFutureIsFileExists() {
-        return futureIsFileExists;
     }
 
     void setFutureIsFileExists(CompletableFuture<Boolean> futureIsFileExists) {
         this.futureIsFileExists = futureIsFileExists;
     }
 
-    CompletableFuture<Frame> getFutureRequestNewFrame() {
-        return futureRequestNewFrame;
-    }
-
     void setFutureRequestNewFrame(CompletableFuture<Frame> futureRequestNewFrame) {
         this.futureRequestNewFrame = futureRequestNewFrame;
-    }
-
-    public CompletableFuture<Void> getFutureBelongsTo() {
-        return futureBelongsTo;
     }
 
     public void setFutureBelongsTo(CompletableFuture<Void> futureBelongsTo) {
@@ -507,7 +491,6 @@ public final class Uploader implements Runnable {
         ShardMeta shardMeta = shard.getMeta();
 
         Farmer farmer = shard.getPointer().getFarmer();
-        String farmerNodeId = farmer.getNodeID();
         String farmerAddress = farmer.getAddress();
         String farmerPort = farmer.getPort();
         String metaHash = shard.getMeta().getHash();

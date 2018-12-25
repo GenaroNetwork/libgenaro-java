@@ -120,16 +120,8 @@ public final class Downloader implements Runnable {
         this(bridge, bucketId, fileId, path, overwrite, new ResolveFileCallback() {});
     }
 
-    CompletableFuture<GenaroFile> getFutureGetFileInfo() {
-        return futureGetFileInfo;
-    }
-
     void setFutureGetFileInfo(CompletableFuture<GenaroFile> futureGetFileInfo) {
         this.futureGetFileInfo = futureGetFileInfo;
-    }
-
-    CompletableFuture<List<Pointer>> getFutureGetPointers() {
-        return futureGetPointers;
     }
 
     void setFutureGetPointers(CompletableFuture<List<Pointer>> futureGetPointers) {
@@ -138,10 +130,6 @@ public final class Downloader implements Runnable {
 
     OkHttpClient getDownHttpClient() {
         return downHttpClient;
-    }
-
-    public CompletableFuture<Void> getFutureBelongsTo() {
-        return futureBelongsTo;
     }
 
     public void setFutureBelongsTo(CompletableFuture<Void> futureBelongsTo) {

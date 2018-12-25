@@ -55,5 +55,4 @@ final class UploadRequestBody extends RequestBody {
             Util.closeQuietly(source);
         }
     }
-
 }

@@ -2,9 +2,10 @@ package network.genaro.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+// do not delete the methods that are not called explicitly, the set methods is used when method readValue of ObjectMapper
+// is called, and the get method is provided for 3rd parties.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class GenaroFile {
-
     public final class Hmac {
         String value;
         String type;
