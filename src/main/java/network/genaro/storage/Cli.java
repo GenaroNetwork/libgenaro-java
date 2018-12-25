@@ -3,7 +3,11 @@ package network.genaro.storage;
 import gnu.getopt.Getopt;
 import gnu.getopt.LongOpt;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.File;
+import java.io.Console;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;

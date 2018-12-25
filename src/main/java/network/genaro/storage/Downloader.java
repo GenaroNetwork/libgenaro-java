@@ -3,10 +3,15 @@ package network.genaro.storage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import okhttp3.*;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Response;
+import okhttp3.Request;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
+
 import org.bouncycastle.util.encoders.Hex;
 import org.xbill.DNS.utils.base16;
 
@@ -15,19 +20,30 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import static javax.crypto.Cipher.DECRYPT_MODE;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.BufferedInputStream;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.TimeoutException;
 
 import network.genaro.storage.GenaroCallback.ResolveFileCallback;
 import static network.genaro.storage.Parameters.*;
@@ -40,8 +56,6 @@ public final class Downloader implements Runnable {
     public static final int GENARO_MAX_REPORT_TRIES = 2;
     public static final int GENARO_MAX_REQUEST_POINTERS = 3;
     public static final int GENARO_MAX_GET_FILE_INFO = 3;
-
-    private static final Logger logger = LogManager.getLogger(Genaro.class);
 
     private String path;
     private String tempPath;
@@ -81,10 +95,10 @@ public final class Downloader implements Runnable {
     // not try to download from these farmers
     private String excludedFarmerIds;
 
-    // 使用CachedThreadPool比较耗内存，并发高的时候会造成内存溢出
+    // CachedThreadPool takes up too much memory，and it will cause memory overflow when high concurrency
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
 
-    // 如果是CPU密集型应用，则线程池大小建议设置为N+1，如果是IO密集型应用，则线程池大小建议设置为2N+1，下载和上传都是IO密集型。（parallelStream也能实现多线程，但是适用于CPU密集型应用）
+    // for CPU bound application，set the thread pool size to N+1 is suggested; for I/O bound application, set the thread pool size to 2N+1 is suggested
     private final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
     private final OkHttpClient downHttpClient = new OkHttpClient.Builder()
@@ -154,7 +168,7 @@ public final class Downloader implements Runnable {
             if (response != null) {
                 response.close();
             }
-            logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
+            Genaro.logger.error(String.format("Download Pointer %d failed", pointer.getIndex()));
             downloadedBytes.addAndGet(-pointer.getDownloadedSize());
             pointer.setDownloadedSize(0);
         }
@@ -222,7 +236,7 @@ public final class Downloader implements Runnable {
                     return;
                 }
 
-                logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
+                Genaro.logger.info(String.format("Download Pointer %d finished", pointer.getIndex()));
             } catch (IOException e) {
                 fail(response);
                 // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestShard") will cause an SocketException
@@ -264,12 +278,12 @@ public final class Downloader implements Runnable {
             throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
         }
 
-        logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
+        Genaro.logger.info(String.format("Starting download Pointer %d...", pointer.getIndex()));
 
         RequestShardCallbackFuture future = new RequestShardCallbackFuture(this, pointer);
         downHttpClient.newCall(request).enqueue(future);
 
-        // save the start time of downloading
+        // save the starting time of downloading
         pointer.getReport().setStart(System.currentTimeMillis());
 
         try {
@@ -299,7 +313,7 @@ public final class Downloader implements Runnable {
                 }
             }
         } finally {
-            // save the end time of downloading
+            // save the ending time of downloading
             pointer.getReport().setEnd(System.currentTimeMillis());
         }
 
@@ -352,7 +366,7 @@ public final class Downloader implements Runnable {
                         break;
                     } else {
                         if (bodyNode.has("error")) {
-                            logger.warn(bodyNode.get("error").asText());
+                            Genaro.logger.warn(bodyNode.get("error").asText());
                         }
                     }
                 } catch (IOException e) {
@@ -394,7 +408,7 @@ public final class Downloader implements Runnable {
                     excludedFarmerIds += "," + farmerId;
                 }
 
-                logger.info(String.format("Requesting replacement pointer at index: %d", newPointer.getIndex()));
+                Genaro.logger.info(String.format("Requesting replacement pointer at index: %d", newPointer.getIndex()));
 
                 newPointer.setReplaceCount(newPointer.getReplaceCount() + 1);
 
@@ -424,16 +438,16 @@ public final class Downloader implements Runnable {
                         ObjectMapper om = new ObjectMapper();
                         JsonNode bodyNode = om.readTree(responseBody);
 
-                        logger.info(String.format("Finished request replace pointer %d - JSON Response: %s", newPointer.getIndex(), responseBody));
+                        Genaro.logger.info(String.format("Finished request replace pointer %d - JSON Response: %s", newPointer.getIndex(), responseBody));
 
                         if (code == 429 || code == 420) {
                             if (bodyNode.has("error")) {
-                                logger.error(bodyNode.get("error").asText());
+                                Genaro.logger.error(bodyNode.get("error").asText());
                             }
                             throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_RATE_ERROR));
                         } else if (code != 200) {
                             if (bodyNode.has("error")) {
-                                logger.error(bodyNode.get("error").asText());
+                                Genaro.logger.error(bodyNode.get("error").asText());
                             }
                             throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_POINTER_ERROR));
                         }
@@ -571,7 +585,7 @@ public final class Downloader implements Runnable {
 
         long fileSize = 0;
         for (Pointer pointer: pointers) {
-            logger.info(pointer.toBriefString());
+            Genaro.logger.info(pointer.toBriefString());
             long size = pointer.getSize();
             totalBytes += size;
             if(!pointer.isParity()) {
@@ -686,7 +700,7 @@ public final class Downloader implements Runnable {
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                 resolveFileCallback.onFail(e.getCause().getMessage());
             } else {
-                logger.warn("Warn: Would not get here");
+                Genaro.logger.warn("Warn: Would not get here");
                 resolveFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
             }
             return;
@@ -703,7 +717,7 @@ public final class Downloader implements Runnable {
 //        }
 
         if(downloadedBytes.get() != totalBytes) {
-            logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
+            Genaro.logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
         }
 
         try {
@@ -715,7 +729,7 @@ public final class Downloader implements Runnable {
         }
 
         // decryption:
-        logger.info("Download complete, begin to decrypt...");
+        Genaro.logger.info("Download complete, begin to decrypt...");
         byte[] bucketId = Hex.decode(file.getBucket());
         byte[] index   = Hex.decode(file.getIndex());
 
@@ -771,10 +785,10 @@ public final class Downloader implements Runnable {
             downFileChannel.close();
         } catch (Exception e) {
             // do not call resolveFileCallback.onFail here
-            logger.warn("File close exception");
+            Genaro.logger.warn("File close exception");
         }
 
-        logger.info("Decrypt complete, download is success");
+        Genaro.logger.info("Decrypt complete, download is success");
 
         // download success
         resolveFileCallback.onFinish();

@@ -11,8 +11,6 @@ import okhttp3.Response;
 import okhttp3.MediaType;
 import okhttp3.RequestBody;
 
-import org.bouncycastle.util.encoders.Hex;
-
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
@@ -20,12 +18,25 @@ import java.net.URLEncoder;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import org.apache.logging.log4j.core.Filter;
+import org.apache.logging.log4j.core.appender.ConsoleAppender;
+import org.apache.logging.log4j.core.config.Configurator;
+import org.apache.logging.log4j.core.config.builder.api.AppenderComponentBuilder;
+import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilder;
+import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
+import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
 import org.web3j.crypto.CipherException;
+
+import org.bouncycastle.util.encoders.Hex;
 
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
@@ -575,7 +586,7 @@ final class ShardTracker {
 }
 
 public final class Genaro {
-    private final Logger logger = LogManager.getLogger(Genaro.class);
+    public static final Logger logger = LogManager.getLogger(Genaro.class);
     private static final int POINT_PAGE_COUNT = 3;
 
     private String bridgeUrl;
@@ -597,6 +608,11 @@ public final class Genaro {
         init(bridgeUrl, privKey, passwd);
     }
 
+    public Genaro(final String bridgeUrl, final String privKey, final String passwd, final int logLevel) throws CipherException, IOException {
+        this(bridgeUrl, privKey, passwd);
+        initLog(logLevel);
+    }
+
     public void init(final String bridgeUrl) {
         this.bridgeUrl = bridgeUrl;
     }
@@ -607,10 +623,58 @@ public final class Genaro {
         this.wallet = wallet;
     }
 
-    private void verifyInit(boolean checkWallet) {
+    public void init(final String bridgeUrl, final String privKey, final String passwd, final int logLevel) throws CipherException, IOException {
+        this.init(bridgeUrl, privKey, passwd);
+        initLog(logLevel);
+    }
+
+    private void verifyInit(final boolean checkWallet) {
         if (bridgeUrl == null || (checkWallet && wallet == null)) {
             throw new GenaroRuntimeException("Bridge url or wallet has not been initialized!");
         }
+    }
+
+    // init log level fo log4j2
+    public static void initLog(final int logLevel) {
+        Level level;
+        switch (logLevel) {
+            case 4:
+                level = Level.DEBUG;
+                break;
+            case 3:
+                level = Level.INFO;
+                break;
+            case 2:
+                level = Level.WARN;
+                break;
+            case 1:
+                level = Level.ERROR;
+                break;
+            default:
+                level = Level.OFF;
+                break;
+        }
+
+        ConfigurationBuilder<BuiltConfiguration> builder = ConfigurationBuilderFactory.newConfigurationBuilder();
+        builder.add(builder.newFilter("ThresholdFilter", Filter.Result.ACCEPT, Filter.Result.DENY)
+                .addAttribute("level", level));
+
+        AppenderComponentBuilder appenderBuilder = builder.newAppender("Stdout", "Console").addAttribute("target",
+                ConsoleAppender.Target.SYSTEM_OUT);
+        appenderBuilder.add(builder.newLayout("PatternLayout")
+                .addAttribute("pattern", "[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"));
+        builder.add(appenderBuilder);
+        builder.add(builder.newRootLogger(level).add(builder.newAppenderRef("Stdout")));
+        Configurator.initialize(builder.build());
+
+//        final LoggerContext context = LoggerContext.getContext(false);
+//        final Configuration config = context.getConfiguration();
+//        final PatternLayout layout = PatternLayout.newBuilder().withPattern("%-5level %c{-4} - %msg%n").build();
+//        Appender appender = ConsoleAppender.newBuilder().setFollow(true).setTarget(ConsoleAppender.Target.SYSTEM_OUT)
+//                .withName("Genaro").withLayout(layout).build();
+//        appender.start();
+//        config.addAppender(appender);
+//        config.getRootLogger().addAppender(appender, level, null);
     }
 
     public String getBridgeUrl() {
@@ -621,7 +685,7 @@ public final class Genaro {
         this.bridgeUrl = bridgeUrl;
     }
 
-    public static String genaroStrError(int error_code)
+    public static String genaroStrError(final int error_code)
     {
         switch(error_code) {
             case GENARO_BRIDGE_REQUEST_ERROR:

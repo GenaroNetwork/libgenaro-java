@@ -5,7 +5,7 @@
 <configuration status="WARN" monitorInterval="30">
     <!--先定义所有的appender-->
     <appenders>
-    <!--这个输出控制台的配置-->
+        <!--这个输出控制台的配置-->
         <console name="Console" target="SYSTEM_OUT">
             <!--只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch）-->
             <ThresholdFilter level="ALL" onMatch="ACCEPT" onMismatch="DENY"/>
