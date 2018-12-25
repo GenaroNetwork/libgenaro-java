@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
@@ -269,7 +268,6 @@ public final class Downloader implements Runnable {
         String url = String.format("http://%s:%s/shards/%s?token=%s", farmer.getAddress(), farmer.getPort(), pointer.getHash(), pointer.getToken());
         Request request = new Request.Builder()
                                      .tag("requestShard")
-                                     .header("x-storj-node-id", farmer.getNodeID())
                                      .url(url)
                                      .get()
                                      .build();
@@ -291,26 +289,11 @@ public final class Downloader implements Runnable {
         } catch (Exception e) {
             pointer.setStatus(POINTER_ERROR);
             pointer.getReport().setCode(GENARO_REPORT_FAILURE);
-            pointer.getReport().setMessage(GENARO_REPORT_DOWNLOAD_ERROR);
-
-            if(e instanceof ExecutionException) {
-                Throwable cause = e.getCause();
-                if (cause instanceof SocketTimeoutException) {
-                    if (pointer.getRequestCount() >= (GENARO_DEFAULT_MIRRORS + 1)) {
-                        throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_TIMEOUT_ERROR));
-                    }
-                } else if (cause instanceof GenaroRuntimeException) {
-                    if (cause.getMessage().equals(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR))) {
-                        pointer.getReport().setMessage(GENARO_REPORT_FAILED_INTEGRITY);
-                    }
-                    if (pointer.getRequestCount() >= (GENARO_DEFAULT_MIRRORS + 1)) {
-                        throw new GenaroRuntimeException(cause.getMessage());
-                    }
-                }
+            if (e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException &&
+                    e.getCause().getMessage().equals(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR))) {
+                pointer.getReport().setMessage(GENARO_REPORT_FAILED_INTEGRITY);
             } else {
-                if (pointer.getRequestCount() >= (GENARO_DEFAULT_MIRRORS + 1)) {
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR));
-                }
+                pointer.getReport().setMessage(GENARO_REPORT_DOWNLOAD_ERROR);
             }
         } finally {
             // save the ending time of downloading
@@ -394,93 +377,84 @@ public final class Downloader implements Runnable {
         Pointer newPointer = pointer;
         newPointer.setReplaced(false);
         if (newPointer.getStatus() == POINTER_ERROR_REPORTED) {
-            for (int i = 0; i < GENARO_MAX_REQUEST_POINTERS; i++) {
-                if (newPointer.getReplaceCount() >= GENARO_DEFAULT_MIRRORS) {
-                    newPointer.setStatus(POINTER_MISSING);
+            newPointer.setStatus(POINTER_MISSING);
 
-                    break;
-                }
+            if (newPointer.getReplaceCount() >= GENARO_DEFAULT_MIRRORS) {
+                return newPointer;
+            }
 
-                String farmerId = newPointer.getFarmer().getNodeID();
+            Farmer farmer = newPointer.getFarmer();
+            String farmerId = null;
+            if (farmer != null) {
+                farmerId = farmer.getNodeID();
+            }
+
+            if (farmerId != null) {
                 if (excludedFarmerIds == null) {
                     excludedFarmerIds = farmerId;
                 } else if (!excludedFarmerIds.contains(farmerId)) {
                     excludedFarmerIds += "," + farmerId;
                 }
+            }
 
-                Genaro.logger.info(String.format("Requesting replacement pointer at index: %d", newPointer.getIndex()));
+            Genaro.logger.info(String.format("Requesting replacement pointer at index: %d", newPointer.getIndex()));
 
-                newPointer.setReplaceCount(newPointer.getReplaceCount() + 1);
+            newPointer.setReplaceCount(newPointer.getReplaceCount() + 1);
 
-                String queryArgs = String.format("limit=1&skip=%d&exclude=%s", newPointer.getIndex(), excludedFarmerIds);
-                String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
-                String path = String.format("%s?%s", url, queryArgs);
-                String signature;
-                try {
-                    signature = bridge.signRequest("GET", url, queryArgs);
-                } catch (Exception e) {
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_ALGORITHM_ERROR));
+            String queryArgs = String.format("limit=1&skip=%d&exclude=%s", newPointer.getIndex(), excludedFarmerIds);
+            String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
+            String path = String.format("%s?%s", url, queryArgs);
+            String signature;
+            try {
+                signature = bridge.signRequest("GET", url, queryArgs);
+            } catch (Exception e) {
+                return newPointer;
+            }
+
+            String pubKey = bridge.getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .tag("requestReplacePointer")
+                    .url(bridge.getBridgeUrl() + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
+
+            try (Response response = downHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                String responseBody = response.body().string();
+                ObjectMapper om = new ObjectMapper();
+                JsonNode bodyNode = om.readTree(responseBody);
+
+                Genaro.logger.info(String.format("Finished request replace pointer %d - JSON Response: %s", newPointer.getIndex(), responseBody));
+
+                if (code != 200) {
+                    if (bodyNode.has("error")) {
+                        Genaro.logger.error(bodyNode.get("error").asText());
+                    }
+                    return newPointer;
                 }
 
-                String pubKey = bridge.getPublicKeyHexString();
-                Request request = new Request.Builder()
-                        .tag("requestReplacePointer")
-                        .url(bridge.getBridgeUrl() + path)
-                        .header("x-signature", signature)
-                        .header("x-pubkey", pubKey)
-                        .get()
-                        .build();
-
-                try {
-                    try (Response response = downHttpClient.newCall(request).execute()) {
-                        int code = response.code();
-                        String responseBody = response.body().string();
-                        ObjectMapper om = new ObjectMapper();
-                        JsonNode bodyNode = om.readTree(responseBody);
-
-                        Genaro.logger.info(String.format("Finished request replace pointer %d - JSON Response: %s", newPointer.getIndex(), responseBody));
-
-                        if (code == 429 || code == 420) {
-                            if (bodyNode.has("error")) {
-                                Genaro.logger.error(bodyNode.get("error").asText());
-                            }
-                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_RATE_ERROR));
-                        } else if (code != 200) {
-                            if (bodyNode.has("error")) {
-                                Genaro.logger.error(bodyNode.get("error").asText());
-                            }
-                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_POINTER_ERROR));
-                        }
-
-                        List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
-                        newPointer = pointers.get(0);
-                        newPointer.setReport(new GenaroExchangeReport());
-                        if (newPointer.getToken() != null && newPointer.getFarmer() != null) {
-                            newPointer.setReplaced(true);
-                            newPointer.setStatus(POINTER_REPLACED);
-                        } else {
-                            newPointer.setStatus(POINTER_MISSING);
-                        }
-                    } catch (IOException e) {
-                        if (e instanceof SocketException || e.getMessage() == "Canceled") {
-                            // if it's canceled, do not try again
-                            i = GENARO_MAX_REQUEST_POINTERS - 1;
-                            throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
-                        } else if (e instanceof SocketTimeoutException) {
-                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                        } else {
-                            throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                        }
-                    }
-                } catch (GenaroRuntimeException e) {
-                    if(i == GENARO_MAX_REQUEST_POINTERS - 1) {
-                        newPointer.setStatus(POINTER_MISSING);
-                        break;
-                    }
-                    // try again
-                    continue;
+                List<Pointer> pointers = om.readValue(responseBody, new TypeReference<List<Pointer>>(){});
+                Pointer replacedPointer = pointers.get(0);
+                newPointer.setIndex(replacedPointer.getIndex());
+                newPointer.setHash(replacedPointer.getHash());
+                newPointer.setSize(replacedPointer.getSize());
+                newPointer.setParity(replacedPointer.isParity());
+                newPointer.setToken(replacedPointer.getToken());
+                newPointer.setFarmer(replacedPointer.getFarmer());
+                newPointer.setOperation(replacedPointer.getOperation());
+                newPointer.setReport(new GenaroExchangeReport());
+                if (newPointer.getToken() != null && newPointer.getFarmer() != null) {
+                    newPointer.setReplaced(true);
+                    newPointer.setStatus(POINTER_REPLACED);
+                } else {
+                    return newPointer;
                 }
-                break;
+            } catch (IOException e) {
+                if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
+                }
             }
 
             // replace the pointer in pointers
@@ -701,6 +675,7 @@ public final class Downloader implements Runnable {
                 resolveFileCallback.onFail(e.getCause().getMessage());
             } else {
                 Genaro.logger.warn("Warn: Would not get here");
+                e.printStackTrace();
                 resolveFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
             }
             return;

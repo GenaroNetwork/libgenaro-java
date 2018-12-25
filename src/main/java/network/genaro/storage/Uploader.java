@@ -554,7 +554,6 @@ public final class Uploader implements Runnable {
         Request request = new Request.Builder()
                 .tag("pushShard")
                 .url(url)
-                .header("x-storj-node-id", farmerNodeId)
                 .post(uploadRequestBody)
                 .build();
 
@@ -983,6 +982,7 @@ public final class Uploader implements Runnable {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else {
                 Genaro.logger.warn("Warn: Would not get here");
+                e.printStackTrace();
                 storeFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
             }
             return;

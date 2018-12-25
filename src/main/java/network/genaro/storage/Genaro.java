@@ -459,7 +459,7 @@ final class Pointer {
                 "index=" + index +
                 ", size=" + size +
                 ", parity=" + parity +
-                ", farmer=" + farmer.toBriefString() +
+                ", farmer=" + ((farmer != null) ? farmer.toBriefString() : "null") +
                 '}';
     }
 
