@@ -1,10 +1,12 @@
 .idea
+.gradle
 .classpath
 .factorypath
 .project
 .settings
 genaro-sdk.iml
 dependency-reduced-pom.xml
-Todo
 logs
 target
+build
+out

@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.Console;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -183,7 +182,6 @@ final class Cli {
             System.exit(0);
         }
         char passwdChars[] = console.readPassword("Enter password: ");
-        Arrays.fill(passwdChars, '*');
         String passwd = new String(passwdChars);
 
         try {

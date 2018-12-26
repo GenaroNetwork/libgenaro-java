@@ -50,7 +50,6 @@
                     <archive>
                         <!--<manifestFile>${project.basedir}/src/main/java/META-INF/MANIFEST.MF</manifestFile>-->
                         <manifestEntries>
-                            <Manifest-Version>0.1</Manifest-Version>
                             <Created-By>GENARO NETWORK</Created-By>
                             <Main-Class>network.genaro.storage.Cli</Main-Class>
                             <Class-Path>bcprov-jdk15on-1.60.jar</Class-Path>>

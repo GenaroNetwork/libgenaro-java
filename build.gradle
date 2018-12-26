@@ -1,0 +1,57 @@
+apply plugin: 'java'
+//apply plugin: 'maven'
+
+group = 'network.genaro.storage'
+version = '0.1'
+
+description = """"""
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+//     maven { url "http://repo2.maven.org/maven2/" }
+    mavenCentral()
+    maven { url "http://www.jabylon.org/maven/" }
+}
+
+configurations {
+    bcprov
+    compile.extendsFrom bcprov
+}
+
+dependencies {
+    compile 'org.web3j:core:3.5.0'
+    compile 'com.fasterxml.jackson.core:jackson-core:2.9.6'
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.6'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
+    compile 'com.squareup.okhttp3:okhttp:3.11.0'
+    bcprov 'org.bouncycastle:bcprov-jdk15on:1.60'
+//    compile 'org.bouncycastle:bcprov-jdk15on:1.60'
+    compile 'com.google.guava:guava:27.0-jre'
+    compile 'org.apache.commons:commons-lang3:3.8.1'
+    compile 'org.apache.logging.log4j:log4j-api:2.11.1'
+    compile 'org.apache.logging.log4j:log4j-core:2.11.1'
+    compile 'org.xbill:dns:2.0.8'
+    compile 'gnu.getopt:java-getopt:1.0.13'
+    testCompile 'org.testng:testng:6.8'
+}
+
+copy {
+    from('lib'){
+        include '*.jar'
+    }
+    into getLibsDir().getPath()
+}
+
+jar {
+    manifest {
+        attributes 'Created-By': 'GENARO NETWORK'
+        attributes 'Main-Class': 'network.genaro.storage.Cli'
+        attributes 'Class-Path': 'bcprov-jdk15on-1.60.jar'
+    }
+
+    from ((configurations.runtime - configurations.bcprov).collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude ('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+    }
+}

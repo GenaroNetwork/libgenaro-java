@@ -6,7 +6,7 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 
 - Load wallet from json file with password
 - Use wallet to sign request for user authentication
-- Delete bucket/rename bucket/list buckets/list files/delete file/download file
+- Delete bucket/rename bucket/list buckets/list files/delete file/upload file/download file
 - Asynchronous I/O with concurrent peer-to-peer network requests for shards
 - File encryption with AES-256-CTR
 - File name and bucket name encryption with AES-256-GCM
