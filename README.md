@@ -48,7 +48,7 @@ mvn clean package
 or if you don't want to run the tests:
 
 ```shell
-mvn clean package -DskipTests
+mvn clean package -Dmaven.test.skip=true
 ```
 
 ### Gradle
