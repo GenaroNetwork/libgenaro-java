@@ -41,10 +41,12 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 final class CryptoUtil {
-
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
+
+    private static final String AES_PROVIDER = "BC";
+
     private static final int RIPEMD160_DIGEST_SIZE = 20;
     private static final int AES_GCM_DIGEST_LENGTH = 16;
     private static final int AES_GCM_IV_LENGTH = 32;
@@ -136,7 +138,7 @@ final class CryptoUtil {
             throw new IllegalArgumentException("IV length must be " + AES_GCM_IV_LENGTH);
         }
 
-        Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding", AES_PROVIDER);
         SecretKeySpec k = new SecretKeySpec(encryptKey, "AES");
         c.init(Cipher.ENCRYPT_MODE, k, new IvParameterSpec(encryptIv));
         byte[] cipherPlusDigest = c.doFinal(fileMeta);
@@ -179,7 +181,7 @@ final class CryptoUtil {
         // fill cipher text
         System.arraycopy(encryptedData, AES_GCM_DIGEST_LENGTH + AES_GCM_IV_LENGTH, cipherPlusDigest, 0, cipherTextLen);
 
-        Cipher c = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding", AES_PROVIDER);
         SecretKeySpec k = new SecretKeySpec(decryptKey, "AES");
         c.init(Cipher.DECRYPT_MODE, k, new IvParameterSpec(decryptIv));
 

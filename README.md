@@ -26,13 +26,13 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 ## 3rd party dependencies
 
 - [Bouncy Castle](https://www.bouncycastle.org/java.html) for crypto algorithms.
-- [dnsjava](http://www.xbill.org/dnsjava/) for base16 encoding.
-- [web3j](https://github.com/web3j/web3j) for wallet managment, BIP39 and Interaction with blockchain.
+- [dnsjava](http://www.xbill.org/dnsjava) for base16 encoding.
+- [web3j](https://web3j.io) for wallet managment, BIP39 and Interaction with blockchain.
 - [JavaReedSolomon](https://github.com/Backblaze/JavaReedSolomon) for reed solomon algorithm.
 - [jackson](https://github.com/FasterXML/jackson) for JSON parse/compose.
 - [okhttp3](https://github.com/square/okhttp) as HTTP client.
 - [java-getopt](https://www.urbanophile.com/arenn/hacking/download.html) a Java command line option parser that is compatible with GNU getopt.
-- [guava](https://github.com/google/guava) and [apache.commons](https://commons.apache.org/) as utility.
+- [guava](https://github.com/google/guava) and [apache.commons](https://commons.apache.org) as utility.
 - [log4j](https://logging.apache.org/log4j) for logging.
 - [testng](https://testng.org/doc/index.html) for testing.
 - [maven](https://maven.apache.org/) for dependency managment.
@@ -53,13 +53,13 @@ mvn clean package -Dmaven.test.skip=true
 
 ### Gradle
 
-for Linux/Mac:
+on Linux/Mac:
 
 ```shell
 ./gradlew build
 ```
 
-for Windows:
+on Windows:
 
 ```cmd
 gradlew build
