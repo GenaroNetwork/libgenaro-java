@@ -226,7 +226,7 @@ public final class Downloader implements Runnable {
             } catch (IOException e) {
                 fail(response);
                 // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestShard") will cause an SocketException
-                if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
                     super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED)));
                 } else {
                     super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_FARMER_REQUEST_ERROR)));
@@ -439,7 +439,7 @@ public final class Downloader implements Runnable {
                     return newPointer;
                 }
             } catch (IOException e) {
-                if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 }
             }

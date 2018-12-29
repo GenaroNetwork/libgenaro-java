@@ -442,7 +442,7 @@ public final class Uploader implements Runnable {
                     shard.setPointer(fp);
                 } catch (IOException e) {
                     // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame") will cause an SocketException
-                    if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                    if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
                         // if it's canceled, do not try again
                         i = GENARO_MAX_PUSH_SHARD - 1;
                         throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
@@ -575,7 +575,7 @@ public final class Uploader implements Runnable {
         } catch (IOException e) {
             uploadedBytes.addAndGet(-shard.getUploadedSize());
             shard.setUploadedSize(0);
-            if (e instanceof SocketException || e.getMessage() == "Canceled") {
+            if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else if (e instanceof SocketTimeoutException) {
                 if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
@@ -729,7 +729,7 @@ public final class Uploader implements Runnable {
 
                     fileId = bodyNode.get("id").asText();
                 } catch (IOException e) {
-                    if (e instanceof SocketException || e.getMessage() == "Canceled") {
+                    if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
                         // if it's canceled, do not try again
                         i = GENARO_MAX_CREATE_BUCKET_ENTRY - 1;
                         throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
@@ -992,7 +992,7 @@ public final class Uploader implements Runnable {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else if(e instanceof NoSuchAlgorithmException) {
                 storeFileCallback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-            } else if (e instanceof SocketException || e.getMessage() == "Canceled") {
+            } else if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
                 storeFileCallback.onFail(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else if (e instanceof SocketTimeoutException) {
                 storeFileCallback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
