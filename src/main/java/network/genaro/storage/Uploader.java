@@ -752,7 +752,7 @@ public final class Uploader implements Runnable {
     }
 
     public void start() {
-        if (!Files.exists(Paths.get(originPath))) {
+        if (originPath == null || originPath.trim().isEmpty() || !Files.exists(Paths.get(originPath))) {
             storeFileCallback.onFail("Invalid file path");
             return;
         }
