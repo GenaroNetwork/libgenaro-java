@@ -32,7 +32,7 @@ final class Cli {
             "downloading and uploading files\n" +
             "  upload-file <bucket-id> <path>\n" +
             "  download-file <bucket-id> <file-id> <path>\n" +
-            "bridge api information\n" +
+            "bridge genaro information\n" +
             "  get-info\n\n" +
             "options:\n" +
             "  -h, --help                output usage information\n" +
@@ -51,15 +51,15 @@ final class Cli {
         int c;
         int logLevel = 0;
 
-        LongOpt [] longopts = new LongOpt[6];
-        longopts[0] = new LongOpt("url", LongOpt.NO_ARGUMENT, null, 'u');
-        longopts[1] = new LongOpt("wallet", LongOpt.REQUIRED_ARGUMENT, null, 'w');
-        longopts[2] = new LongOpt("version", LongOpt.REQUIRED_ARGUMENT, null, 'v');
-        longopts[3] = new LongOpt("log", LongOpt.REQUIRED_ARGUMENT, null, 'l');
-        longopts[4] = new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd');
-        longopts[5] = new LongOpt("help", LongOpt.REQUIRED_ARGUMENT, null, 'h');
+        LongOpt [] longOpts = new LongOpt[6];
+        longOpts[0] = new LongOpt("url", LongOpt.NO_ARGUMENT, null, 'u');
+        longOpts[1] = new LongOpt("wallet", LongOpt.REQUIRED_ARGUMENT, null, 'w');
+        longOpts[2] = new LongOpt("version", LongOpt.REQUIRED_ARGUMENT, null, 'v');
+        longOpts[3] = new LongOpt("log", LongOpt.REQUIRED_ARGUMENT, null, 'l');
+        longOpts[4] = new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd');
+        longOpts[5] = new LongOpt("help", LongOpt.REQUIRED_ARGUMENT, null, 'h');
 
-        Getopt g = new Getopt("libgenaro-java", args, "u:w:l:dVvh", longopts);
+        Getopt g = new Getopt("libgenaro-java", args, "u:w:l:dVvh", longOpts);
 
         while ((c = g.getopt()) != -1)
         {
@@ -135,12 +135,12 @@ final class Cli {
 
         genaroBridge = String.format("%s://%s:%d", proto, host, port);
 
-        Genaro api = null;
+        Genaro genaro = null;
 
         if (command.equals("get-info")) {
-            api = new Genaro(genaroBridge);
+            genaro = new Genaro(genaroBridge);
             System.out.println(String.format("Genaro bridge: %s\n", genaroBridge));
-            String info = api.getInfo();
+            String info = genaro.getInfo();
 
             if (info == null) {
                 System.out.println("Unable to get bridge information");
@@ -185,7 +185,7 @@ final class Cli {
         String passwd = new String(passwdChars);
 
         try {
-            api = new Genaro(genaroBridge, privKey, passwd);
+            genaro = new Genaro(genaroBridge, privKey, passwd, logLevel);
         } catch (Exception e) {
             System.out.println("Wallet invalid or password incorrect");
             System.exit(0);
@@ -201,7 +201,7 @@ final class Cli {
             String fileId = args[commandIndex + 2];
             String path = args[commandIndex + 3];
 
-            Downloader downloader = api.resolveFile(bucketId, fileId, path, true, new ResolveFileCallback() {
+            Downloader downloader = genaro.resolveFile(bucketId, fileId, path, true, new ResolveFileCallback() {
                 @Override
                 public void onBegin() {
                     System.out.println("Download started");
@@ -237,7 +237,7 @@ final class Cli {
             File file = new File(path);
             String name = file.getName();
 
-            Uploader uploader = api.storeFile(false, path, name, bucketId, new StoreFileCallback() {
+            Uploader uploader = genaro.storeFile(false, path, name, bucketId, new StoreFileCallback() {
                 @Override
                 public void onBegin(long fileSize) {
                     System.out.println("Upload started");
@@ -270,7 +270,7 @@ final class Cli {
 
             String bucketId = args[commandIndex + 1];
 
-            CompletableFuture<Void> fu = api.listFiles(bucketId, new ListFilesCallback() {
+            CompletableFuture<Void> fu = genaro.listFiles(bucketId, new ListFilesCallback() {
                 @Override
                 public void onFinish(GenaroFile[] files) {
                     if(files.length == 0) {
@@ -296,7 +296,7 @@ final class Cli {
             }
 
             String bucketId = args[commandIndex + 1];
-            CompletableFuture<Void> fu = api.deleteBucket(bucketId, new DeleteBucketCallback() {
+            CompletableFuture<Void> fu = genaro.deleteBucket(bucketId, new DeleteBucketCallback() {
                 @Override
                 public void onFinish() {
                     System.out.println("Delete bucket success.");
@@ -319,7 +319,7 @@ final class Cli {
             String bucketId = args[commandIndex + 1];
             String fileId = args[commandIndex + 2];
 
-            CompletableFuture<Void> fu = api.deleteFile(bucketId, fileId, new DeleteFileCallback() {
+            CompletableFuture<Void> fu = genaro.deleteFile(bucketId, fileId, new DeleteFileCallback() {
                 @Override
                 public void onFinish() {
                     System.out.println("Delete file success.");
@@ -333,7 +333,7 @@ final class Cli {
             fu.join();
             System.exit(0);
         } else if (command.equals("list-buckets")) {
-            CompletableFuture<Void> fu = api.getBuckets(new GetBucketsCallback() {
+            CompletableFuture<Void> fu = genaro.getBuckets(new GetBucketsCallback() {
                 @Override
                 public void onFinish(Bucket[] buckets) {
                     if(buckets.length == 0) {
@@ -362,7 +362,7 @@ final class Cli {
             String bucketId = args[commandIndex + 1];
             String fileId = args[commandIndex + 2];
 
-            CompletableFuture<Void> fu = api.listMirrors(bucketId, fileId, new ListMirrorsCallback() {
+            CompletableFuture<Void> fu = genaro.listMirrors(bucketId, fileId, new ListMirrorsCallback() {
                 @Override
                 public void onFinish(String text) {
                     System.out.println(text);
@@ -384,7 +384,7 @@ final class Cli {
             String bucketId = args[commandIndex + 1];
             String newBucketName = args[commandIndex + 2];
 
-            CompletableFuture<Void> fu = api.renameBucket(bucketId, newBucketName, new RenameBucketCallback() {
+            CompletableFuture<Void> fu = genaro.renameBucket(bucketId, newBucketName, new RenameBucketCallback() {
                 @Override
                 public void onFinish() {
                     System.out.println("Rename bucket success.");
