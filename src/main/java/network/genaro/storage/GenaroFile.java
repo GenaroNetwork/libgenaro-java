@@ -133,12 +133,12 @@ public final class GenaroFile {
 
     @Override
     public String toString() {
+        // do not return the value of "erasure", because listFiles will not set the value of "erasure"
         return "File{" +
                 "filename='" + filename + '\'' +
                 ", bucket='" + bucket + '\'' +
                 ", frame='" + frame + '\'' +
                 ", hmac=" + hmac +
-                ", erasure=" + erasure +
                 ", index='" + index + '\'' +
                 ", mimetype='" + mimetype + '\'' +
                 ", size=" + size +

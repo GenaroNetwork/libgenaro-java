@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.File;
 import java.io.ByteArrayInputStream;
+
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedByInterruptException;
@@ -772,6 +773,30 @@ public final class Uploader implements Runnable {
         totalParityShards = rs ? (int)Math.ceil((double)totalDataShards * 2.0 / 3.0) : 0;
         totalShards = totalDataShards + totalParityShards;
         totalBytes = fileSize + totalParityShards * shardSize;
+
+        /*
+        // Make the buffers to hold the shards.
+        byte [][] shards = new byte [totalShards] [(int)shardSize];
+
+        // Fill in the data shards
+        for (int i = 0; i < totalDataShards; i++) {
+            System.arraycopy(allBytes, i * shardSize, shards[i], 0, shardSize);
+        }
+
+        ReedSolomon reedSolomon = new ReedSolomon(totalDataShards, totalParityShards, new OutputInputByteTableCodingLoop());
+        reedSolomon.encodeParity(shards, 0, shardSize);
+
+        // Write out the resulting files.
+        for (int i = 0; i < totalShards; i++) {
+            File outputFile = new File(
+                    inputFile.getParentFile(),
+                    inputFile.getName() + "." + i);
+            OutputStream out = new FileOutputStream(outputFile);
+            out.write(shards[i]);
+            out.close();
+            System.out.println("wrote " + outputFile);
+        }
+        */
 
         for (int i = 0; i < GENARO_MAX_VERIFY_BUCKET_ID; i++) {
             // verify bucket id

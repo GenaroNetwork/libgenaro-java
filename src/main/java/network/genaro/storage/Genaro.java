@@ -1342,6 +1342,10 @@ public final class Genaro {
                 ps.addAll(psr);
             }
 
+            if (ps.size() == 0) {
+                throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+            }
+
             return ps;
         });
     }

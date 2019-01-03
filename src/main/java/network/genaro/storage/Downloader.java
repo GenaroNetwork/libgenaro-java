@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.BufferedInputStream;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -43,6 +44,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeoutException;
+
+import com.backblaze.erasure.OutputInputByteTableCodingLoop;
+import com.backblaze.erasure.ReedSolomon;
 
 import network.genaro.storage.GenaroCallback.ResolveFileCallback;
 import static network.genaro.storage.Parameters.*;
@@ -73,6 +77,8 @@ public final class Downloader implements Runnable {
     private List<Pointer> pointers;
 
     private long shardSize;
+    private int totalPointers;
+    private int totalDataPointers;
     private int totalParityPointers;
 
     private FileChannel downFileChannel;
@@ -93,6 +99,11 @@ public final class Downloader implements Runnable {
 
     // not try to download from these farmers
     private String excludedFarmerIds;
+
+    // whether the shard is non-missing
+    private boolean[] shardPresent;
+    // whether need to use Reed-Solomon to recover file
+    private boolean isNeedRecover = false;
 
     // CachedThreadPool takes up too much memory，and it will cause memory overflow when high concurrency
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
@@ -287,6 +298,8 @@ public final class Downloader implements Runnable {
             pointer.getReport().setEnd(System.currentTimeMillis());
         }
 
+        shardPresent[pointer.getIndex()] = true;
+
         pointer.getReport().setCode(GENARO_REPORT_SUCCESS);
         pointer.getReport().setMessage(GENARO_REPORT_SHARD_DOWNLOADED);
 
@@ -459,6 +472,8 @@ public final class Downloader implements Runnable {
         if(file.isRs()) {
             if(missingPointers > totalParityPointers) {
                 canRecoverShards = false;
+            } else if (missingPointers > 0) {
+                isNeedRecover = true;
             }
         } else {
             if (missingPointers != 0) {
@@ -549,11 +564,18 @@ public final class Downloader implements Runnable {
             Genaro.logger.info(pointer.toBriefString());
             long size = pointer.getSize();
             totalBytes += size;
+            totalPointers += 1;
             if(!pointer.isParity()) {
+                totalDataPointers += 1;
                 fileSize += size;
             } else {
                 totalParityPointers += 1;
             }
+        }
+
+        shardPresent = new boolean[totalPointers];
+        for (int i = 0; i < totalPointers; i++) {
+            shardPresent[i] = false;
         }
 
         try {
@@ -674,9 +696,47 @@ public final class Downloader implements Runnable {
             return;
         }
 
-//        if(hasMissingShard) {
-//            //TODO: queue_recover_shards
-//        }
+        // use Reed-Solomon algorithm to recover file
+        if (isNeedRecover) {
+            MappedByteBuffer dataBuffer;
+            try {
+                // the 3rd parameter is not "totalBytes"
+                dataBuffer = downFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, totalPointers * shardSize);
+            } catch (IOException e) {
+                resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
+                return;
+            }
+
+            byte[][] shards = new byte[totalPointers][];
+            for (int i = 0; i < totalPointers; i++) {
+                // TODO: if the shard size > 2GB, size will be negative
+                int size = (int)pointers.get(i).getSize();
+                shards[i] = new byte[(int)shardSize];
+
+                // TODO: if i * (int)shardSize > 2GB, it will be negative
+                dataBuffer.position(i * (int)shardSize);
+                dataBuffer.get(shards[i], 0, size);
+            }
+
+            ReedSolomon reedSolomon = new ReedSolomon(totalDataPointers,
+                    totalParityPointers, new OutputInputByteTableCodingLoop());
+
+            try {
+                reedSolomon.decodeMissing(shards, shardPresent, 0, (int) shardSize);
+            } catch (Exception e) {
+                resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
+                return;
+            }
+
+            for (int i = 0; i < totalDataPointers; i++) {
+                // TODO: if the shard size > 2GB, size will be negative
+                int size = (int)pointers.get(i).getSize();
+
+                // TODO: if i * (int)shardSize > 2GB, it will be negative
+                dataBuffer.position(i * (int)shardSize);
+                dataBuffer.put(shards[i], 0, size);
+            }
+        }
 
         if(downloadedBytes.get() != totalBytes) {
             Genaro.logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
