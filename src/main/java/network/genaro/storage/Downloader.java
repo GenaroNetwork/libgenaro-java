@@ -488,11 +488,6 @@ public final class Downloader implements Runnable {
     }
 
     void start() {
-        // todo: test
-//        int b = Integer.MAX_VALUE;
-        int b = 1 << 30;
-        byte[] a = new byte[b];
-
         if(!overwrite && Files.exists(Paths.get(path))) {
             resolveFileCallback.onFail("File already exists");
             return;
@@ -704,22 +699,24 @@ public final class Downloader implements Runnable {
 
         // use Reed-Solomon algorithm to recover file
         if (isNeedRecover) {
-            MappedByteBuffer dataBuffer;
-            try {
-                // the 3rd parameter is not "totalBytes", but "totalPointers * shardSize"
-                dataBuffer = downFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, totalPointers * shardSize);
-            } catch (IOException e) {
+            // shard size >= 2GB is not supported for now
+            if (shardSize >= (1L << 31)) {
                 resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
                 return;
             }
 
             byte[][] shards = new byte[totalPointers][];
+            MappedByteBuffer[] dataBuffers = new MappedByteBuffer[totalPointers];
             for (int i = 0; i < totalPointers; i++) {
-                // TODO: if the shard size > 2GB, size will be negative
                 int size = (int)pointers.get(i).getSize();
 
-                // TODO: if i * (int)shardSize > 2GB, it will be negative
-                dataBuffer.position(i * (int)shardSize);
+                try {
+                    // the 3rd parameter is not "totalBytes", but "totalPointers * shardSize"
+                    dataBuffers[i] = downFileChannel.map(FileChannel.MapMode.READ_WRITE, i * shardSize, shardSize);
+                } catch (IOException e) {
+                    resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
+                    return;
+                }
 
                 try {
                     // here use "shardSize", not "size"
@@ -729,32 +726,29 @@ public final class Downloader implements Runnable {
                     return;
                 }
 
-                dataBuffer.get(shards[i], 0, size);
+                dataBuffers[i].get(shards[i], 0, size);
             }
 
             ReedSolomon reedSolomon = new ReedSolomon(totalDataPointers,
                     totalParityPointers, new OutputInputByteTableCodingLoop());
 
             try {
-                reedSolomon.decodeMissing(shards, shardPresent, 0, (int) shardSize);
+                reedSolomon.decodeMissing(shards, shardPresent, 0, (int)shardSize);
             } catch (Exception e) {
                 resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
                 return;
             }
 
             for (int i = 0; i < totalDataPointers; i++) {
-                // TODO: if the shard size > 2GB, size will be negative
                 int size = (int)pointers.get(i).getSize();
-
-                // TODO: if i * (int)shardSize > 2GB, it will be negative
-                dataBuffer.position(i * (int)shardSize);
-                dataBuffer.put(shards[i], 0, size);
+                dataBuffers[i].position(0);
+                dataBuffers[i].put(shards[i], 0, size);
             }
 
             // To speed up GC
             for (int i = 0; i < totalPointers; i++) {
                 shards[i] = null;
-                shards = null;
+                dataBuffers[i] = null;
             }
         }
 
