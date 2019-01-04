@@ -23,6 +23,7 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
+import java.io.RandomAccessFile;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
@@ -487,6 +488,11 @@ public final class Downloader implements Runnable {
     }
 
     void start() {
+        // todo: test
+//        int b = Integer.MAX_VALUE;
+        int b = 1 << 30;
+        byte[] a = new byte[b];
+
         if(!overwrite && Files.exists(Paths.get(path))) {
             resolveFileCallback.onFail("File already exists");
             return;
@@ -700,7 +706,7 @@ public final class Downloader implements Runnable {
         if (isNeedRecover) {
             MappedByteBuffer dataBuffer;
             try {
-                // the 3rd parameter is not "totalBytes"
+                // the 3rd parameter is not "totalBytes", but "totalPointers * shardSize"
                 dataBuffer = downFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, totalPointers * shardSize);
             } catch (IOException e) {
                 resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
@@ -711,10 +717,18 @@ public final class Downloader implements Runnable {
             for (int i = 0; i < totalPointers; i++) {
                 // TODO: if the shard size > 2GB, size will be negative
                 int size = (int)pointers.get(i).getSize();
-                shards[i] = new byte[(int)shardSize];
 
                 // TODO: if i * (int)shardSize > 2GB, it will be negative
                 dataBuffer.position(i * (int)shardSize);
+
+                try {
+                    // here use "shardSize", not "size"
+                    shards[i] = new byte[(int)shardSize];
+                } catch (OutOfMemoryError e) {
+                    resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
+                    return;
+                }
+
                 dataBuffer.get(shards[i], 0, size);
             }
 
@@ -735,6 +749,12 @@ public final class Downloader implements Runnable {
                 // TODO: if i * (int)shardSize > 2GB, it will be negative
                 dataBuffer.position(i * (int)shardSize);
                 dataBuffer.put(shards[i], 0, size);
+            }
+
+            // To speed up GC
+            for (int i = 0; i < totalPointers; i++) {
+                shards[i] = null;
+                shards = null;
             }
         }
 

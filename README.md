@@ -39,18 +39,6 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 
 ## Package
 
-### Maven
-
-```shell
-mvn clean package
-```
-
-or if you don't want to run the tests:
-
-```shell
-mvn clean package -Dmaven.test.skip=true
-```
-
 ### Gradle
 
 on Linux/Mac:
@@ -69,6 +57,18 @@ or if you want to use your local gardle:
 
 ```shell
 gradle build
+```
+
+### Maven
+
+```shell
+mvn clean package
+```
+
+or if you don't want to run the tests:
+
+```shell
+mvn clean package -Dmaven.test.skip=true
 ```
 
 PS: Will not package org.bouncycastle for signature issue.

@@ -24,6 +24,13 @@ public class ReedSolomon {
     private final byte [] [] parityRows;
 
     /**
+     * Creates a ReedSolomon codec with the default coding loop.
+     */
+    public static ReedSolomon create(int dataShardCount, int parityShardCount) {
+        return new ReedSolomon(dataShardCount, parityShardCount, new InputOutputByteTableCodingLoop());
+    }
+
+    /**
      * Initializes a new encoder/decoder, with a chosen coding loop.
      */
     public ReedSolomon(int dataShardCount, int parityShardCount, CodingLoop codingLoop) {
