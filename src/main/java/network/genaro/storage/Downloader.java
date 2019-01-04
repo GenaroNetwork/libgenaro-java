@@ -23,7 +23,6 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
-import java.io.RandomAccessFile;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
@@ -699,7 +698,7 @@ public final class Downloader implements Runnable {
 
         // use Reed-Solomon algorithm to recover file
         if (isNeedRecover) {
-            // shard size >= 2GB is not supported for now
+            // shard size >= 2GB(means that the file size > 16GB) is not supported for java version of libgenaro for now
             if (shardSize >= (1L << 31)) {
                 resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
                 return;

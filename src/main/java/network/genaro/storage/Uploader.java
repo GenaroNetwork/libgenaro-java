@@ -1,5 +1,7 @@
 package network.genaro.storage;
 
+import com.backblaze.erasure.OutputInputByteTableCodingLoop;
+import com.backblaze.erasure.ReedSolomon;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,10 +26,13 @@ import java.io.ByteArrayInputStream;
 
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -72,9 +77,12 @@ public final class Uploader implements Runnable {
     private String originPath;
     private String fileName;
     private String encryptedFileName;
+    private long originFileSize;
 
     // the .crypt file path
     private String cryptFilePath;
+    // the .parity file path
+    private String parityFilePath;
 
     private Genaro bridge;
     private String bucketId;
@@ -261,6 +269,36 @@ public final class Uploader implements Runnable {
         return true;
     }
 
+    private boolean createParityFile() {
+        parityFilePath = createTmpName(encryptedFileName, ".parity");
+        if(parityFilePath == null) {
+            return false;
+        }
+
+        long paritySize = totalShards * shardSize - originFileSize;
+
+        FileChannel parityFileChannel;
+        try {
+            parityFileChannel = FileChannel.open(Paths.get(parityFilePath), StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
+        } catch (IOException e) {
+            return false;
+        }
+
+        ReedSolomon reedSolomon = new ReedSolomon(totalDataShards,
+                totalParityShards, new OutputInputByteTableCodingLoop());
+
+        // todo: unfinished
+        byte[][] shards = new byte [totalShards][];
+        for (int i = 0; i < totalDataShards; i++) {
+
+        }
+
+//        downFileChannel.write(ByteBuffer.wrap(buff, 0, delta), shardSize * pointer.getIndex() + pointer.getDownloadedSize());
+
+        return true;
+    }
+
     private ShardTracker prepareFrame(final ShardTracker shard) {
         ShardMeta shardMeta = shard.getMeta();
         shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
@@ -293,8 +331,7 @@ public final class Uploader implements Runnable {
         }
 
         if (shard.getIndex() + 1 > totalDataShards) {
-            // TODO: Reed-solomn is not implemented yet
-            shard.setShardFile("xxxxxx");
+            shard.setShardFile(parityFilePath);
         } else {
             shard.setShardFile(cryptFilePath);
         }
@@ -303,7 +340,7 @@ public final class Uploader implements Runnable {
         int shardIndex = shard.getIndex();
         shardMeta.setIndex((shardIndex + 1 > totalDataShards) ? shardIndex - totalDataShards : shardIndex);
 
-        try (FileInputStream fin = new FileInputStream(cryptFilePath)) {
+        try (FileInputStream fin = new FileInputStream(shard.getShardFile())) {
             int readBytes;
             final int BYTES = AES_BLOCK_SIZE * 256;
 
@@ -678,20 +715,13 @@ public final class Uploader implements Runnable {
 
         Genaro.logger.info(String.format("[%s] Creating bucket entry... ", fileName));
 
-        String jsonStrBody;
-        if (!rs) {
-            jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}}",
-                    frameId, encryptedFileName, Hex.toHexString(index), hmacId);
-        } else {
+        String jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}",
+                frameId, encryptedFileName, Hex.toHexString(index), hmacId);
+        if (rs) {
             // TODO: ReedSolomn is not completed.
-            jsonStrBody = "";
-            //                  if (state->rs) {
-            //                      struct json_object *erasure = json_object_new_object();
-            //                      json_object *erasure_type = json_object_new_string("reedsolomon");
-            //                      json_object_object_add(erasure, "type", erasure_type);
-            //                      json_object_object_add(body, "erasure", erasure);
-            //                  }
+            jsonStrBody += String.format(", \"erasure\": {\"type\": \"reedsolomon\"}");
         }
+        jsonStrBody += "}";
 
         MediaType JSON = MediaType.parse("application/json; charset=utf-8");
         RequestBody body = RequestBody.create(JSON, jsonStrBody);
@@ -759,44 +789,26 @@ public final class Uploader implements Runnable {
         }
 
         // calculate shard size and count
-        long fileSize = originFile.length();
-        shardSize = determineShardSize(fileSize, 0);
+        long originFileSize = originFile.length();
+        shardSize = determineShardSize(originFileSize, 0);
         if (shardSize <= 0) {
             errorStatus = GENARO_FILE_SIZE_ERROR;
             storeFileCallback.onFail(genaroStrError(errorStatus));
             return;
         }
 
-        storeFileCallback.onBegin(fileSize);
+        storeFileCallback.onBegin(originFileSize);
 
-        totalDataShards = (int)Math.ceil((double)fileSize / shardSize);
+        // when file size <= MIN_SHARD_SIZE, there is only one shard, Reed-Solomon is unnecessary
+        // when shard size >= 2GB(means that the file size > 16GB), Reed-Solomon is not supported for java version of libgenaro for now
+        if (originFileSize <= MIN_SHARD_SIZE || shardSize >= (1L << 31)) {
+            rs = false;
+        }
+
+        totalDataShards = (int)Math.ceil((double)originFileSize / shardSize);
         totalParityShards = rs ? (int)Math.ceil((double)totalDataShards * 2.0 / 3.0) : 0;
         totalShards = totalDataShards + totalParityShards;
-        totalBytes = fileSize + totalParityShards * shardSize;
-
-        /*
-        // Make the buffers to hold the shards.
-        byte [][] shards = new byte [totalShards] [(int)shardSize];
-
-        // Fill in the data shards
-        for (int i = 0; i < totalDataShards; i++) {
-            System.arraycopy(allBytes, i * shardSize, shards[i], 0, shardSize);
-        }
-
-        ReedSolomon reedSolomon = new ReedSolomon(totalDataShards, totalParityShards, new OutputInputByteTableCodingLoop());
-        reedSolomon.encodeParity(shards, 0, shardSize);
-
-        // Write out the resulting files.
-        for (int i = 0; i < totalShards; i++) {
-            File outputFile = new File(
-                    inputFile.getParentFile(),
-                    inputFile.getName() + "." + i);
-            OutputStream out = new FileOutputStream(outputFile);
-            out.write(shards[i]);
-            out.close();
-            System.out.println("wrote " + outputFile);
-        }
-        */
+        totalBytes = originFileSize + totalParityShards * shardSize;
 
         for (int i = 0; i < GENARO_MAX_VERIFY_BUCKET_ID; i++) {
             // verify bucket id
@@ -878,6 +890,12 @@ public final class Uploader implements Runnable {
         if(!createEncryptedFile()) {
             stop();
             storeFileCallback.onFail(genaroStrError(GENARO_FILE_ENCRYPTION_ERROR));
+            return;
+        }
+
+        if (rs && !createParityFile()) {
+            stop();
+            storeFileCallback.onFail(genaroStrError(GENARO_FILE_PARITY_ERROR));
             return;
         }
 
@@ -994,6 +1012,15 @@ public final class Uploader implements Runnable {
                 storeFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
             }
             return;
+        } finally {
+            try {
+                Files.deleteIfExists(Paths.get(cryptFilePath));
+                if (rs) {
+                    Files.deleteIfExists(Paths.get(parityFilePath));
+                }
+            } catch (IOException e) {
+                // do nothing
+            }
         }
 
         // check if cancel() is called
