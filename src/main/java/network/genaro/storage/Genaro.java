@@ -1041,12 +1041,12 @@ public final class Genaro {
             }
             String pubKey = getPublicKeyHexString();
             Request request = new Request.Builder()
-                .tag("getFileInfo")
-                .url(bridgeUrl + path)
-                .header("x-signature", signature)
-                .header("x-pubkey", pubKey)
-                .get()
-                .build();
+                    .tag("getFileInfo")
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
 
             OkHttpClient okHttpClient;
             if(downloader != null) {
@@ -1062,7 +1062,7 @@ public final class Genaro {
                 if(code == 403 || code == 401) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
                 } else if (code == 404 || code == 400) {
-                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                    throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
                 } else if(code == 500) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
                 } else if (code != 200 && code != 304){
@@ -1072,20 +1072,24 @@ public final class Genaro {
                 ObjectMapper om = new ObjectMapper();
 
                 GenaroFile file;
-                String realName;
                 try {
                     file = om.readValue(responseBody, GenaroFile.class);
-                    realName = CryptoUtil.decryptMetaHmacSha512(file.getFilename(), getPrivateKey(), Hex.decode(bucketId));
                 } catch (Exception e) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_FILEINFO_ERROR));
                 }
 
-                file.setFilename(realName);
+                String realName = file.getFilename();
+                try {
+                    realName = CryptoUtil.decryptMetaHmacSha512(realName, getPrivateKey(), Hex.decode(bucketId));
+                    file.setFilename(realName);
+                } catch (Exception e) {
+                    // do nothing
+                }
 
                 String erasureType = file.getErasure().getType();
                 if (erasureType != null) {
                     if (erasureType.equals("reedsolomon")) {
-                         file.setRs(true);
+                        file.setRs(true);
                     } else {
                         throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_UNSUPPORTED_ERASURE));
                     }
@@ -1234,15 +1238,15 @@ public final class Genaro {
 
                 GenaroFile[] files = om.readValue(responseBody, GenaroFile[].class);
 
-                try {
-                    // decrypt
-                    for (GenaroFile f : files) {
-                        String realName = CryptoUtil.decryptMetaHmacSha512(f.getFilename(), getPrivateKey(), Hex.decode(bucketId));
+                // decrypt
+                for (GenaroFile f : files) {
+                    String realName = f.getFilename();
+                    try {
+                        realName = CryptoUtil.decryptMetaHmacSha512(realName, getPrivateKey(), Hex.decode(bucketId));
                         f.setFilename(realName);
+                    } catch (Exception e) {
+                        // do nothing
                     }
-                } catch (Exception e) {
-                    callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                    return null;
                 }
 
                 callback.onFinish(files);
