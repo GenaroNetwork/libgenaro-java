@@ -353,7 +353,6 @@ final class Cli {
             fu.join();
             System.exit(0);
         } else if (command.equals("list-mirrors")) {
-            //TODO:
             if (args.length < commandIndex + 3) {
                 System.out.println("Missing arguments, expected: <bucket-id> <file-id>");
                 System.exit(0);

@@ -227,6 +227,7 @@ public final class Downloader implements Runnable {
                 byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
 
                 String downloadedHash = base16.toString(prehashRipemd160).toLowerCase();
+                // check the downloaded data
                 if(pointer.getDownloadedSize() != pointer.getSize() || !downloadedHash.equals(pointer.getHash())) {
                     fail(response);
                     super.completeExceptionally(new GenaroRuntimeException(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR)));
@@ -590,7 +591,7 @@ public final class Downloader implements Runnable {
         resolveFileCallback.onProgress(0.0f);
 
         // TODO: seems terrible for so many duplicate codes
-        CompletableFuture<Void>[] downFutures = pointers
+        CompletableFuture[] downFutures = pointers
             .parallelStream()
             .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
             .map(future -> future.thenApplyAsync(this::sendExchangeReport, downloaderExecutor))

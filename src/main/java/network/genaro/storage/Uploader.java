@@ -27,11 +27,11 @@ import java.io.ByteArrayInputStream;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -84,6 +84,9 @@ public final class Uploader implements Runnable {
     // the .parity file path
     private String parityFilePath;
 
+    private FileChannel cryptChannel;
+    private FileChannel parityChannel;
+
     private Genaro bridge;
     private String bucketId;
     private File originFile;
@@ -106,8 +109,6 @@ public final class Uploader implements Runnable {
 
     private byte[] index;
     private byte[] fileKey;
-
-    private int errorStatus;
 
     // not try to upload to these farmers
     private List<String> excludedFarmerIds = new ArrayList<>();
@@ -261,8 +262,11 @@ public final class Uploader implements Runnable {
             if(cryptFilePath == null) {
                 return false;
             }
-            Files.copy(cypherIn, Paths.get(cryptFilePath), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
+
+            cryptChannel = FileChannel.open(Paths.get(cryptFilePath), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
+            cryptChannel.transferFrom(Channels.newChannel(cypherIn), 0, originFileSize);
+        } catch (Exception e) {
             return false;
         }
 
@@ -275,26 +279,36 @@ public final class Uploader implements Runnable {
             return false;
         }
 
-        long paritySize = totalShards * shardSize - originFileSize;
-
-        FileChannel parityFileChannel;
         try {
-            parityFileChannel = FileChannel.open(Paths.get(parityFilePath), StandardOpenOption.CREATE,
+            parityChannel = FileChannel.open(Paths.get(parityFilePath), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
-        } catch (IOException e) {
+
+            ReedSolomon reedSolomon = new ReedSolomon(totalDataShards,
+                    totalParityShards, new OutputInputByteTableCodingLoop());
+
+            byte[][] shards = new byte [totalShards][];
+
+            ByteBuffer readBuffer = ByteBuffer.allocate((int)shardSize);
+            for (int i = 0; i < totalDataShards; i++) {
+                int readBytes = cryptChannel.read(readBuffer, shardSize * i);
+                readBuffer.flip();
+                shards[i] = new byte[(int)shardSize];
+                readBuffer.get(shards[i], 0, readBytes);
+                readBuffer.flip();
+            }
+
+            for (int i = totalDataShards; i < totalShards; i++) {
+                shards[i] = new byte[(int)shardSize];
+            }
+
+            reedSolomon.encodeParity(shards, 0, (int)shardSize);
+
+            for (int i = totalDataShards; i < totalShards; i++) {
+                parityChannel.write(ByteBuffer.wrap(shards[i], 0, (int)shardSize));
+            }
+        } catch (Exception e) {
             return false;
         }
-
-        ReedSolomon reedSolomon = new ReedSolomon(totalDataShards,
-                totalParityShards, new OutputInputByteTableCodingLoop());
-
-        // todo: unfinished
-        byte[][] shards = new byte [totalShards][];
-        for (int i = 0; i < totalDataShards; i++) {
-
-        }
-
-//        downFileChannel.write(ByteBuffer.wrap(buff, 0, delta), shardSize * pointer.getIndex() + pointer.getDownloadedSize());
 
         return true;
     }
@@ -330,30 +344,28 @@ public final class Uploader implements Runnable {
             firstSha256ForLeaf[i].update(shardMeta.getChallenges()[i]);
         }
 
-        if (shard.getIndex() + 1 > totalDataShards) {
-            shard.setShardFile(parityFilePath);
+        if (shard.getIndex() < totalDataShards) {
+            shard.setShardChannel(cryptChannel);
         } else {
-            shard.setShardFile(cryptFilePath);
+            shard.setShardChannel(parityChannel);
         }
 
         // Reset shard index when using parity shards
         int shardIndex = shard.getIndex();
-        shardMeta.setIndex((shardIndex + 1 > totalDataShards) ? shardIndex - totalDataShards : shardIndex);
+        shardMeta.setIndex((shardIndex >= totalDataShards) ? shardIndex - totalDataShards : shardIndex);
 
-        try (FileInputStream fin = new FileInputStream(shard.getShardFile())) {
+        try {
             int readBytes;
             final int BYTES = AES_BLOCK_SIZE * 256;
-
             long totalRead = 0;
-
             long position = shardMeta.getIndex() * shardSize;
 
-            byte[] readData = new byte[BYTES];
-            do {
-                // set file position
-                fin.getChannel().position(position);
+            ByteBuffer readBuffer = ByteBuffer.allocate(BYTES);
+            FileChannel shardChannel = shard.getShardChannel();
 
-                readBytes = fin.read(readData, 0, BYTES);
+            do {
+                readBytes = shardChannel.read(readBuffer, position);
+                readBuffer.flip();
 
                 // end of file
                 if (readBytes == -1) {
@@ -361,13 +373,18 @@ public final class Uploader implements Runnable {
                 }
 
                 totalRead += readBytes;
-                position += readBytes;
+                byte[] readData = new byte[readBytes];
+
+                readBuffer.get(readData, 0, readBytes);
+                readBuffer.flip();
 
                 shardHashMd.update(readData, 0, readBytes);
 
                 for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
                     firstSha256ForLeaf[i].update(readData, 0, readBytes);
                 }
+
+                position += readBytes;
             } while (totalRead < shardSize);
 
             shardMeta.setSize(totalRead);
@@ -382,7 +399,8 @@ public final class Uploader implements Runnable {
         byte[] prehashSha256 = shardHashMd.digest();
         byte[] prehashRipemd160 = CryptoUtil.ripemd160(prehashSha256);
 
-        shardMeta.setHash(base16.toString(prehashRipemd160).toLowerCase());
+        String shardHash = base16.toString(prehashRipemd160).toLowerCase();
+        shardMeta.setHash(shardHash);
 
         byte[] preleafSha256;
         byte[] preleafRipemd160;
@@ -505,19 +523,6 @@ public final class Uploader implements Runnable {
     }
 
     private ShardTracker pushShard(final ShardTracker shard) {
-        //                  // Reset shard index when using parity shards
-//                  req->shard_index = (index + 1 > state->total_data_shards) ? index - state->total_data_shards: index;
-//
-//                  // make sure we switch between parity and data shards files.
-//                  // When using Reed solomon must also read from encrypted file
-//                  // rather than the original file for the data
-//                  if (index + 1 > state->total_data_shards) {
-//                      req->shard_file = state->parity_file;
-//                  } else if (state->rs) {
-//                      req->shard_file = state->encrypted_file;
-//                  } else {
-//                      req->shard_file = state->original_file;
-//                  }
         if (shard.getStatus() == SHARD_PUSH_SUCCESS) {
             shard.setHasTriedToPush(false);
             return shard;
@@ -533,29 +538,24 @@ public final class Uploader implements Runnable {
         String farmerPort = farmer.getPort();
         String metaHash = shard.getMeta().getHash();
         long metaSize = shard.getMeta().getSize();
-        String shardFileStr = shard.getShardFile();
+        FileChannel shardChannel = shard.getShardChannel();
 
         long filePosition = shardMeta.getIndex() * shardSize;
         String token = shard.getPointer().getToken();
 
-        File shardFile = new File(shardFileStr);
-        final byte[] mBlock;
+        ByteBuffer dataBuffer = ByteBuffer.allocate((int)metaSize);
         try {
-            mBlock = FileUtils.getBlock(filePosition, shardFile, (int)metaSize);
+            shardChannel.read(dataBuffer, filePosition);
         } catch (IOException e) {
             if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
             }
             return shard;
         }
+        dataBuffer.flip();
 
-        if (mBlock == null) {
-            if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
-                throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
-            }
-            return shard;
-        }
-
+        byte[] mBlock = new byte[(int)metaSize];
+        dataBuffer.get(mBlock);
         UploadRequestBody uploadRequestBody = new UploadRequestBody(new ByteArrayInputStream(mBlock),
                 "application/octet-stream; charset=utf-8", new UploadRequestBody.ProgressListener() {
             @Override
@@ -718,7 +718,6 @@ public final class Uploader implements Runnable {
         String jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}",
                 frameId, encryptedFileName, Hex.toHexString(index), hmacId);
         if (rs) {
-            // TODO: ReedSolomn is not completed.
             jsonStrBody += String.format(", \"erasure\": {\"type\": \"reedsolomon\"}");
         }
         jsonStrBody += "}";
@@ -789,19 +788,21 @@ public final class Uploader implements Runnable {
         }
 
         // calculate shard size and count
-        long originFileSize = originFile.length();
+        originFileSize = originFile.length();
         shardSize = determineShardSize(originFileSize, 0);
         if (shardSize <= 0) {
-            errorStatus = GENARO_FILE_SIZE_ERROR;
-            storeFileCallback.onFail(genaroStrError(errorStatus));
+            storeFileCallback.onFail(genaroStrError(GENARO_FILE_SIZE_ERROR));
             return;
         }
 
-        storeFileCallback.onBegin(originFileSize);
+        // when shard size >= 2GB(means that the file size > 16GB), it is not supported for java version of libgenaro for now
+        if (shardSize >= (1L << 31)) {
+            storeFileCallback.onFail(genaroStrError(GENARO_FILE_SIZE_ERROR));
+            return;
+        }
 
         // when file size <= MIN_SHARD_SIZE, there is only one shard, Reed-Solomon is unnecessary
-        // when shard size >= 2GB(means that the file size > 16GB), Reed-Solomon is not supported for java version of libgenaro for now
-        if (originFileSize <= MIN_SHARD_SIZE || shardSize >= (1L << 31)) {
+        if (originFileSize <= MIN_SHARD_SIZE) {
             rs = false;
         }
 
@@ -809,6 +810,8 @@ public final class Uploader implements Runnable {
         totalParityShards = rs ? (int)Math.ceil((double)totalDataShards * 2.0 / 3.0) : 0;
         totalShards = totalDataShards + totalParityShards;
         totalBytes = originFileSize + totalParityShards * shardSize;
+
+        storeFileCallback.onBegin(originFileSize);
 
         for (int i = 0; i < GENARO_MAX_VERIFY_BUCKET_ID; i++) {
             // verify bucket id
@@ -952,49 +955,49 @@ public final class Uploader implements Runnable {
 
         // TODO: seems terrible for so many duplicate codes
         CompletableFuture[] upFutures = shards
-            .parallelStream()
-            .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
-            // 1st pushFrame
-            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(this::sendExchangeReport, uploaderExecutor))
-            // 2nd pushFrame
-            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.getHasTriedToPush()) {
-                    sendExchangeReport(shard);
-                }
-                return shard;
-            }, uploaderExecutor))
-            // 3rd pushFrame
-            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.getHasTriedToPush()) {
-                    sendExchangeReport(shard);
-                }
-                return shard;
-            }, uploaderExecutor))
-            // 4th pushFrame
-            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.getHasTriedToPush()) {
-                    sendExchangeReport(shard);
-                }
-                return shard;
-            }, uploaderExecutor))
-            // 5th pushFrame
-            .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
-            .map(future -> future.thenApplyAsync(shard -> {
-                if (shard.getHasTriedToPush()) {
-                    sendExchangeReport(shard);
-                }
-                return shard;
-            }, uploaderExecutor))
-            .toArray(CompletableFuture[]::new);
+                .parallelStream()
+                .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
+                // 1st pushFrame
+                .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::sendExchangeReport, uploaderExecutor))
+                // 2nd pushFrame
+                .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(shard -> {
+                    if (shard.getHasTriedToPush()) {
+                        sendExchangeReport(shard);
+                    }
+                    return shard;
+                }, uploaderExecutor))
+                // 3rd pushFrame
+                .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(shard -> {
+                    if (shard.getHasTriedToPush()) {
+                        sendExchangeReport(shard);
+                    }
+                    return shard;
+                }, uploaderExecutor))
+                // 4th pushFrame
+                .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(shard -> {
+                    if (shard.getHasTriedToPush()) {
+                        sendExchangeReport(shard);
+                    }
+                    return shard;
+                }, uploaderExecutor))
+                // 5th pushFrame
+                .map(future -> future.thenApplyAsync(this::pushFrame, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(this::pushShard, uploaderExecutor))
+                .map(future -> future.thenApplyAsync(shard -> {
+                    if (shard.getHasTriedToPush()) {
+                        sendExchangeReport(shard);
+                    }
+                    return shard;
+                }, uploaderExecutor))
+                .toArray(CompletableFuture[]::new);
 
         futureAllFromPrepareFrame = CompletableFuture.allOf(upFutures);
 
@@ -1014,9 +1017,9 @@ public final class Uploader implements Runnable {
             return;
         } finally {
             try {
-                Files.deleteIfExists(Paths.get(cryptFilePath));
+                cryptChannel.close();
                 if (rs) {
-                    Files.deleteIfExists(Paths.get(parityFilePath));
+                    parityChannel.close();
                 }
             } catch (IOException e) {
                 // do nothing

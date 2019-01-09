@@ -14,12 +14,12 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - Retry several times when upload/download is failed
 - Seed based file encryption key for portability between devices
 - File integrity and authenticity verified with HMAC-SHA512
+- Erasure encoding with reed solomon for data reliability
 - Exchange report with bridge
 - Command line interface
 
 ## Feature Todo
 
-- Erasure encoding with reed solomon for data reliability
 - File encryption key be provided to decrypt encrypted file
 - String literal be encrypted with AES-256-CTR and directly stored to a bucket
 

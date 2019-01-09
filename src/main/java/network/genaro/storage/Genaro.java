@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
+import java.nio.channels.FileChannel;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.ArrayList;
@@ -476,7 +477,8 @@ final class ShardTracker {
     private FarmerPointer pointer;
     private ShardMeta meta;
     private long uploadedSize;
-    private String shardFile;
+
+    private FileChannel shardChannel;
 
     // exchange report with bridge
     private GenaroExchangeReport report;
@@ -519,10 +521,6 @@ final class ShardTracker {
         this.uploadedSize = uploadedSize;
     }
 
-    String getShardFile() { return shardFile; }
-
-    void setShardFile(String shardFile) { this.shardFile = shardFile; }
-
     GenaroExchangeReport getReport() {
         return report;
     }
@@ -553,6 +551,14 @@ final class ShardTracker {
 
     void setStatus(ShardStatus status) {
         this.status = status;
+    }
+
+    public FileChannel getShardChannel() {
+        return shardChannel;
+    }
+
+    public void setShardChannel(FileChannel shardChannel) {
+        this.shardChannel = shardChannel;
     }
 }
 
