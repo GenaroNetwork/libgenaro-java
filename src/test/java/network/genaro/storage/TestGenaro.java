@@ -7,7 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import network.genaro.storage.GenaroCallback.*;
+import network.genaro.storage.GenaroCallback.GetBucketsCallback;
+import network.genaro.storage.GenaroCallback.DeleteBucketCallback;
+import network.genaro.storage.GenaroCallback.RenameBucketCallback;
+import network.genaro.storage.GenaroCallback.ListFilesCallback;
+import network.genaro.storage.GenaroCallback.ListMirrorsCallback;
+import network.genaro.storage.GenaroCallback.DeleteFileCallback;
+import network.genaro.storage.GenaroCallback.ResolveFileCallback;
+import network.genaro.storage.GenaroCallback.StoreFileCallback;
 
 @Test()
 public final class TestGenaro {
@@ -219,7 +226,7 @@ public final class TestGenaro {
     }
 
     public void testResolveFile() throws Exception {
-        Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111", 4);
+        Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
 
 //        Downloader downloader = api.resolveFile(testbucketId, "5c2df645926e422b70d1d319", "/Users/dingyi/Genaro/test/download/Parallels_Desktop_13.3.1_TNT.dmg", true, new ResolveFileCallback() {
         Downloader downloader = api.resolveFile(testbucketId, "5c36b8ab926e422b70d1df94", "/Users/dingyi/Genaro/test/download/1.txt", true, new ResolveFileCallback() {

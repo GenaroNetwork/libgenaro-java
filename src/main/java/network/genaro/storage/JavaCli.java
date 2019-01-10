@@ -14,7 +14,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import network.genaro.storage.GenaroCallback.*;
+import network.genaro.storage.GenaroCallback.GetBucketsCallback;
+import network.genaro.storage.GenaroCallback.DeleteBucketCallback;
+import network.genaro.storage.GenaroCallback.RenameBucketCallback;
+import network.genaro.storage.GenaroCallback.ListFilesCallback;
+import network.genaro.storage.GenaroCallback.ListMirrorsCallback;
+import network.genaro.storage.GenaroCallback.DeleteFileCallback;
+import network.genaro.storage.GenaroCallback.ResolveFileCallback;
+import network.genaro.storage.GenaroCallback.StoreFileCallback;
 
 final class Cli {
     private final static String CLI_VERSION = "libgenaro-java-1.0.0";

@@ -20,7 +20,10 @@ import org.testng.annotations.Test;
 
 import org.bouncycastle.util.encoders.Hex;
 
-import org.web3j.crypto.*;
+import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.MnemonicUtils;
+import org.web3j.crypto.Wallet;
+import org.web3j.crypto.WalletFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
@@ -190,7 +193,7 @@ public final class TestCryptoUtil {
         System.out.println(sig);
     }
 
-    public void testAesCtr() throws Exception {
+//    public void testAesCtr() throws Exception {
         // make Iv byte[]
 //        byte[] iv  = Hex.decode("f123abc2f123abcf2123abc2f123abc2");
 //        // make key
@@ -204,7 +207,7 @@ public final class TestCryptoUtil {
 //
 //
 //        System.out.println(deMessage);
-    }
+//    }
 
     public void testGetPrivateKey() throws Exception {
         Genaro api = new Genaro(null, V3JSON, "lgygn_9982");

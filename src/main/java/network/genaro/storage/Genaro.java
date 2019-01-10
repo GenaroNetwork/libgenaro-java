@@ -42,7 +42,14 @@ import org.bouncycastle.util.encoders.Hex;
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Pointer.PointerStatus.*;
-import network.genaro.storage.GenaroCallback.*;
+import network.genaro.storage.GenaroCallback.GetBucketsCallback;
+import network.genaro.storage.GenaroCallback.DeleteBucketCallback;
+import network.genaro.storage.GenaroCallback.RenameBucketCallback;
+import network.genaro.storage.GenaroCallback.ListFilesCallback;
+import network.genaro.storage.GenaroCallback.ListMirrorsCallback;
+import network.genaro.storage.GenaroCallback.DeleteFileCallback;
+import network.genaro.storage.GenaroCallback.ResolveFileCallback;
+import network.genaro.storage.GenaroCallback.StoreFileCallback;
 
 final class ShardMeta {
     private String hash;
