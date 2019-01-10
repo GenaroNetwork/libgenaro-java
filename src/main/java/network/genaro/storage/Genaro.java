@@ -297,7 +297,7 @@ final class Pointer {
     private int index;
     private String hash;
     private long size;
-    boolean parity;
+    private boolean parity;
 
     // token & operation & Farmer will be null if no farmer found
     private String token;

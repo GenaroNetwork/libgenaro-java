@@ -564,9 +564,14 @@ public final class Uploader implements Runnable {
                 uploadedBytes.addAndGet(delta);
                 deltaUploaded.addAndGet(delta);
 
-                if (deltaUploaded.floatValue() / totalBytes >= 0.001) {  // call onProgress every 0.1%
+                if (deltaUploaded.floatValue() / totalBytes >= 0.001f) {  // call onProgress every 0.1%
                     storeFileCallback.onProgress(uploadedBytes.floatValue() / totalBytes);
                     deltaUploaded.set(0);
+                } else if (uploadedBytes.longValue() == totalBytes) {
+                    storeFileCallback.onProgress(1.0f);
+                    deltaUploaded.set(0);
+                } else {
+                    // do nothing
                 }
             }
         });
@@ -597,7 +602,7 @@ public final class Uploader implements Runnable {
                 long uploaded = shard.getUploadedSize();
                 long total = shard.getMeta().getSize();
                 if (uploaded != total) {
-                    Genaro.logger.error(String.format("Shard index %d, uploaded bytes: %d, total bytes: %d", shard.getIndex(), uploaded, total));
+                    Genaro.logger.warn(String.format("Shard index %d, uploaded bytes: %d, total bytes: %d", shard.getIndex(), uploaded, total));
                     if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
                         throw new GenaroRuntimeException(genaroStrError(GENARO_FARMER_INTEGRITY_ERROR));
                     }
@@ -750,7 +755,7 @@ public final class Uploader implements Runnable {
 
                     if (code != 200 && code != 201) {
                         if (bodyNode.has("error")) {
-                            Genaro.logger.error(bodyNode.get("error").asText());
+                            Genaro.logger.warn(bodyNode.get("error").asText());
                         }
                         throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
                     }
@@ -1006,15 +1011,21 @@ public final class Uploader implements Runnable {
         } catch (Exception e) {
             stop();
             if(e instanceof CancellationException) {
-                storeFileCallback.onCancel();
+                if (isCanceled) {
+                    storeFileCallback.onCancel();
+                    return;
+                } else {
+                    // do nothing
+                }
             } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                 storeFileCallback.onFail(e.getCause().getMessage());
+                return;
             } else {
                 Genaro.logger.warn("Warn: Would not get here");
                 e.printStackTrace();
                 storeFileCallback.onFail(genaroStrError(GENARO_UNKNOWN_ERROR));
+                return;
             }
-            return;
         } finally {
             try {
                 cryptChannel.close();
