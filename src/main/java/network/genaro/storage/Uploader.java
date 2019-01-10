@@ -571,7 +571,7 @@ public final class Uploader implements Runnable {
                 if (deltaUploaded.floatValue() / totalBytes >= 0.001f) {  // call onProgress every 0.1%
                     storeFileCallback.onProgress(uploadedBytes.floatValue() / totalBytes);
                     deltaUploaded.set(0);
-                } else if (uploadedBytes.longValue() == totalBytes) {
+                } else if (uploadedBytes.get() == totalBytes) {
                     storeFileCallback.onProgress(1.0f);
                     deltaUploaded.set(0);
                 } else {

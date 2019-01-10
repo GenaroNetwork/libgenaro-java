@@ -212,7 +212,7 @@ public final class Downloader implements Runnable {
                     if (deltaDownloaded.floatValue() / totalBytes >= 0.001f) {  // call onProgress every 0.1%
                         resolveFileCallback.onProgress(downloadedBytes.floatValue() / totalBytes);
                         deltaDownloaded.set(0);
-                    } else if (downloadedBytes.longValue() == totalBytes) {
+                    } else if (downloadedBytes.get() == totalBytes) {
                         resolveFileCallback.onProgress(1.0f);
                         deltaDownloaded.set(0);
                     } else {
@@ -716,6 +716,11 @@ public final class Downloader implements Runnable {
 
         // use Reed-Solomon algorithm to recover file
         if (file.isRs()) {
+            // set the progress directly to 100%
+            if (downloadedBytes.get() != totalBytes) {
+                resolveFileCallback.onProgress(1.0f);
+            }
+
             // shard size >= 2GB(means that the file size > 16GB) is not supported for java version of libgenaro for now
             if (shardSize >= (1L << 31)) {
                 resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
@@ -767,10 +772,10 @@ public final class Downloader implements Runnable {
                 shards[i] = null;
                 dataBuffers[i] = null;
             }
-        }
-
-        if(downloadedBytes.get() != totalBytes) {
+        } else if(downloadedBytes.get() != totalBytes) {
             Genaro.logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
+        } else {
+            // do nothing
         }
 
         try {
