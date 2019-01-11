@@ -744,7 +744,7 @@ public final class Downloader implements Runnable {
                     // here use "shardSize", not "size"
                     shards[i] = new byte[(int)shardSize];
                 } catch (OutOfMemoryError e) {
-                    resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
+                    resolveFileCallback.onFail(genaroStrError(GENARO_OUTOFMEMORY_ERROR));
                     return;
                 }
 
@@ -787,7 +787,7 @@ public final class Downloader implements Runnable {
         }
 
         // decryption:
-        Genaro.logger.info("Download complete, begin to decrypt...");
+        Genaro.logger.info("Decrypt file...");
         byte[] bucketId = Hex.decode(file.getBucket());
         byte[] index   = Hex.decode(file.getIndex());
 
@@ -846,7 +846,7 @@ public final class Downloader implements Runnable {
             Genaro.logger.warn("File close exception");
         }
 
-        Genaro.logger.info("Decrypt complete, download is success");
+        Genaro.logger.info("Decrypt file success, download is completed");
 
         // download success
         resolveFileCallback.onFinish();
