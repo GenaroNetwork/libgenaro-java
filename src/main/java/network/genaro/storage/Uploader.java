@@ -1092,6 +1092,9 @@ public final class Uploader implements Runnable {
             return;
         }
 
+        // it's not necessary, because 1.0f is already passed to onProgress
+        // storeFileCallback.onProgress(1.0f);
+
         storeFileCallback.onFinish(fileId);
     }
 
