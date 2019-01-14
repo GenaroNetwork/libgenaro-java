@@ -23,6 +23,10 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - File encryption key be provided to decrypt encrypted file
 - String literal be encrypted with AES-256-CTR and directly stored to a bucket
 
+## Issues
+
+- Upload or download file of large size(maybe 500mb or even smaller) may cause an OutOfMemoryError
+
 ## 3rd party dependencies
 
 - [Bouncy Castle](https://www.bouncycastle.org/java.html) for crypto algorithms.

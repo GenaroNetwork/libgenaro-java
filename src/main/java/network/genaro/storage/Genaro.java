@@ -740,6 +740,8 @@ public final class Genaro {
                 return "No errors";
             case GENARO_ALGORITHM_ERROR:
                 return "Algorithm error";
+            case GENARO_OUTOFMEMORY_ERROR:
+                return "Out of memory error";
             case GENARO_UNKNOWN_ERROR:
                 // fall through
             default:
@@ -786,11 +788,7 @@ public final class Genaro {
                         "Version:     " + version + "\n" +
                         "Host:        " + host + "\n";
             } catch (IOException e) {
-                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
-                } else {
-                    throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                }
+                throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
             }
         });
 
@@ -842,8 +840,7 @@ public final class Genaro {
                 Bucket bucket = om.readValue(responseBody, Bucket.class);
                 return bucket;
             } catch (IOException e) {
-                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getBucket") will cause an SocketException
-                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                if (uploader.isCanceled()) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 } else {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
@@ -1110,8 +1107,7 @@ public final class Genaro {
 
                 return file;
             } catch (IOException e) {
-                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "getFileInfo") will cause an SocketException
-                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                if (downloader.isCanceled()) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 } else {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
@@ -1437,8 +1433,7 @@ public final class Genaro {
 
                 return pointers;
             } catch (IOException e) {
-                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestPointersRaw") will cause an SocketException
-                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                if (downloader.isCanceled()) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 } else {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
@@ -1495,8 +1490,7 @@ public final class Genaro {
                     throw new GenaroRuntimeException("Request file-ids failed");
                 }
             } catch (IOException e) {
-                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "isFileExist") will cause an SocketException
-                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                if (uploader.isCanceled()) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 } else {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
@@ -1559,8 +1553,7 @@ public final class Genaro {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_FRAME_ERROR));
                 }
             } catch (IOException e) {
-                // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "requestNewFrame") will cause an SocketException
-                if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                if (uploader.isCanceled()) {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
                 } else {
                     throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));

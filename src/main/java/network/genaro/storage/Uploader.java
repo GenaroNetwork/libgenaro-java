@@ -154,6 +154,10 @@ public final class Uploader implements Runnable {
         this(bridge, rs, filePath, fileName, bucketId, new StoreFileCallback() {});
     }
 
+    public boolean isCanceled() {
+        return isCanceled;
+    }
+
     void setFutureGetBucket(CompletableFuture<Bucket> futureGetBucket) {
         this.futureGetBucket = futureGetBucket;
     }
@@ -407,7 +411,7 @@ public final class Uploader implements Runnable {
 
             shardMeta.setSize(totalRead);
         } catch (IOException e) {
-            if (e instanceof ClosedByInterruptException) {
+            if (isCanceled) {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
@@ -515,8 +519,7 @@ public final class Uploader implements Runnable {
                     FarmerPointer fp = om.readValue(responseBody, FarmerPointer.class);
                     shard.setPointer(fp);
                 } catch (IOException e) {
-                    // BasicUtil.cancelOkHttpCallWithTag(okHttpClient, "pushFrame") will cause an SocketException
-                    if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                    if (isCanceled) {
                         // if it's canceled, do not try again
                         i = GENARO_MAX_PUSH_SHARD - 1;
                         throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
@@ -642,7 +645,7 @@ public final class Uploader implements Runnable {
         } catch (IOException e) {
             uploadedBytes.addAndGet(-shard.getUploadedSize());
             shard.setUploadedSize(0);
-            if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+            if (isCanceled) {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else if (e instanceof SocketTimeoutException) {
                 if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
@@ -788,7 +791,7 @@ public final class Uploader implements Runnable {
 
                     fileId = bodyNode.get("id").asText();
                 } catch (IOException e) {
-                    if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
+                    if (isCanceled) {
                         // if it's canceled, do not try again
                         i = GENARO_MAX_CREATE_BUCKET_ENTRY - 1;
                         throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
@@ -983,7 +986,7 @@ public final class Uploader implements Runnable {
         storeFileCallback.onProgress(0.0f);
 
         // TODO: seems terrible for so many duplicate codes
-        CompletableFuture[] upFutures = shards
+        CompletableFuture<Void>[] upFutures = shards
                 .parallelStream()
                 .map(shard -> CompletableFuture.supplyAsync(() -> prepareFrame(shard), uploaderExecutor))
                 // 1st pushFrame
@@ -1078,12 +1081,12 @@ public final class Uploader implements Runnable {
             createBucketEntry(shards);
         } catch (Exception e) {
             stop();
-            if(e instanceof GenaroRuntimeException) {
+            if (isCanceled) {
+                storeFileCallback.onFail(genaroStrError(GENARO_TRANSFER_CANCELED));
+            } else if(e instanceof GenaroRuntimeException) {
                 storeFileCallback.onFail(e.getCause().getMessage());
             } else if(e instanceof NoSuchAlgorithmException) {
                 storeFileCallback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-            } else if ((e instanceof SocketException && e.getMessage().equals("Socket closed") || e.getMessage().equals("Canceled"))) {
-                storeFileCallback.onFail(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else if (e instanceof SocketTimeoutException) {
                 storeFileCallback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
             } else {
