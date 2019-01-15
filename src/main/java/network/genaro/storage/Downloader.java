@@ -23,6 +23,8 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.Channels;
@@ -116,11 +118,7 @@ public final class Downloader implements Runnable {
     // for CPU bound application，set the thread pool size to N+1 is suggested; for I/O bound application, set the thread pool size to 2N+1 is suggested
     private final ExecutorService downloaderExecutor = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors() + 1);
 
-    private final OkHttpClient downHttpClient = new OkHttpClient.Builder()
-            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
-            .build();
+    private final OkHttpClient downHttpClient;
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String filePath, final boolean overwrite, final ResolveFileCallback resolveFileCallback) {
         this.bridge = bridge;
@@ -130,6 +128,20 @@ public final class Downloader implements Runnable {
         this.overwrite = overwrite;
         this.tempPath = filePath + ".genarotemp";
         this.resolveFileCallback = resolveFileCallback;
+
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+                .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+                .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
+
+        // set proxy server
+        String proxyAddr = bridge.getProxyAddr();
+        int proxyPort = bridge.getProxyPort();
+        if (proxyAddr != null && !proxyAddr.trim().isEmpty() && proxyPort > 0 && proxyPort <= 65535) {
+            builder = builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyAddr, proxyPort)));
+        }
+
+        downHttpClient = builder.build();
     }
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite) {

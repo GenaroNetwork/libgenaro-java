@@ -42,37 +42,45 @@ final class Cli {
             "bridge genaro information\n" +
             "  get-info\n\n" +
             "options:\n" +
-            "  -h, --help                output usage information\n" +
-            "  -v, --version             output the version number\n" +
-            "  -u, --url <url>           set the bridge host\n" +
-            "  -w, --wallet <path>       set the path of wallet file\n" +
-            "  -l, --log <level>         set the log level (default 0)\n" +
-            "  -d, --debug               set the debug log level\n\n" +
+            "  -h, --help                  output usage information\n" +
+            "  -v, --version               output the version number\n" +
+            "  -u, --url <url>             set the bridge host\n" +
+            "  -p, --proxy <host:port>     set the http proxy " +
+            "(e.g. <127.0.0.1:8888>)\n" +
+            "  -w, --wallet <path>         set the path of wallet file\n" +
+            "  -l, --log <level>           set the log level (default 0)\n" +
+            "  -d, --debug                 set the debug log level\n\n" +
             "environment variables:\n" +
-            "  GENARO_BRIDGE             the bridge host\n" +
-            "  GENARO_WALLET             the path of wallet file";
+            "  GENARO_BRIDGE               the bridge host\n" +
+            "  GENARO_PROXY                the http proxy (e.g. <127.0.0.1:8888>)\n" +
+            "  GENARO_WALLET               the path of wallet file";
 
     public static void main(String[] args) {
         String genaroBridge = System.getenv("GENARO_BRIDGE");
         String genaroWallet = System.getenv("GENARO_WALLET");
+        String genaroProxy = System.getenv("GENARO_PROXY");
         int c;
         int logLevel = 0;
 
-        LongOpt [] longOpts = new LongOpt[6];
+        LongOpt [] longOpts = new LongOpt[7];
         longOpts[0] = new LongOpt("url", LongOpt.NO_ARGUMENT, null, 'u');
-        longOpts[1] = new LongOpt("wallet", LongOpt.REQUIRED_ARGUMENT, null, 'w');
-        longOpts[2] = new LongOpt("version", LongOpt.REQUIRED_ARGUMENT, null, 'v');
-        longOpts[3] = new LongOpt("log", LongOpt.REQUIRED_ARGUMENT, null, 'l');
-        longOpts[4] = new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd');
-        longOpts[5] = new LongOpt("help", LongOpt.REQUIRED_ARGUMENT, null, 'h');
+        longOpts[1] = new LongOpt("proxy", LongOpt.REQUIRED_ARGUMENT, null, 'p');
+        longOpts[2] = new LongOpt("wallet", LongOpt.REQUIRED_ARGUMENT, null, 'w');
+        longOpts[3] = new LongOpt("version", LongOpt.REQUIRED_ARGUMENT, null, 'v');
+        longOpts[4] = new LongOpt("log", LongOpt.REQUIRED_ARGUMENT, null, 'l');
+        longOpts[5] = new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd');
+        longOpts[6] = new LongOpt("help", LongOpt.REQUIRED_ARGUMENT, null, 'h');
 
-        Getopt g = new Getopt("libgenaro-java", args, "u:w:l:dVvh", longOpts);
+        Getopt g = new Getopt("libgenaro-java", args, "u:w:l:p:dVvh", longOpts);
 
         while ((c = g.getopt()) != -1)
         {
             switch (c) {
                 case 'u':
                     genaroBridge = g.getOptarg();
+                    break;
+                case 'p':
+                    genaroProxy = g.getOptarg();
                     break;
                 case 'w':
                     genaroWallet = g.getOptarg();
@@ -142,10 +150,32 @@ final class Cli {
 
         genaroBridge = String.format("%s://%s:%d", proto, host, port);
 
+        String genaroProxyAddr = null;
+        int genaroProxyPort = 0;
+        if (genaroProxy != null && !genaroProxy.trim().isEmpty()) {
+            pattern = Pattern.compile("(.+):(\\d+)");
+            matcher = pattern.matcher(genaroProxy);
+            if (!matcher.find()) {
+                System.out.println("Invalid proxy\n");
+                System.exit(0);
+            }
+
+            host = matcher.group(1);
+            port = Integer.parseInt(matcher.group(2));
+
+            if (port <= 0 || port >= 65535) {
+                System.out.println("Invalid proxy\n");
+                System.exit(0);
+            }
+
+            genaroProxyAddr = host;
+            genaroProxyPort = port;
+        }
+
         Genaro genaro = null;
 
         if (command.equals("get-info")) {
-            genaro = new Genaro(genaroBridge);
+            genaro = new Genaro(genaroBridge, genaroProxyAddr, genaroProxyPort);
             System.out.println(String.format("Genaro bridge: %s\n", genaroBridge));
             String info = genaro.getInfo();
 
@@ -192,7 +222,7 @@ final class Cli {
         String passwd = new String(passwdChars);
 
         try {
-            genaro = new Genaro(genaroBridge, privKey, passwd, logLevel);
+            genaro = new Genaro(genaroBridge, privKey, passwd, logLevel, genaroProxyAddr, genaroProxyPort);
         } catch (Exception e) {
             System.out.println("Wallet invalid or password incorrect");
             System.exit(0);

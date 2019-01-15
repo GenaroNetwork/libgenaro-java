@@ -12,7 +12,8 @@ import okhttp3.MediaType;
 import okhttp3.RequestBody;
 
 import java.io.IOException;
-import java.net.SocketException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
 import java.nio.channels.FileChannel;
@@ -576,11 +577,10 @@ public final class Genaro {
     private String bridgeUrl;
     private GenaroWallet wallet;
 
-    private OkHttpClient genaroHttpClient = new OkHttpClient.Builder()
-            .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
-            .build();
+    private OkHttpClient genaroHttpClient;
+
+    private String proxyAddr;
+    private int proxyPort;
 
     public Genaro() {}
 
@@ -588,27 +588,63 @@ public final class Genaro {
         init(bridgeUrl);
     }
 
+    public Genaro(final String bridgeUrl, final String proxyAddr, final int proxyPort) {
+        init(bridgeUrl, proxyAddr, proxyPort);
+    }
+
     public Genaro(final String bridgeUrl, final String privKey, final String passwd) throws CipherException, IOException {
         init(bridgeUrl, privKey, passwd);
     }
 
     public Genaro(final String bridgeUrl, final String privKey, final String passwd, final int logLevel) throws CipherException, IOException {
-        this(bridgeUrl, privKey, passwd);
-        initLog(logLevel);
+        init(bridgeUrl, privKey, passwd, logLevel);
+    }
+
+    public Genaro(final String bridgeUrl, final String privKey, final String passwd, final int logLevel, final String proxyAddr, final int proxyPort) throws CipherException, IOException {
+        init(bridgeUrl, privKey, passwd, logLevel, proxyAddr, proxyPort);
     }
 
     public void init(final String bridgeUrl) {
         this.bridgeUrl = bridgeUrl;
+
+        genaroHttpClient = new OkHttpClient.Builder()
+                .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+                .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+                .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS)
+                .build();
+    }
+
+    public void init(final String bridgeUrl, final String proxyAddr, final int proxyPort) {
+        this.bridgeUrl = bridgeUrl;
+
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
+                .writeTimeout(GENARO_OKHTTP_WRITE_TIMEOUT, TimeUnit.SECONDS)
+                .readTimeout(GENARO_OKHTTP_READ_TIMEOUT, TimeUnit.SECONDS);
+
+        // set proxy server
+        if (proxyAddr != null && !proxyAddr.trim().isEmpty() && proxyPort > 0 && proxyPort <= 65535) {
+            this.proxyAddr = proxyAddr;
+            this.proxyPort = proxyPort;
+            builder = builder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyAddr, proxyPort)));
+        }
+
+        genaroHttpClient = builder.build();
     }
 
     public void init(final String bridgeUrl, final String privKey, final String passwd) throws CipherException, IOException {
-        this.bridgeUrl = bridgeUrl;
-        GenaroWallet wallet = new GenaroWallet(privKey, passwd);
-        this.wallet = wallet;
+        this.init(bridgeUrl);
+        this.wallet = new GenaroWallet(privKey, passwd);
     }
 
     public void init(final String bridgeUrl, final String privKey, final String passwd, final int logLevel) throws CipherException, IOException {
         this.init(bridgeUrl, privKey, passwd);
+        initLog(logLevel);
+    }
+
+    public void init(final String bridgeUrl, final String privKey, final String passwd, final int logLevel, final String proxyAddr, final int proxyPort) throws CipherException, IOException {
+        this.init(bridgeUrl, proxyAddr, proxyPort);
+        this.wallet = new GenaroWallet(privKey, passwd);
         initLog(logLevel);
     }
 
@@ -663,6 +699,14 @@ public final class Genaro {
 
     public String getBridgeUrl() {
         return bridgeUrl;
+    }
+
+    public String getProxyAddr() {
+        return proxyAddr;
+    }
+
+    public int getProxyPort() {
+        return proxyPort;
     }
 
     static String genaroStrError(final int error_code)
