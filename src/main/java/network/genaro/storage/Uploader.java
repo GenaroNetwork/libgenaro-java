@@ -22,13 +22,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.File;
-import java.io.ByteArrayInputStream;
-
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -179,7 +175,7 @@ public final class Uploader implements Runnable {
     }
 
     private static long shardSize(final int hops) {
-        return (long) (MIN_SHARD_SIZE * Math.pow(2, hops));
+        return (long)(MIN_SHARD_SIZE * Math.pow(2, hops));
     }
 
     private static long determineShardSize(final long fileSize, int accumulator) {
@@ -193,7 +189,7 @@ public final class Uploader implements Runnable {
         int hops = ((accumulator - SHARD_MULTIPLES_BACK) < 0 ) ? 0 : accumulator - SHARD_MULTIPLES_BACK;
 
         long byteMultiple = shardSize(accumulator);
-        double check = (double) fileSize / byteMultiple;
+        double check = (double)fileSize / byteMultiple;
 
         // Determine if bytemultiple is highest bytemultiple that is still <= size
         if (check > 0 && check <= 1) {
@@ -311,12 +307,15 @@ public final class Uploader implements Runnable {
             for (int i = 0; i < totalDataShards; i++) {
                 int readBytes = cryptChannel.read(readBuffer, shardSize * i);
                 readBuffer.flip();
+
+                // todo: when shardSize is too big(maybe 1g) it will casue an OutOfMemoryError exception
                 shards[i] = new byte[(int)shardSize];
                 readBuffer.get(shards[i], 0, readBytes);
                 readBuffer.flip();
             }
 
             for (int i = totalDataShards; i < totalShards; i++) {
+                // todo: when shardSize is too big(maybe 1g) it will casue an OutOfMemoryError exception
                 shards[i] = new byte[(int)shardSize];
             }
 
@@ -564,26 +563,7 @@ public final class Uploader implements Runnable {
         long filePosition = shardMeta.getIndex() * shardSize;
         String token = shard.getPointer().getToken();
 
-        ByteBuffer dataBuffer = ByteBuffer.allocate((int)metaSize);
-        try {
-            shardChannel.read(dataBuffer, filePosition);
-        } catch (IOException e) {
-            if (shard.getPushCount() >= GENARO_MAX_PUSH_SHARD) {
-                throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_READ_ERROR));
-            }
-            return shard;
-        }
-        dataBuffer.flip();
-
-        byte[] mBlock;
-        try {
-            mBlock = new byte[(int)metaSize];
-        } catch (OutOfMemoryError e) {
-            throw new GenaroRuntimeException(genaroStrError(GENARO_OUTOFMEMORY_ERROR));
-        }
-
-        dataBuffer.get(mBlock);
-        UploadRequestBody uploadRequestBody = new UploadRequestBody(new ByteArrayInputStream(mBlock),
+        UploadRequestBody uploadRequestBody = new UploadRequestBody(shardChannel, filePosition, metaSize,
                 "application/octet-stream; charset=utf-8", new UploadRequestBody.ProgressListener() {
             @Override
             public void transferred(long delta) {
@@ -821,16 +801,18 @@ public final class Uploader implements Runnable {
 
         // calculate shard size and count
         originFileSize = originFile.length();
+
         shardSize = determineShardSize(originFileSize, 0);
         if (shardSize <= 0) {
             storeFileCallback.onFail(genaroStrError(GENARO_FILE_SIZE_ERROR));
             return;
         }
 
-        // when shard size >= 2GB(means that the file size > 16GB), it is not supported for java version of libgenaro for now
-        if (shardSize >= (1L << 31)) {
-            storeFileCallback.onFail(genaroStrError(GENARO_FILE_SIZE_ERROR));
-            return;
+        // todo: when shard size >= 2GB(shardSize >= (1L << 31), means that the file size > 16GB) and you need to use Reed-Solomon, it is not supported for java version of libgenaro for now
+        // todo: when shard size >= 64MB(means that the file size > 512MB) and you need to use Reed-Solomon, may cause an OutOfMemoryError if use Reed-Solomon for java version of libgenaro for now
+        if (shardSize >= (1L << 26) && rs) {
+            rs = false;
+            Genaro.logger.warn(genaroStrError(GENARO_RS_FILE_SIZE_ERROR));
         }
 
         // when file size <= MIN_SHARD_SIZE, there is only one shard, Reed-Solomon is unnecessary
@@ -838,8 +820,8 @@ public final class Uploader implements Runnable {
             rs = false;
         }
 
-        totalDataShards = (int)Math.ceil((double)originFileSize / shardSize);
-        totalParityShards = rs ? (int)Math.ceil((double)totalDataShards * 2.0 / 3.0) : 0;
+        totalDataShards = (int)Math.ceil(originFileSize * 1.0 / shardSize);
+        totalParityShards = rs ? (int)Math.ceil(totalDataShards * 2.0 / 3.0) : 0;
         totalShards = totalDataShards + totalParityShards;
         totalBytes = originFileSize + totalParityShards * shardSize;
 

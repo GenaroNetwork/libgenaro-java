@@ -23,7 +23,6 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
-import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.Channels;
@@ -107,6 +106,9 @@ public final class Downloader implements Runnable {
 
     // whether the shard is non-missing
     private boolean[] shardsPresent;
+
+    // whether all data shards(ignoring parity shards) are present
+    private boolean isDataShardsAllPresent = false;
 
     // CachedThreadPool takes up too much memory，and it will cause memory overflow when high concurrency
     // private static final ExecutorService uploaderExecutor = Executors.newCachedThreadPool();
@@ -528,11 +530,34 @@ public final class Downloader implements Runnable {
     private void verifyRecover() {
         boolean shardMissingError = false;
 
-        int missingPointers = (int) pointers.stream().filter(pointer -> pointer.getStatus() == POINTER_MISSING).count();
+        isDataShardsAllPresent = true;
+        for(int i = 0; i < totalDataPointers; i++) {
+            if (!shardsPresent[i]) {
+                isDataShardsAllPresent = false;
+            }
+        }
+
+        if (isDataShardsAllPresent) {
+            return;
+        }
+
+        int missingPointers = (int)pointers.stream().filter(pointer -> pointer.getStatus() == POINTER_MISSING).count();
         int presentPointers = 0;
         for (boolean shardPresent: shardsPresent) {
             if (shardPresent) {
                 presentPointers += 1;
+            }
+        }
+
+        // todo: when shard size >= 2GB(shardSize >= (1L << 31), means that the file size > 16GB), Reed-Solomon algorithm can not work normally for java version of libgenaro for now
+        // todo: when shard size >= 64MB(means that the file size > 512MB), may cause an OutOfMemoryError if use Reed-Solomon for java version of libgenaro for now
+        if (shardSize >= (1L << 26) && file.isRs()) {
+            shardMissingError = pointers.stream().filter(pointer -> pointer.getIndex() < totalDataPointers)
+                    .anyMatch(pointer -> pointer.getStatus() == POINTER_MISSING);
+            if (shardMissingError || pointers.size() == 0) {
+                throw new GenaroRuntimeException(genaroStrError(GENARO_FILE_SHARD_MISSING_ERROR));
+            } else {
+                return;
             }
         }
 
@@ -771,16 +796,10 @@ public final class Downloader implements Runnable {
         }
 
         // use Reed-Solomon algorithm to recover file
-        if (file.isRs()) {
+        if (!isDataShardsAllPresent && file.isRs()) {
             // set the progress directly to 100%
             if (downloadedBytes.get() != totalBytes) {
                 resolveFileCallback.onProgress(1.0f);
-            }
-
-            // shard size >= 2GB(means that the file size > 16GB) is not supported for java version of libgenaro for now
-            if (shardSize >= (1L << 31)) {
-                resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
-                return;
             }
 
             byte[][] shards = new byte[totalPointers][];
@@ -796,6 +815,7 @@ public final class Downloader implements Runnable {
                     return;
                 }
 
+                // todo: when shardSize is too big(maybe 1g) it will casue an OutOfMemoryError exception
                 try {
                     // here use "shardSize", not "size"
                     shards[i] = new byte[(int)shardSize];
@@ -823,7 +843,7 @@ public final class Downloader implements Runnable {
                 dataBuffers[i].put(shards[i], 0, size);
             }
 
-            // To speed up GC
+            // Speed up GC
             for (int i = 0; i < totalPointers; i++) {
                 shards[i] = null;
                 dataBuffers[i] = null;
@@ -902,7 +922,7 @@ public final class Downloader implements Runnable {
             Genaro.logger.warn("File close exception");
         }
 
-        Genaro.logger.info("Decrypt file success, download is completed");
+        Genaro.logger.info("Decrypt file success, download is finished");
 
         resolveFileCallback.onProgress(1.0f);
 

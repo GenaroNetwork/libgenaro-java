@@ -742,6 +742,8 @@ public final class Genaro {
                 return "Algorithm error";
             case GENARO_OUTOFMEMORY_ERROR:
                 return "Out of memory error";
+            case GENARO_RS_FILE_SIZE_ERROR:
+                return "File too large to use Forward Error Correction(Reed-Solomon)";
             case GENARO_UNKNOWN_ERROR:
                 // fall through
             default:

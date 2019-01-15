@@ -25,7 +25,7 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 
 ## Issues
 
-- Upload or download file of large size(maybe 500mb or even smaller) may cause an OutOfMemoryError
+- Upload or download file of large size(>512MB) will not use Reed-Solomon algorithm, or it will cause an OutOfMemoryError
 
 ## 3rd party dependencies
 

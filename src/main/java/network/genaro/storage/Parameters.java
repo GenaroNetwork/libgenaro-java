@@ -53,6 +53,7 @@ final class Parameters {
     // algorithm error
     public static final int GENARO_ALGORITHM_ERROR = 4000;
     public static final int GENARO_OUTOFMEMORY_ERROR = 4001;
+    public static final int GENARO_RS_FILE_SIZE_ERROR = 4002;
 
     // unknown error
     public static final int GENARO_UNKNOWN_ERROR = 9000;

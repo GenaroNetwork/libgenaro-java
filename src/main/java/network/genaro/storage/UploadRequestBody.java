@@ -2,13 +2,11 @@ package network.genaro.storage;
 
 import okhttp3.MediaType;
 import okhttp3.RequestBody;
-import okhttp3.internal.Util;
 import okio.BufferedSink;
-import okio.Okio;
-import okio.Source;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 final class UploadRequestBody extends RequestBody {
     public interface ProgressListener {
@@ -17,20 +15,24 @@ final class UploadRequestBody extends RequestBody {
 
     private static final int SEGMENT_SIZE = 2 * 1024;
 
-    private InputStream input;
+    private FileChannel inputChannel;
+    private long position;
+    private long size;
+
     private ProgressListener listener;
     private String contentType;
 
-    public UploadRequestBody(InputStream input, String contentType, ProgressListener listener) {
-        this.input = input;
+    public UploadRequestBody(FileChannel inputChannel, long position, long size, String contentType, ProgressListener listener) {
+        this.inputChannel = inputChannel;
+        this.position = position;
+        this.size = size;
         this.contentType = contentType;
         this.listener = listener;
     }
 
     @Override
-    public long contentLength() throws IOException {
-        long length = input.available();
-        return length;
+    public long contentLength() {
+        return size;
     }
 
     @Override
@@ -40,19 +42,23 @@ final class UploadRequestBody extends RequestBody {
 
     @Override
     public void writeTo(BufferedSink sink) throws IOException {
-        Source source = null;
-        try {
-            source = Okio.source(input);
-            long delta;
+        ByteBuffer dataBuffer = ByteBuffer.allocate(SEGMENT_SIZE);
+        byte[] mBlock = new byte[SEGMENT_SIZE];
+        int delta;
+        long readBytes = 0;
 
-            while ((delta = source.read(sink.buffer(), SEGMENT_SIZE)) != -1) {
-                sink.flush();
-                if(listener != null) {
-                    listener.transferred(delta);
-                }
+        while ((delta = inputChannel.read(dataBuffer, position)) != -1 && readBytes < size) {
+            dataBuffer.flip();
+            dataBuffer.get(mBlock, 0, delta);
+            dataBuffer.flip();
+
+            sink.write(mBlock, 0, delta);
+            position += delta;
+            readBytes += delta;
+
+            if (listener != null) {
+                listener.transferred(delta);
             }
-        } finally {
-            Util.closeQuietly(source);
         }
     }
 }
