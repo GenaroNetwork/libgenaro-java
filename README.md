@@ -42,7 +42,6 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - [guava](https://github.com/google/guava) and [apache.commons](https://commons.apache.org) as utility.
 - [log4j](https://logging.apache.org/log4j) for logging.
 - [testng](https://testng.org/doc/index.html) for testing.
-- [maven](https://maven.apache.org/) for dependency managment.
 
 ## Package
 
