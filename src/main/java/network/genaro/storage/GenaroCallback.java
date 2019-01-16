@@ -2,49 +2,42 @@ package network.genaro.storage;
 
 public interface GenaroCallback {
     interface GetBucketsCallback {
-        void onFinish(Bucket[] buckets);
-        void onFail(String error);
+        default void onFinish(Bucket[] buckets) { }
+        default void onFail(String error) { }
     }
 
     interface DeleteBucketCallback {
-        void onFinish();
-        void onFail(String error);
+        default void onFinish() { }
+        default void onFail(String error) { }
     }
 
     interface RenameBucketCallback {
-        void onFinish();
-        void onFail(String error);
+        default void onFinish() { }
+        default void onFail(String error) { }
     }
 
     interface ListFilesCallback {
-        void onFinish(GenaroFile[] files);
-        void onFail(String error);
+        default void onFinish(GenaroFile[] files) { }
+        default void onFail(String error) { }
     }
 
     interface DeleteFileCallback {
-        void onFinish();
-        void onFail(String error);
+        default void onFinish() { }
+        default void onFail(String error) { }
     }
 
     interface ListMirrorsCallback {
-        void onFinish(String text);
-        void onFail(String error);
+        default void onFinish(String text) { }
+        default void onFail(String error) { }
     }
 
     interface ResolveFileCallback {
-        default void onBegin() {
-            //        System.out.println("Download started");
-        }
+        default void onBegin() { }
 
-        default void onFinish() {
-            //        System.out.println("Download finished");
-        }
+        default void onFinish() { }
 
-        default void onFail(String error) {
-            //        System.out.println("Download failed, reason: " + error != null ? error : "Unknown");
-        }
+        default void onFail(String error) { }
 
-        // after Uploader::cancel is called
         default void onCancel() { }
 
         /**
@@ -56,19 +49,12 @@ public interface GenaroCallback {
     }
 
     interface StoreFileCallback {
-        default void onBegin(long fileSize) {
-            //        System.out.println("Upload started");
-        }
+        default void onBegin(long fileSize) { }
 
-        default void onFinish(String fileId) {
-            //        System.out.println("Upload finished, fileId: " + fileId);
-        }
+        default void onFinish(String fileId) { }
 
-        default void onFail(String error) {
-            //        System.out.println("Upload failed, reason: " + error != null ? error : "Unknown");
-        }
+        default void onFail(String error) { }
 
-        // after Uploader::cancel is called
         default void onCancel() { }
 
         /**

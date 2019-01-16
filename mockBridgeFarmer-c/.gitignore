@@ -1,0 +1,6 @@
+/.idea
+/build-mac
+/build-linux
+/build-win32
+/build
+/cmake-build-debug

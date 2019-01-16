@@ -105,6 +105,7 @@ public final class Uploader implements Runnable {
     private String hmacId;
     private String fileId;
 
+    private String indexStr;
     private byte[] index;
     private byte[] fileKey;
 
@@ -142,6 +143,8 @@ public final class Uploader implements Runnable {
         this.originFile = new File(filePath);
         this.bucketId = bucketId;
         this.storeFileCallback = storeFileCallback;
+
+        this.indexStr = bridge.getIndexStr();
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
@@ -252,8 +255,26 @@ public final class Uploader implements Runnable {
     }
 
     private boolean createEncryptedFile() {
-        index = randomBuff(32);
+        boolean indexInvalid = true;
+        int len;
+        if (indexStr != null && (len = indexStr.length()) == 64) {
+            for(int i = 0; i < len; i++) {
+                char c = indexStr.charAt(i);
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+                    indexInvalid = false;
+                }
+            }
+        } else {
+            indexInvalid = false;
+        }
+
+        if (indexInvalid) {
+            index = Hex.decode(indexStr);
+        } else {
+            index = randomBuff(32);
+        }
 //        index = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
+
         try {
             fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(bucketId), index);
         } catch (NoSuchAlgorithmException e) {
@@ -635,8 +656,6 @@ public final class Uploader implements Runnable {
                 return shard;
             }
         } catch (IOException e) {
-            uploadedBytes.addAndGet(-shard.getUploadedSize());
-            shard.setUploadedSize(0);
             if (isCanceled) {
                 throw new GenaroRuntimeException(genaroStrError(GENARO_TRANSFER_CANCELED));
             } else if (e instanceof SocketTimeoutException) {
@@ -654,6 +673,9 @@ public final class Uploader implements Runnable {
             // save the ending time of downloading
             shard.getReport().setEnd(System.currentTimeMillis());
             if (shard.getStatus() != SHARD_PUSH_SUCCESS) {
+                uploadedBytes.addAndGet(-shard.getUploadedSize());
+                shard.setUploadedSize(0);
+
                 // Add pointer to exclude for future calls
                 String farmerId = shard.getPointer().getFarmer().getNodeID();
                 if (!excludedFarmerIds.contains(farmerId)) {

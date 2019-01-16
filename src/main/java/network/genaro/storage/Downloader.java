@@ -593,7 +593,7 @@ public final class Downloader implements Runnable {
     }
 
     void start() {
-        if(!overwrite && Files.exists(Paths.get(path))) {
+        if (!overwrite && Files.exists(Paths.get(path))) {
             resolveFileCallback.onFail("File already exists");
             return;
         }
@@ -626,7 +626,7 @@ public final class Downloader implements Runnable {
         }
 
         // check if cancel() is called
-        if(isCanceled) {
+        if (isCanceled) {
             resolveFileCallback.onCancel();
             return;
         }
@@ -657,7 +657,7 @@ public final class Downloader implements Runnable {
         }
 
         // check if cancel() is called
-        if(isCanceled) {
+        if (isCanceled) {
             resolveFileCallback.onCancel();
             return;
         }
@@ -665,12 +665,12 @@ public final class Downloader implements Runnable {
         // set shard size to the size of the first shard
         shardSize = pointers.get(0).getSize();
 
-        for (Pointer pointer: pointers) {
+        for (Pointer pointer : pointers) {
             Genaro.logger.info(pointer.toBriefString());
             long size = pointer.getSize();
             totalBytes += size;
             totalPointers += 1;
-            if(!pointer.isParity()) {
+            if (!pointer.isParity()) {
                 totalDataPointers += 1;
                 fileSize += size;
             } else {
@@ -696,86 +696,86 @@ public final class Downloader implements Runnable {
 
         // TODO: seems terrible for so many duplicate codes
         CompletableFuture<Void>[] downFutures = pointers
-            .parallelStream()
-            .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
-            .map(future -> future.thenApplyAsync(this::sendExchangeReport, downloaderExecutor))
-            // 1st requestReplacePointer
-            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                // download replaced pointer
-                if (pointer.isReplaced()) {
-                    requestShard(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                if (pointer.isReplaced()) {
-                    sendExchangeReport(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            // 2nd requestReplacePointer
-            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                // download replaced pointer
-                if (pointer.isReplaced()) {
-                    requestShard(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                if (pointer.isReplaced()) {
-                    sendExchangeReport(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            // 3rd requestReplacePointer
-            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                // download replaced pointer
-                if (pointer.isReplaced()) {
-                    requestShard(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                if (pointer.isReplaced()) {
-                    sendExchangeReport(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            // 4th requestReplacePointer
-            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                // download replaced pointer
-                if (pointer.isReplaced()) {
-                    requestShard(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                if (pointer.isReplaced()) {
-                    sendExchangeReport(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            // 5th requestReplacePointer, try request replace pointer for 5 times because GENARO_DEFAULT_MIRRORS = 5
-            .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                // download replaced pointer
-                if (pointer.isReplaced()) {
-                    requestShard(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            .map(future -> future.thenApplyAsync((pointer) -> {
-                if (pointer.isReplaced()) {
-                    sendExchangeReport(pointer);
-                }
-                return pointer;
-            }, downloaderExecutor))
-            .map(future -> future.thenAcceptAsync((pointer) -> verifyRecover(), downloaderExecutor))
-            .toArray(CompletableFuture[]::new);
+                .parallelStream()
+                .map(pointer -> CompletableFuture.supplyAsync(() -> requestShard(pointer), downloaderExecutor))
+                .map(future -> future.thenApplyAsync(this::sendExchangeReport, downloaderExecutor))
+                // 1st requestReplacePointer
+                .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    // download replaced pointer
+                    if (pointer.isReplaced()) {
+                        requestShard(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    if (pointer.isReplaced()) {
+                        sendExchangeReport(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                // 2nd requestReplacePointer
+                .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    // download replaced pointer
+                    if (pointer.isReplaced()) {
+                        requestShard(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    if (pointer.isReplaced()) {
+                        sendExchangeReport(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                // 3rd requestReplacePointer
+                .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    // download replaced pointer
+                    if (pointer.isReplaced()) {
+                        requestShard(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    if (pointer.isReplaced()) {
+                        sendExchangeReport(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                // 4th requestReplacePointer
+                .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    // download replaced pointer
+                    if (pointer.isReplaced()) {
+                        requestShard(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    if (pointer.isReplaced()) {
+                        sendExchangeReport(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                // 5th requestReplacePointer, try request replace pointer for 5 times because GENARO_DEFAULT_MIRRORS = 5
+                .map(future -> future.thenApplyAsync(this::requestReplacePointer, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    // download replaced pointer
+                    if (pointer.isReplaced()) {
+                        requestShard(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                .map(future -> future.thenApplyAsync((pointer) -> {
+                    if (pointer.isReplaced()) {
+                        sendExchangeReport(pointer);
+                    }
+                    return pointer;
+                }, downloaderExecutor))
+                .map(future -> future.thenAcceptAsync((pointer) -> verifyRecover(), downloaderExecutor))
+                .toArray(CompletableFuture[]::new);
 
         futureAllFromRequestShard = CompletableFuture.allOf(downFutures);
 
@@ -783,14 +783,14 @@ public final class Downloader implements Runnable {
             futureAllFromRequestShard.get();
         } catch (Exception e) {
             stop();
-            if(e instanceof CancellationException) {
+            if (e instanceof CancellationException) {
                 if (isCanceled) {
                     resolveFileCallback.onCancel();
                     return;
                 } else {
                     // do nothing(if the downloaded data is sufficient, may reach here)
                 }
-            } else if(e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
+            } else if (e instanceof ExecutionException && e.getCause() instanceof GenaroRuntimeException) {
                 resolveFileCallback.onFail(e.getCause().getMessage());
                 return;
             } else {
@@ -802,7 +802,7 @@ public final class Downloader implements Runnable {
         }
 
         // check if cancel() is called
-        if(isCanceled) {
+        if (isCanceled) {
             resolveFileCallback.onCancel();
             return;
         }
@@ -817,7 +817,7 @@ public final class Downloader implements Runnable {
             byte[][] shards = new byte[totalPointers][];
             MappedByteBuffer[] dataBuffers = new MappedByteBuffer[totalPointers];
             for (int i = 0; i < totalPointers; i++) {
-                int size = (int)pointers.get(i).getSize();
+                int size = (int) pointers.get(i).getSize();
 
                 try {
                     // the 3rd parameter is not "totalBytes", but "totalPointers * shardSize"
@@ -830,7 +830,7 @@ public final class Downloader implements Runnable {
                 // todo: when shardSize is too big(maybe 1g) it will casue an OutOfMemoryError exception
                 try {
                     // here use "shardSize", not "size"
-                    shards[i] = new byte[(int)shardSize];
+                    shards[i] = new byte[(int) shardSize];
                 } catch (OutOfMemoryError e) {
                     resolveFileCallback.onFail(genaroStrError(GENARO_OUTOFMEMORY_ERROR));
                     return;
@@ -843,14 +843,14 @@ public final class Downloader implements Runnable {
                     totalParityPointers, new OutputInputByteTableCodingLoop());
 
             try {
-                reedSolomon.decodeMissing(shards, shardsPresent, 0, (int)shardSize);
+                reedSolomon.decodeMissing(shards, shardsPresent, 0, (int) shardSize);
             } catch (Exception e) {
                 resolveFileCallback.onFail(genaroStrError(GENARO_FILE_RECOVER_ERROR));
                 return;
             }
 
             for (int i = 0; i < totalDataPointers; i++) {
-                int size = (int)pointers.get(i).getSize();
+                int size = (int) pointers.get(i).getSize();
                 dataBuffers[i].position(0);
                 dataBuffers[i].put(shards[i], 0, size);
             }
@@ -860,7 +860,7 @@ public final class Downloader implements Runnable {
                 shards[i] = null;
                 dataBuffers[i] = null;
             }
-        } else if(downloadedBytes.get() != totalBytes) {
+        } else if (downloadedBytes.get() != totalBytes) {
             Genaro.logger.warn("Downloaded bytes is not the same with total bytes, downloaded bytes: " + downloadedBytes + ", totalBytes: " + totalBytes);
         } else {
             // do nothing
@@ -876,19 +876,36 @@ public final class Downloader implements Runnable {
 
         // decryption:
         Genaro.logger.info("Decrypt file...");
-        byte[] bucketId = Hex.decode(file.getBucket());
-        byte[] index   = Hex.decode(file.getIndex());
+        byte[] bucketIdBytes = Hex.decode(bucketId);
+        byte[] fileIdBytes = Hex.decode(fileId);
 
+        // key for decryption
         byte[] fileKey;
+        // ctr for decryption
+        byte[] ivBytes;
+
+        String indexStr = file.getIndex();
+
         try {
-            fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketId, index);
-        } catch (Exception e) {
+            if (indexStr != null && indexStr.length() == 32) {
+                // calculate decryption key based on the index
+                byte[] index = Hex.decode(indexStr);
+
+                fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, index);
+                ivBytes = Arrays.copyOf(index, 16);
+            } else {
+                // calculate decryption key based on the file_id
+                fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, fileIdBytes);
+                fileKey = Hex.encode(fileKey);
+                fileKey = CryptoUtil.sha256(fileKey);
+                ivBytes = Arrays.copyOf(CryptoUtil.ripemd160(fileId.getBytes()), 16);
+            }
+        } catch(Exception e){
             stop();
             resolveFileCallback.onFail("Generate file key error");
             return;
         }
 
-        byte[] ivBytes = Arrays.copyOf(index, 16);
         SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
         IvParameterSpec iv = new IvParameterSpec(ivBytes);
 

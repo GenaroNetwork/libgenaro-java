@@ -577,15 +577,28 @@ public final class Genaro {
     private String bridgeUrl;
     private GenaroWallet wallet;
 
+    // only for test
+    private boolean test = false;
+    // only for test
+    private String privKeyForTest;
+
     private OkHttpClient genaroHttpClient;
 
     private String proxyAddr;
     private int proxyPort;
 
-    public Genaro() {}
+    // the index for uploading
+    private String indexStr;
 
     public Genaro(final String bridgeUrl) {
         init(bridgeUrl);
+    }
+
+    // default, not public
+    Genaro(final String bridgeUrl, final String privKeyForTest) {
+        init(bridgeUrl);
+        this.privKeyForTest = privKeyForTest;
+        test = true;
     }
 
     public Genaro(final String bridgeUrl, final String proxyAddr, final int proxyPort) {
@@ -648,8 +661,16 @@ public final class Genaro {
         initLog(logLevel);
     }
 
+    public String getIndexStr() {
+        return indexStr;
+    }
+
+    public void setIndexStr(String indexStr) {
+        this.indexStr = indexStr;
+    }
+
     private void verifyInit(final boolean checkWallet) {
-        if (bridgeUrl == null || (checkWallet && wallet == null)) {
+        if (!test && (bridgeUrl == null || (checkWallet && wallet == null))) {
             throw new GenaroRuntimeException("Bridge url or wallet has not been initialized!");
         }
     }
@@ -795,15 +816,29 @@ public final class Genaro {
         }
     }
 
-    byte[] getPrivateKey() { return wallet.getPrivateKey(); }
+    byte[] getPrivateKey() {
+        if (!test) {
+            return wallet.getPrivateKey();
+        } else {
+            return BasicUtil.string2Bytes(privKeyForTest);
+        }
+    }
 
     String getPublicKeyHexString() {
-        return wallet.getPublicKeyHexString();
+        if (!test) {
+            return wallet.getPublicKeyHexString();
+        } else {
+            return "";
+        }
     }
 
     String signRequest(final String method, final String path, final String body) throws NoSuchAlgorithmException {
-        String msg = method + "\n" + path + "\n" + body;
-        return wallet.signMessage(msg);
+        if (!test) {
+            String msg = method + "\n" + path + "\n" + body;
+            return wallet.signMessage(msg);
+        } else {
+            return "";
+        }
     }
 
     public String getInfo() {
