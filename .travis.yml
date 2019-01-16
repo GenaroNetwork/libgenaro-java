@@ -1,4 +1,13 @@
 language: java
+os: linux
+sudo: true
 
 script:
-  - mvn test -Dtest=Verify*
+  - sudo apt-get install build-essential cmake
+  - cd MockBridgeFarmer-C
+  - mkdir build
+  - cd build
+  - cmake ..
+  - ./MockBridgeFarmer
+  - cd ../..
+  - mvn clean test -Dtest=Verify*
