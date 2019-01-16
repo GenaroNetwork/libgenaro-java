@@ -23,7 +23,7 @@ public final class VerifyGenaro {
     private static final String testBucketId = "368be0816766b28fd5f43af5";
     private static final String testFileId = "998960317b6725a3f8080c2b";
 
-    private static final String tempDir = System.getProperty("java.io.tmpdir");
+    private String tempDir = System.getProperty("java.io.tmpdir");
     private static final String testUploadFileName = "genaro-test-upload.data";
     private static final String testDownloadFileName = "genaro-test-download.data";
 
@@ -174,6 +174,9 @@ public final class VerifyGenaro {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
         api.setIndexStr(testIndexStr);
 
+        if (!tempDir.endsWith("/")) {
+            tempDir += "/";
+        }
         Uploader uploader = api.storeFile(true, tempDir + testUploadFileName, testUploadFileName, testBucketId, new StoreFileCallback() {
             @Override
             public void onFinish(String fileId) {
@@ -190,6 +193,9 @@ public final class VerifyGenaro {
     public void verifyResolveFile() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
+        if (!tempDir.endsWith("/")) {
+            tempDir += "/";
+        }
         Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, new ResolveFileCallback() {
             @Override
             public void onFinish() {

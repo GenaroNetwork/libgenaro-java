@@ -2,12 +2,31 @@ language: java
 os: linux
 sudo: true
 
+before_script:
+  - echo "deb http://us.archive.ubuntu.com/ubuntu/ xenial main" | sudo tee -a /etc/apt/sources.list
+  - echo "deb http://us.archive.ubuntu.com/ubuntu/ xenial universe" | sudo tee -a /etc/apt/sources.list
+  - echo "deb http://us.archive.ubuntu.com/ubuntu/ xenial-updates universe" | sudo tee -a /etc/apt/sources.list
+  - echo "deb http://us.archive.ubuntu.com/ubuntu/ xenial-updates multiverse" | sudo tee -a /etc/apt/sources.list
+  - echo "deb http://security.ubuntu.com/ubuntu xenial-security main" | sudo tee -a /etc/apt/sources.list
+  - echo "deb http://security.ubuntu.com/ubuntu xenial-security multiverse" | sudo tee -a /etc/apt/sources.list
+  - sudo apt-get update -qq
+  - sudo apt-get install build-essential libjson-c-dev nettle-dev libmicrohttpd-dev libcurl4-gnutls-dev libuv1-dev cmake
+
 script:
-  - sudo apt-get install build-essential cmake
+  - git clone https://github.com/bitcoin-core/secp256k1.git ~/secp256k1
+  - cd ~/secp256k1
+  - ./autogen.sh
+  - ./configure
+  - make
+  - sudo make install
+  - cd -
   - cd MockBridgeFarmer-C
   - mkdir build
   - cd build
   - cmake ..
-  - ./MockBridgeFarmer
+  - make
+  - export TMPDIR=/tmp/
+  - ./MockBridgeFarmer &
+  - sleep 20  # wait for the mock bridge and farmer is ready
   - cd ../..
   - mvn clean test -Dtest=Verify*
