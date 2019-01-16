@@ -27,13 +27,13 @@ public final class VerifyGenaro {
     private static final String testUploadFileName = "genaro-test-upload.data";
     private static final String testDownloadFileName = "genaro-test-download.data";
 
-    public void testGetInfo() {
+    public void verifyGetInfo() {
         Genaro api = new Genaro(testBridgeUrl);
         String info = api.getInfo();
         Assert.assertNotNull(info);
     }
 
-    public void testGetBuckets() {
+    public void verifyGetBuckets() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         CompletableFuture<Void> fu = api.getBuckets(new GetBucketsCallback() {
@@ -53,7 +53,7 @@ public final class VerifyGenaro {
         fu.join();
     }
 
-    public void testDeleteBucket() {
+    public void verifyDeleteBucket() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         CompletableFuture<Void> fu = api.deleteBucket(testBucketId, new DeleteBucketCallback() {
@@ -66,7 +66,7 @@ public final class VerifyGenaro {
         fu.join();
     }
 
-    public void testGetBucket() throws Exception {
+    public void verifyGetBucket() throws Exception {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         Bucket b = api.getBucket(null, testBucketId);
@@ -78,7 +78,7 @@ public final class VerifyGenaro {
         Assert.assertEquals(b.getId(), "368be0816766b28fd5f43af5");
     }
 
-    public void testListFiles() {
+    public void verifyListFiles() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         CompletableFuture<Void> fu = api.listFiles(testBucketId, new ListFilesCallback() {
@@ -97,7 +97,7 @@ public final class VerifyGenaro {
         fu.join();
     }
 
-    public void testListMirrors() {
+    public void verifyListMirrors() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         CompletableFuture<Void> fu = api.listMirrors(testBucketId, testFileId, new ListMirrorsCallback() {
@@ -114,7 +114,7 @@ public final class VerifyGenaro {
         fu.join();
     }
 
-    public void testDeleteFile() {
+    public void verifyDeleteFile() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         CompletableFuture<Void> fu = api.deleteFile(testBucketId, testFileId, new DeleteFileCallback() {
@@ -127,7 +127,7 @@ public final class VerifyGenaro {
         fu.join();
     }
 
-    public void testGetFileInfo() {
+    public void verifyGetFileInfo() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         GenaroFile file;
@@ -141,7 +141,7 @@ public final class VerifyGenaro {
         Assert.assertEquals(file.getId(), "998960317b6725a3f8080c2b");
     }
 
-    public void testGetPointers() {
+    public void verifyGetPointers() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         List<Pointer> psa;
@@ -156,7 +156,7 @@ public final class VerifyGenaro {
         Assert.assertEquals(psa.get(0).getHash(), "269e72f24703be80bbb10499c91dc9b2022c4dc3");
     }
 
-    public void testRequestFrameId() {
+    public void verifyRequestFrameId() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         Frame frame;
@@ -170,7 +170,7 @@ public final class VerifyGenaro {
         Assert.assertEquals(frame.getId(), "d6367831f7f1b117ffdd0015");
     }
 
-    public void testStoreFile() {
+    public void verifyStoreFile() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
         api.setIndexStr(testIndexStr);
 
@@ -187,7 +187,7 @@ public final class VerifyGenaro {
         uploader.join();
     }
 
-    public void testResolveFile() {
+    public void verifyResolveFile() {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, new ResolveFileCallback() {

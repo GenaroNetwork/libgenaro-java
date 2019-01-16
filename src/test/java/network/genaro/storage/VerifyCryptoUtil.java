@@ -12,42 +12,35 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Test()
 public final class VerifyCryptoUtil {
-    public void test() throws Exception {
-        byte[] byts = BasicUtil.string2Bytes("123kkk");
-        byte[] ripemded = CryptoUtil.ripemd160Sha256(byts);
-        String hexx = Hex.toHexString(ripemded);
-        Assert.assertEquals(hexx, "8792d67cdcf37195da42c6a8db27745424647d69");
-    }
-
-    public void testSha256() throws Exception {
+    public void verfiySha256() throws Exception {
         byte[] bbb = CryptoUtil.sha256((BasicUtil.string2Bytes("abcde")));
         String hresult = Hex.toHexString(bbb);
         Assert.assertEquals(hresult, "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c");
     }
 
-    public void testRipemd160() {
+    public void verfiyRipemd160() {
         byte[] byts = BasicUtil.string2Bytes("123kkk");
         byte[] out = CryptoUtil.ripemd160(byts);
         Assert.assertEquals(Hex.toHexString(out), "5d3405a87994ba690252b17a7cf33d774448df9c");
     }
 
-    public void testRipemd160Sha256() throws Exception {
+    public void verfiyRipemd160Sha256() throws Exception {
         byte[] bbb = CryptoUtil.ripemd160Sha256(Hex.decode("36217336fd8deee3"));
         String hresult = Hex.toHexString(bbb);
         Assert.assertEquals(hresult, "47bf19535be7d2058875c28dbac9fa3070bbd809");
     }
 
-//    public void string2HexTest() {
+//    public void verfiyString2Hex() {
 //        String tt = Hex.toHexString(Hex.decode("12343213ef"));
 //        Assert.assertEquals(tt, "12343213ef");
 //    }
 
-    public void testDeterministicKey() throws Exception {
+    public void verfiyDeterministicKey() throws Exception {
         byte[] ss = CryptoUtil.generateDeterministicKey(Hex.decode("1625348fba"), Hex.decode("385960ffa4"));
         Assert.assertEquals(Hex.toHexString(ss), "296195601e0557bef8963a418c53489f4216e8fe033768b5ca2a9bfb02188296");
     }
 
-    public void testMnemonic2Seed2() throws UnsupportedEncodingException {
+    public void verfiyMnemonic2Seed2() throws UnsupportedEncodingException {
         String mnemonic = "29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6";
         byte[] buf = Hex.decode(mnemonic);
         byte[] buf2 = mnemonic.getBytes(UTF_8);
@@ -62,12 +55,12 @@ public final class VerifyCryptoUtil {
         Assert.assertEquals(hresult3, "65a0962bf6b22b0fd22cc1a6468d4b94b8597d8126a5bb4366488968c4b652c7f47cac81d8f342611c2c59c8da76d042aa0286ecc2a5146cbe746279a9d857f5");
     }
 
-    public void testGenerateBucketKey() throws Exception {
+    public void verfiyGenerateBucketKey() throws Exception {
         byte[] key = CryptoUtil.generateBucketKey(BasicUtil.string2Bytes("abcde abcde abcde abcde abcde abcde abcde abcde abcde abcde abcd"), Hex.decode("0123456789ab0123456789ab"));
         Assert.assertEquals(Hex.toHexString(key), "b17403c5130847731abd1c233e74002aa666c71497a19c90b7c305479ccd5844");
     }
 
-    public void testGenerateBucketKey2() throws Exception {
+    public void verfiyGenerateBucketKey2() throws Exception {
         byte[] pkpk = Hex.decode("29565ea5ecddb8fd624932dc82c24fd5fe9e06a3ccf5c5764e4a64712aa834a6");
         String magicBid = "398734aab3c4c30c9f22590e83a95f7e43556a45fc2b3060e0c39fde31f50272";
         byte[] key = CryptoUtil.generateBucketKey(pkpk, Hex.decode(magicBid));
@@ -75,7 +68,7 @@ public final class VerifyCryptoUtil {
         Assert.assertEquals(kstr, "76afd3c76a52bd9a2fc7449c5701dbaaa2caa2e67e8bfcee3b108c06dacc576a");
     }
 
-    public void testGenerateFileKey() throws Exception {
+    public void verfiyGenerateFileKey() throws Exception {
         String mnemonic = "abcde abcde abcde abcde abcde abcde abcde abcde abcde abcde abcd";
         String bucket_id = "0123456789ab0123456789ab";
         String index = "150589c9593bbebc0e795d8c4fa97304b42c110d9f0095abfac644763beca66e";
@@ -83,7 +76,7 @@ public final class VerifyCryptoUtil {
         Assert.assertEquals(Hex.toHexString(key), "eccd01f6a87991ff0b504718df1da40cb2bcda48099375f5124358771c9ebe2c");
     }
 
-    public void testAES() throws Exception {
+    public void verfiyAES() throws Exception {
         String message = "1234567890"; // e105e1aaf8da 6019753b58409d356e5c1cfc5a053ea8
         byte[] key = Hex.decode("123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f");
         byte[] iv  = Hex.decode("123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abc2f123abcf2");
@@ -93,7 +86,7 @@ public final class VerifyCryptoUtil {
         Assert.assertEquals(new String(messageBytes), message);
     }
 
-    public void testDecryptMeta() throws Exception {
+    public void verfiyDecryptMeta() throws Exception {
         byte[] realnameba = CryptoUtil.decryptMeta("0PkgasRWbaPHhAlRIPf/ZdhopoGRv4nQk8PeZQeyCizXv+DeNGbx48KobaTbRI9r9CTLBwOo", Hex.decode("727324ff68e45f183951f13d7fd70efd653cccf73ef8b60e3cbe7560aacecd8c"));
         String name = new String(realnameba);
         Assert.assertEquals(name, "secret");
