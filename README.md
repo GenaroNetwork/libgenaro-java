@@ -17,6 +17,7 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - Erasure encoding with reed solomon for data reliability
 - Exchange report with bridge
 - Command line interface
+- Mock bridge and farmer, and continous integration
 
 ## Feature Todo
 
