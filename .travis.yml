@@ -25,7 +25,6 @@ script:
   - cd build
   - cmake ..
   - make
-  - export TMPDIR=/tmp/
   - ./MockBridgeFarmer &
   - sleep 20  # wait for the mock bridge and farmer is ready
   - cd ../..

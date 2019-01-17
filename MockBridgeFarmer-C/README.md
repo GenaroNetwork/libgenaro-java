@@ -27,6 +27,5 @@ make
 
 ```shell
 cd build
-export TMPDIR=/tmp/
 ./MockBridgeFarmer
 ```

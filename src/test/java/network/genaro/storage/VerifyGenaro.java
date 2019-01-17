@@ -14,6 +14,9 @@ import network.genaro.storage.GenaroCallback.StoreFileCallback;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/*
+* before run the tests, run MockBridgeFarmer first. (read "README.md" of "MockBridgeFarmer-C" directory)
+*/
 @Test()
 public final class VerifyGenaro {
     private static final String testPrivKey = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
