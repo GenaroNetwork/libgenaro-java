@@ -329,7 +329,7 @@ public final class TestGenaro {
     }
 
     public void testStoreFile() throws Exception {
-        Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111", 0);
+        Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
 
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/513m.data", "513m.data", testBucketId, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(false, "/Users/dingyi/Downloads/500m.data", "500m2.data", testBucketId, new StoreFileCallback() {

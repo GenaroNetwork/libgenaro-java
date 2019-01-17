@@ -184,7 +184,7 @@ public final class VerifyGenaro {
             }
             @Override
             public void onFail(String error) {
-                Assert.fail("Download failed, reason: " + (error != null ? error : "Unknown") + ".");
+                Assert.fail("Upload failed, reason: " + (error != null ? error : "Unknown") + ".");
             }
         });
         uploader.join();

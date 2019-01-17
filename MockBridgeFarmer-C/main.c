@@ -40,11 +40,16 @@ int main(void)
 {
     // Make sure we have a tmp folder
     char *folder = getenv("TMPDIR");
-
-    if (folder == 0) {
-        printf("You need to set $TMPDIR before running. (e.g. export TMPDIR=/tmp/)\n");
-        exit(1);
-    }
+	
+	if (folder == 0) {
+        struct stat sb;
+		if (stat("/tmp/", &sb) == 0 && S_ISDIR(sb.st_mode)) {
+	        folder = "/tmp/";
+	    } else {
+	        printf("You need to set $TMPDIR before running. (e.g. export TMPDIR=/tmp/)\n");
+	        exit(1);
+	    }
+	}
 
     char *file_name = "genaro-test-upload.data";
     int len = strlen(folder) + 1 + strlen(file_name);
