@@ -59,6 +59,7 @@ final class ShardMeta {
 
     // Merkle Tree leaves. Each leaf is size of RIPEMD160 hash
     private String[] tree;  // [GENARO_SHARD_CHALLENGES]
+
     private int index;
     private boolean isParity;
     private long size;
@@ -235,6 +236,7 @@ final class Frame {
     }
 }
 
+// exchange report with bridge
 final class GenaroExchangeReport {
     private long start;
     private long end;
@@ -882,8 +884,8 @@ public final class Genaro {
         return info;
     }
 
-    CompletableFuture<Bucket> getBucketFuture(final Uploader uploader, final String bucketId) {
-        return CompletableFuture.supplyAsync(() -> {
+    Bucket getBucket(final Uploader uploader, final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<Bucket> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
             String signature;
             try {
@@ -928,10 +930,7 @@ public final class Genaro {
                 }
             }
         });
-    }
 
-    Bucket getBucket(final Uploader uploader, final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Bucket> fu = getBucketFuture(uploader, bucketId);
         if(uploader != null) {
             uploader.setFutureGetBucket(fu);
         }
@@ -1120,8 +1119,8 @@ public final class Genaro {
         });
     }
 
-    CompletableFuture<GenaroFile> getFileInfoFuture(final Downloader downloader, final String bucketId, final String fileId) {
-        return CompletableFuture.supplyAsync(() -> {
+    GenaroFile getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<GenaroFile> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
             String path = String.format("/buckets/%s/files/%s/info", bucketId, fileId);
             String signature;
@@ -1195,10 +1194,7 @@ public final class Genaro {
                 }
             }
         });
-    }
 
-    GenaroFile getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<GenaroFile> fu = getFileInfoFuture(downloader, bucketId, fileId);
         if(downloader != null) {
             downloader.setFutureGetFileInfo(fu);
         }
@@ -1407,8 +1403,8 @@ public final class Genaro {
         });
     }
 
-    CompletableFuture<List<Pointer>> requestPointersFuture(final Downloader downloader, final String bucketId, final String fileId) {
-        return CompletableFuture.supplyAsync(() -> {
+    List<Pointer> requestPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<List<Pointer>> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
             List<Pointer> ps= new ArrayList<>();
 
@@ -1442,10 +1438,7 @@ public final class Genaro {
 
             return ps;
         });
-    }
 
-    List<Pointer> requestPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<List<Pointer>> fu = requestPointersFuture(downloader, bucketId, fileId);
         if(downloader != null) {
             downloader.setFutureGetPointers(fu);
         }
@@ -1454,8 +1447,9 @@ public final class Genaro {
         return fu.get(2 * GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    private CompletableFuture<List<Pointer>> requestPointersRawFuture(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount) {
-        return CompletableFuture.supplyAsync(() -> {
+    private List<Pointer> requestPointersRaw(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<List<Pointer>> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
             String queryArgs = String.format("limit=%d&skip=%d", limit, skipCount);
             String url = String.format("/buckets/%s/files/%s", bucketId, fileId);
@@ -1521,16 +1515,12 @@ public final class Genaro {
                 }
             }
         });
-    }
 
-    private List<Pointer> requestPointersRaw(final Downloader downloader, final String bucketId, final String fileId, final int limit, final int skipCount)
-            throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<List<Pointer>> fu = requestPointersRawFuture(downloader, bucketId, fileId, limit, skipCount);
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    CompletableFuture<Boolean> isFileExistFuture(final Uploader uploader, final String bucketId, final String encryptedFileName) {
-        return CompletableFuture.supplyAsync(() -> {
+    boolean isFileExist(final Uploader uploader, final String bucketId, final String encryptedFileName) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<Boolean> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
             String escapedName;
             String path;
@@ -1578,18 +1568,15 @@ public final class Genaro {
                 }
             }
         });
-    }
 
-    boolean isFileExist(final Uploader uploader, final String bucketId, final String encryptedFileName) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Boolean> fu = isFileExistFuture(uploader, bucketId, encryptedFileName);
         if(uploader != null) {
             uploader.setFutureIsFileExists(fu);
         }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
     }
 
-    CompletableFuture<Frame> requestNewFrameFuture(final Uploader uploader) {
-        return CompletableFuture.supplyAsync(() -> {
+    Frame requestNewFrame(final Uploader uploader) throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<Frame> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
             String jsonStrBody = "{}";
 
@@ -1641,10 +1628,7 @@ public final class Genaro {
                 }
             }
         });
-    }
 
-    Frame requestNewFrame(final Uploader uploader) throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture<Frame> fu = requestNewFrameFuture(uploader);
         if(uploader != null) {
             uploader.setFutureRequestNewFrame(fu);
         }

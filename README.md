@@ -10,13 +10,13 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - Use wallet to sign request for user authentication
 - Delete bucket/rename bucket/list buckets/list files/delete file/upload file/download file
 - Asynchronous I/O with concurrent peer-to-peer network requests for shards
+- Erasure encoding with reed solomon for data reliability
 - File encryption with AES-256-CTR
 - File name and bucket name encryption with AES-256-GCM
 - Asynchronous progress updates
 - Retry several times when upload/download is failed
 - Seed based file encryption key for portability between devices
 - File integrity and authenticity verified with HMAC-SHA512
-- Erasure encoding with reed solomon for data reliability
 - Exchange report with bridge
 - Command line interface
 - Mock bridge and farmer, and continous integration
