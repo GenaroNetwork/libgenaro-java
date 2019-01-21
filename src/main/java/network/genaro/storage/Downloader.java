@@ -887,7 +887,7 @@ public final class Downloader implements Runnable {
         String indexStr = file.getIndex();
 
         try {
-            if (indexStr != null && indexStr.length() == 32) {
+            if (indexStr != null && indexStr.length() == 64) {
                 // calculate decryption key based on the index
                 byte[] index = Hex.decode(indexStr);
 
