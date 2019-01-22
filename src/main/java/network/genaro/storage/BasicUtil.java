@@ -4,16 +4,25 @@ import okhttp3.Call;
 import okhttp3.OkHttpClient;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Random;
 //import java.util.concurrent.Callable;
 //import java.util.concurrent.CompletableFuture;
 
 final class BasicUtil {
+    private static Random random = new Random();
+
     static byte[] string2Bytes(final String input) {
         return input.getBytes(StandardCharsets.UTF_8);
     }
 
     static String bytes2String(final byte[] input) {
         return new String(input, StandardCharsets.UTF_8);
+    }
+
+    public static byte[] randomBuff(final int len) {
+        byte[] buff = new byte[len];
+        random.nextBytes(buff);
+        return buff;
     }
 
 //    // This is basically doing the same as the CompletableFuture::supplyAsync(Supplier<U> supplier), but allowing checked exceptions

@@ -66,7 +66,6 @@ public final class Uploader implements Runnable {
     public static final int GENARO_MAX_VERIFY_BUCKET_ID = 3;
     public static final int GENARO_MAX_VERIFY_FILE_NAME = 3;
 
-    private static Random random = new Random();
     private static long MAX_SHARD_SIZE = 4294967296L; // 4Gb
     private static long MIN_SHARD_SIZE = 2097152L; // 2Mb
     private static int SHARD_MULTIPLES_BACK = 4;
@@ -105,9 +104,10 @@ public final class Uploader implements Runnable {
     private String hmacId;
     private String fileId;
 
-    private String indexStr;
     private byte[] index;
     private byte[] fileKey;
+
+    private EncryptionInfo ei;
 
     // not try to upload to these farmers
     private List<String> excludedFarmerIds = new ArrayList<>();
@@ -135,7 +135,12 @@ public final class Uploader implements Runnable {
 
     private final OkHttpClient upHttpClient;
 
-    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final StoreFileCallback storeFileCallback) {
+    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName,
+                    final String bucketId, final EncryptionInfo ei, final StoreFileCallback storeFileCallback) throws GenaroException {
+        if (bridge == null || filePath == null || fileName == null || bucketId == null || ei == null || storeFileCallback == null) {
+            throw new GenaroException("Illegal arguments");
+        }
+
         this.bridge = bridge;
         this.rs = rs;
         this.originPath = filePath;
@@ -144,7 +149,7 @@ public final class Uploader implements Runnable {
         this.bucketId = bucketId;
         this.storeFileCallback = storeFileCallback;
 
-        this.indexStr = bridge.getIndexStr();
+        this.ei = ei;
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectTimeout(GENARO_OKHTTP_CONNECT_TIMEOUT, TimeUnit.SECONDS)
@@ -161,8 +166,8 @@ public final class Uploader implements Runnable {
         upHttpClient = builder.build();
     }
 
-    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId) {
-        this(bridge, rs, filePath, fileName, bucketId, new StoreFileCallback() {});
+    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final EncryptionInfo ei) throws GenaroException {
+        this(bridge, rs, filePath, fileName, bucketId, ei, new StoreFileCallback() {});
     }
 
     public boolean isCanceled() {
@@ -222,12 +227,6 @@ public final class Uploader implements Runnable {
         return determineShardSize(fileSize, ++accumulator);
     }
 
-    private static byte[] randomBuff(final int len) {
-        byte[] buff = new byte[len];
-        random.nextBytes(buff);
-        return buff;
-    }
-
     private String createTmpName(final String encryptedFileName, final String extension) {
         String tmpFolder = System.getProperty("java.io.tmpdir");
         byte[] bytesEncoded;
@@ -255,33 +254,10 @@ public final class Uploader implements Runnable {
     }
 
     private boolean createEncryptedFile() {
-        boolean indexInvalid = true;
-        int len;
-        if (indexStr != null && (len = indexStr.length()) == 64) {
-            for(int i = 0; i < len; i++) {
-                char c = indexStr.charAt(i);
-                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-                    indexInvalid = false;
-                }
-            }
-        } else {
-            indexInvalid = false;
-        }
+        index = ei.getIndex();
+        fileKey = ei.getKey();
+        byte[] ivBytes = ei.getCtr();
 
-        if (indexInvalid) {
-            index = Hex.decode(indexStr);
-        } else {
-            index = randomBuff(32);
-        }
-//        index = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
-
-        try {
-            fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), Hex.decode(bucketId), index);
-        } catch (NoSuchAlgorithmException e) {
-            return false;
-        }
-
-        byte[] ivBytes = Arrays.copyOf(index, 16);
         SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
         IvParameterSpec iv = new IvParameterSpec(ivBytes);
 
@@ -372,7 +348,7 @@ public final class Uploader implements Runnable {
         shardMeta.setChallenges(new byte[GENARO_SHARD_CHALLENGES][]);
         shardMeta.setChallengesAsStr(new String[GENARO_SHARD_CHALLENGES]);
         for (int i = 0; i < GENARO_SHARD_CHALLENGES; i++) {
-            byte[] challenge = randomBuff(32);
+            byte[] challenge = BasicUtil.randomBuff(32);
             shardMeta.getChallenges()[i] = challenge;
             shardMeta.getChallengesAsStr()[i] = base16.toString(challenge).toLowerCase();
         }
@@ -763,6 +739,13 @@ public final class Uploader implements Runnable {
 
         String jsonStrBody = String.format("{\"frame\": \"%s\", \"filename\": \"%s\", \"index\": \"%s\", \"hmac\": {\"type\": \"sha512\", \"value\": \"%s\"}",
                 frameId, encryptedFileName, Hex.toHexString(index), hmacId);
+
+        byte[] rsaKey = ei.getRsaKey();
+        byte[] rsaCtr = ei.getRsaCtr();
+        if (rsaKey != null && rsaCtr != null) {
+            jsonStrBody += String.format(", \"rsaKey\": \"%s\", \"rsaCtr\": \"%s\"", base16.toString(rsaKey).toLowerCase(), base16.toString(rsaCtr).toLowerCase());
+        }
+
         if (rs) {
             jsonStrBody += String.format(", \"erasure\": {\"type\": \"reedsolomon\"}");
         }

@@ -1,5 +1,6 @@
 package network.genaro.storage;
 
+import com.sun.tools.javah.Gen;
 import gnu.getopt.Getopt;
 import gnu.getopt.LongOpt;
 
@@ -238,28 +239,34 @@ final class Cli {
             String fileId = args[commandIndex + 2];
             String path = args[commandIndex + 3];
 
-            Downloader downloader = genaro.resolveFile(bucketId, fileId, path, true, new ResolveFileCallback() {
-                @Override
-                public void onBegin() {
-                    System.out.println("Download started");
-                }
-                @Override
-                public void onProgress(float progress) {
-                    System.out.printf("Download progress: %.1f%%\n", progress * 100);
-                }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
-                }
-                @Override
-                public void onCancel() {
-                    System.out.println("Download is cancelled");
-                }
-                @Override
-                public void onFinish() {
-                    System.out.println("Download finished");
-                }
-            });
+            Downloader downloader = null;
+            try {
+                downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, new ResolveFileCallback() {
+                    @Override
+                    public void onBegin() {
+                        System.out.println("Download started");
+                    }
+                    @Override
+                    public void onProgress(float progress) {
+                        System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                    }
+                    @Override
+                    public void onFail(String error) {
+                        System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
+                    }
+                    @Override
+                    public void onCancel() {
+                        System.out.println("Download is cancelled");
+                    }
+                    @Override
+                    public void onFinish() {
+                        System.out.println("Download finished");
+                    }
+                });
+            } catch (GenaroException e) {
+                System.out.println(e.getMessage());
+                System.exit(0);
+            }
 
             downloader.join();
             System.exit(0);
@@ -274,28 +281,35 @@ final class Cli {
             File file = new File(path);
             String name = file.getName();
 
-            Uploader uploader = genaro.storeFile(false, path, name, bucketId, new StoreFileCallback() {
-                @Override
-                public void onBegin(long fileSize) {
-                    System.out.println("Upload started");
-                }
-                @Override
-                public void onProgress(float progress) {
-                    System.out.printf("Upload progress: %.1f%%\n", progress * 100);
-                }
-                @Override
-                public void onFail(String error) {
-                    System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
-                }
-                @Override
-                public void onCancel() {
-                    System.out.println("Upload is cancelled");
-                }
-                @Override
-                public void onFinish(String fileId) {
-                    System.out.println("Upload finished, fileId: " + fileId);
-                }
-            });
+            EncryptionInfo ei = genaro.generateEncryptionInfo(null, bucketId);
+            Uploader uploader = null;
+            try {
+                uploader = genaro.storeFile(false, path, name, bucketId, ei, new StoreFileCallback() {
+                    @Override
+                    public void onBegin(long fileSize) {
+                        System.out.println("Upload started");
+                    }
+                    @Override
+                    public void onProgress(float progress) {
+                        System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+                    }
+                    @Override
+                    public void onFail(String error) {
+                        System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
+                    }
+                    @Override
+                    public void onCancel() {
+                        System.out.println("Upload is cancelled");
+                    }
+                    @Override
+                    public void onFinish(String fileId) {
+                        System.out.println("Upload finished, fileId: " + fileId);
+                    }
+                });
+            } catch (GenaroException e) {
+                System.out.println(e.getMessage());
+                System.exit(0);
+            }
 
             uploader.join();
             System.exit(0);

@@ -120,12 +120,22 @@ public final class Downloader implements Runnable {
 
     private final OkHttpClient downHttpClient;
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String filePath, final boolean overwrite, final ResolveFileCallback resolveFileCallback) {
+    private String keyStr;
+    private String ctrStr;
+
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String filePath, final boolean overwrite,
+                      final String keyStr, final String ctrStr, final ResolveFileCallback resolveFileCallback) throws GenaroException {
+        if (bridge == null || bucketId == null || fileId == null || filePath == null || resolveFileCallback == null) {
+            throw new GenaroException("Illegal arguments");
+        }
+
         this.bridge = bridge;
         this.fileId = fileId;
         this.bucketId = bucketId;
         this.path = filePath;
         this.overwrite = overwrite;
+        this.keyStr = keyStr;
+        this.ctrStr = ctrStr;
         this.tempPath = filePath + ".genarotemp";
         this.resolveFileCallback = resolveFileCallback;
 
@@ -144,8 +154,8 @@ public final class Downloader implements Runnable {
         downHttpClient = builder.build();
     }
 
-    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite) {
-        this(bridge, bucketId, fileId, path, overwrite, new ResolveFileCallback() {});
+    public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite, final String keyStr, final String ctrStr) throws GenaroException {
+        this(bridge, bucketId, fileId, path, overwrite, keyStr, ctrStr, new ResolveFileCallback() {});
     }
 
     public List<Pointer> getPointers() {
@@ -887,14 +897,17 @@ public final class Downloader implements Runnable {
         String indexStr = file.getIndex();
 
         try {
-            if (indexStr != null && indexStr.length() == 64) {
-                // calculate decryption key based on the index
+            if (keyStr != null && ctrStr != null) {
+                fileKey = base16.fromString(keyStr);
+                ivBytes = base16.fromString(ctrStr);
+            } else if (indexStr != null && indexStr.length() == 64) {
+                // calculate decryption key based on index
                 byte[] index = Hex.decode(indexStr);
 
                 fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, index);
                 ivBytes = Arrays.copyOf(index, 16);
             } else {
-                // calculate decryption key based on the file_id
+                // calculate decryption key based on file id
                 fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, fileIdBytes);
                 fileKey = Hex.encode(fileKey);
                 fileKey = CryptoUtil.sha256(fileKey);
@@ -902,7 +915,7 @@ public final class Downloader implements Runnable {
             }
         } catch(Exception e){
             stop();
-            resolveFileCallback.onFail("Generate file key error");
+            resolveFileCallback.onFail("AES file key error");
             return;
         }
 

@@ -1,5 +1,6 @@
 package network.genaro.storage;
 
+import com.sun.tools.javah.Gen;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -173,33 +174,36 @@ public final class VerifyGenaro {
         Assert.assertEquals(frame.getId(), "d6367831f7f1b117ffdd0015");
     }
 
-    public void verifyStoreFile() {
+    public void verifyStoreFile() throws GenaroException {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
-        api.setIndexStr(testIndexStr);
+        EncryptionInfo ei = api.generateEncryptionInfo(testIndexStr, testBucketId);
 
         if (!tempDir.endsWith("/")) {
             tempDir += "/";
         }
-        Uploader uploader = api.storeFile(true, tempDir + testUploadFileName, testUploadFileName, testBucketId, new StoreFileCallback() {
+
+        Uploader uploader = api.storeFile(true, tempDir + testUploadFileName, testUploadFileName, testBucketId, ei, new StoreFileCallback() {
             @Override
             public void onFinish(String fileId) {
                 Assert.assertEquals(fileId, "85fb0ed00de1196dc22e0f6d");
             }
+
             @Override
             public void onFail(String error) {
                 Assert.fail("Upload failed, reason: " + (error != null ? error : "Unknown") + ".");
             }
         });
+
         uploader.join();
     }
 
-    public void verifyResolveFile() {
+    public void verifyResolveFile() throws GenaroException {
         Genaro api = new Genaro(testBridgeUrl, testPrivKey);
 
         if (!tempDir.endsWith("/")) {
             tempDir += "/";
         }
-        Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, null, null, new ResolveFileCallback() {
             @Override
             public void onFinish() {
                 // check the sha256 of the file is: 5b2eb5f37cc1bfaaf73670cafac5ab7ce247ca06e973e7de0dae940d3af6784b

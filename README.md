@@ -18,17 +18,17 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 - Seed based file encryption key for portability between devices
 - File integrity and authenticity verified with HMAC-SHA512
 - Exchange report with bridge
+- File encryption key be provided to decrypt encrypted file
 - Command line interface
 - Mock bridge and farmer, and continous integration
 
 ## Feature Todo
 
-- File encryption key be provided to decrypt encrypted file
 - String literal be encrypted with AES-256-CTR and directly stored to a bucket
 
 ## Issues
 
-- Upload or download file of large size(>512MB) will not use Reed-Solomon algorithm, or it may cause an OutOfMemoryError, becasue the Reed-Solomon algorithm doesn't support memory mapped files for now.
+- Upload or download file of large size(>512MB) will not use Reed-Solomon algorithm, or it may cause an OutOfMemoryError, becasue the JavaReedSolomon library doesn't support memory mapped files.
 
 ## 3rd party dependencies
 
@@ -184,16 +184,21 @@ String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String filePath = "xxxxxx";
 String fileName = "abc.txt";
 boolean rs = false;
-Uploader uploader = api.storeFile(rs, filePath, fileName, bucketId, new StoreFileCallback() {
-    @Override
-    public void onBegin(long fileSize) { }
-    @Override
-    public void onFail(String error) { }
-    @Override
-    public void onFinish(String fileId) { }
-    @Override
-    public void onProgress(float progress) { }
-});
+
+EncryptionInfo ei = genaro.generateEncryptionInfo(null, bucketId);
+Uploader uploader = null;
+try {
+    uploader = api.storeFile(rs, filePath, fileName, bucketId, ei, new StoreFileCallback() {
+        @Override
+        public void onBegin(long fileSize) { }
+        @Override
+        public void onFail(String error) { }
+        @Override
+        public void onFinish(String fileId) { }
+        @Override
+        public void onProgress(float progress) { }
+    });
+} catch (GenaroException e) { }
 
 // storeFile is Non-Blocking, if you want to wait until it is finished, call uploader.join()
 // if you want to cancel it, call uploader.cancel()
@@ -205,16 +210,20 @@ Download file:
 String bucketId = "5bfcf4ea7991d267f4eb53b4";
 String fileId = "5c0103fd5a158a5612e67461";
 String filePath = "xxxxxx";
-Downloader downloader = api.resolveFile(bucketId, fileId, filePath, new ResolveFileCallback() {
-    @Override
-    public void onBegin() { }
-    @Override
-    public void onFail(String error) { }
-    @Override
-    public void onFinish() { }
-    @Override
-    public void onProgress(float progress) { }
-});
+
+Downloader downloader = null;
+try {
+    downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, new ResolveFileCallback() {
+        @Override
+        public void onBegin() { }
+        @Override
+        public void onFail(String error) { }
+        @Override
+        public void onFinish() { }
+        @Override
+        public void onProgress(float progress) { }
+    });
+} catch (GenaroException e) { }
 
 // resolveFile is Non-Blocking, if you want to wait until it is finished, call downloader.join()
 // if you want to cancel it, call downloader.cancel()
