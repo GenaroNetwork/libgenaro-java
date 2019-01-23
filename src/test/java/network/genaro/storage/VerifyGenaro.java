@@ -183,7 +183,7 @@ public final class VerifyGenaro {
 
         Uploader uploader = api.storeFile(true, tempDir + testUploadFileName, testUploadFileName, testBucketId, ei, new StoreFileCallback() {
             @Override
-            public void onFinish(String fileId) {
+            public void onFinish(String fileId, byte[] sha256OfEncrypted) {
                 Assert.assertEquals(fileId, "85fb0ed00de1196dc22e0f6d");
             }
 
@@ -202,9 +202,9 @@ public final class VerifyGenaro {
         if (!tempDir.endsWith("/")) {
             tempDir += "/";
         }
-        Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, null, null, new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, null, null, true, new ResolveFileCallback() {
             @Override
-            public void onFinish() {
+            public void onFinish(long fileBytes, byte[] sha256) {
                 // check the sha256 of the file is: 5b2eb5f37cc1bfaaf73670cafac5ab7ce247ca06e973e7de0dae940d3af6784b
             }
             @Override

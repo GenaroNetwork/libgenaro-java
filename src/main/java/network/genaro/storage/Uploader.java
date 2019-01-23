@@ -35,9 +35,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -103,6 +101,9 @@ public final class Uploader implements Runnable {
     private String frameId;
     private String hmacId;
     private String fileId;
+
+    // Initialize context for sha256 of encrypted data(not include the parity shards)
+    MessageDigest sha256OfEncryptedMd;
 
     private byte[] index;
     private byte[] fileKey;
@@ -280,7 +281,20 @@ public final class Uploader implements Runnable {
             } else {
                 cryptChannel = FileChannel.open(Paths.get(cryptFilePath), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                         StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.DELETE_ON_CLOSE);
+
+                // transfer InputStream to FileChannel
                 cryptChannel.transferFrom(Channels.newChannel(cypherIn), 0, originFileSize);
+
+                // calculate sha256 of the encrypted file
+                int readBytes;
+                ByteBuffer readBuffer = ByteBuffer.allocate(BLOCK_BYTES);
+                while ((readBytes = cryptChannel.read(readBuffer)) != -1) {
+                    readBuffer.flip();
+                    byte[] readData = new byte[readBytes];
+                    readBuffer.get(readData, 0, readBytes);
+                    sha256OfEncryptedMd.update(readData, 0, readBytes);
+                    readBuffer.flip();
+                }
             }
         } catch (Exception e) {
             isSuccess = false;
@@ -355,7 +369,7 @@ public final class Uploader implements Runnable {
 
         Genaro.logger.info(String.format("Creating frame for shard index %d...", shard.getIndex()));
 
-        // Initialize context for sha256 of encrypted data
+        // Initialize context for sha256 of encrypted data of shard
         MessageDigest shardHashMd;
         try {
             shardHashMd = MessageDigest.getInstance("SHA-256");
@@ -386,11 +400,10 @@ public final class Uploader implements Runnable {
 
         try {
             int readBytes;
-            final int BYTES = AES_BLOCK_SIZE * 256;
             long totalRead = 0;
             long position = shardMeta.getIndex() * shardSize;
 
-            ByteBuffer readBuffer = ByteBuffer.allocate(BYTES);
+            ByteBuffer readBuffer = ByteBuffer.allocate(BLOCK_BYTES);
             FileChannel shardChannel = shard.getShardChannel();
 
             do {
@@ -842,6 +855,13 @@ public final class Uploader implements Runnable {
         totalShards = totalDataShards + totalParityShards;
         totalBytes = originFileSize + totalParityShards * shardSize;
 
+        try {
+            sha256OfEncryptedMd = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            storeFileCallback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+            return;
+        }
+
         storeFileCallback.onBegin(originFileSize);
 
         for (int i = 0; i < GENARO_MAX_VERIFY_BUCKET_ID; i++) {
@@ -1097,7 +1117,7 @@ public final class Uploader implements Runnable {
         // it's not necessary, because 1.0f is already passed to onProgress
         // storeFileCallback.onProgress(1.0f);
 
-        storeFileCallback.onFinish(fileId);
+        storeFileCallback.onFinish(fileId, sha256OfEncryptedMd.digest());
     }
 
     private void stop() {

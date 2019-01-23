@@ -34,7 +34,13 @@ public interface GenaroCallback {
     interface ResolveFileCallback {
         default void onBegin() { }
 
-        default void onFinish() { }
+        /**
+         * called when download finish
+         *
+         * @param fileBytes the file size
+         * @param sha256 sha256 of the downloaded file
+         */
+        default void onFinish(long fileBytes, byte[] sha256) { }
 
         default void onFail(String error) { }
 
@@ -51,7 +57,13 @@ public interface GenaroCallback {
     interface StoreFileCallback {
         default void onBegin(long fileSize) { }
 
-        default void onFinish(String fileId) { }
+        /**
+         * called when upload finish
+         *
+         * @param fileId file id
+         * @param sha256OfEncrypted sha256 of the encrypted file(not include the parity shards)
+         */
+        default void onFinish(String fileId, byte[] sha256OfEncrypted) { }
 
         default void onFail(String error) { }
 

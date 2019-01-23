@@ -3,6 +3,8 @@ package network.genaro.storage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -50,7 +52,9 @@ final class CryptoUtil {
     private static final int RIPEMD160_DIGEST_SIZE = 20;
     private static final int AES_GCM_DIGEST_LENGTH = 16;
     private static final int AES_GCM_IV_LENGTH = 32;
-    static final int AES_BLOCK_SIZE = 16;
+//    static final int AES_BLOCK_SIZE = 16;
+
+    static final int BLOCK_BYTES = 8 * 512;
 
     private static final int SEED_ITERATIONS = 2048;
     private static final int SEED_KEY_SIZE = 512;
@@ -63,6 +67,27 @@ final class CryptoUtil {
 
     static byte[] sha256(final byte[] input) throws NoSuchAlgorithmException {
         return MessageDigest.getInstance("SHA-256").digest(input);
+    }
+
+    static byte[] sha256OfFile(final FileChannel fc) throws Exception {
+        MessageDigest sha256Md = MessageDigest.getInstance("SHA-256");
+        ByteBuffer readBuffer = ByteBuffer.allocate(BLOCK_BYTES);
+
+        long originPosition = fc.position();
+        fc.position(0);
+
+        int readBytes;
+        while ((readBytes = fc.read(readBuffer)) != -1) {
+            readBuffer.flip();
+            byte[] readData = new byte[readBytes];
+            readBuffer.get(readData, 0, readBytes);
+            sha256Md.update(readData, 0, readBytes);
+            readBuffer.flip();
+        }
+
+        fc.position(originPosition);
+
+        return sha256Md.digest();
     }
 
     static byte[] sha512(final byte[] input) throws NoSuchAlgorithmException {

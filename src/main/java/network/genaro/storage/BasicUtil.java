@@ -19,7 +19,21 @@ final class BasicUtil {
         return new String(input, StandardCharsets.UTF_8);
     }
 
-    public static byte[] randomBuff(final int len) {
+//    static String byteArrayToHexStr(byte[] byteArray) {
+//        if (byteArray == null){
+//            return null;
+//        }
+//        char[] hexArray = "0123456789abcdef".toCharArray();
+//        char[] hexChars = new char[byteArray.length * 2];
+//        for (int j = 0; j < byteArray.length; j++) {
+//            int v = byteArray[j] & 0xFF;
+//            hexChars[j * 2] = hexArray[v >>> 4];
+//            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+//        }
+//        return new String(hexChars);
+//    }
+
+    static byte[] randomBuff(final int len) {
         byte[] buff = new byte[len];
         random.nextBytes(buff);
         return buff;

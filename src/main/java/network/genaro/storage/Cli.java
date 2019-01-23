@@ -240,7 +240,7 @@ final class Cli {
 
             Downloader downloader = null;
             try {
-                downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, new ResolveFileCallback() {
+                downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, true, new ResolveFileCallback() {
                     @Override
                     public void onBegin() {
                         System.out.println("Download started");
@@ -258,7 +258,7 @@ final class Cli {
                         System.out.println("Download is cancelled");
                     }
                     @Override
-                    public void onFinish() {
+                    public void onFinish(long fileBytes, byte[] sha256) {
                         System.out.println("Download finished");
                     }
                 });
@@ -301,7 +301,7 @@ final class Cli {
                         System.out.println("Upload is cancelled");
                     }
                     @Override
-                    public void onFinish(String fileId) {
+                    public void onFinish(String fileId, byte[] sha256OfEncrypted) {
                         System.out.println("Upload finished, fileId: " + fileId);
                     }
                 });

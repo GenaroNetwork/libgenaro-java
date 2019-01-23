@@ -692,7 +692,7 @@ public final class Genaro {
             indexBytes = BasicUtil.randomBuff(32);
         }
 
-//        index = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
+        // indexBytes = Hex.decode("1ffb37c2ac31231363a5996215e840ab75fc288f98ea77d9bee62b87f6e5852f");
 
         try {
             keyBytes = CryptoUtil.generateFileKey(getPrivateKey(), Hex.decode(bucketId), indexBytes);
@@ -1678,11 +1678,13 @@ public final class Genaro {
      * @param[in] overwrite Whether to overwrite if exists
      * @param[in] key The key of AES for decryption
      * @param[in] ctr The ctr of AES for decryption
+     * @param[in] isDecrypt Whether to decrypt the downloaded data
      * @param[in] callback The callback on progress or when complete
      * @return A Downloader.
      */
-    public Downloader resolveFile(final String bucketId, final String fileId, final String filePath, final boolean overwrite, final String key, final String ctr, final ResolveFileCallback callback) throws GenaroException {
-        Downloader downloader = new Downloader(this, bucketId, fileId, filePath, overwrite, key, ctr, callback);
+    public Downloader resolveFile(final String bucketId, final String fileId, final String filePath, final boolean overwrite,
+                                  final String key, final String ctr, final boolean isDecrypt, final ResolveFileCallback callback) throws GenaroException {
+        Downloader downloader = new Downloader(this, bucketId, fileId, filePath, overwrite, key, ctr, isDecrypt, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(downloader);
         downloader.setFutureBelongsTo(fu);
 
@@ -1700,7 +1702,8 @@ public final class Genaro {
      * @param[in] callback The callback on progress or when complete
      * @return A Uploader.
      */
-    public Uploader storeFile(final boolean rs, final String filePath, final String fileName, final String bucketId, EncryptionInfo ei, final StoreFileCallback callback) throws GenaroException {
+    public Uploader storeFile(final boolean rs, final String filePath, final String fileName, final String bucketId,
+                              EncryptionInfo ei, final StoreFileCallback callback) throws GenaroException {
         Uploader uploader = new Uploader(this, rs, filePath, fileName, bucketId, ei, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(uploader);
         uploader.setFutureBelongsTo(fu);
