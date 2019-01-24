@@ -240,7 +240,7 @@ final class Cli {
 
             Downloader downloader = null;
             try {
-                downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, true, new ResolveFileCallback() {
+                downloader = genaro.resolveFile(bucketId, fileId, path, true, true, null, null, new ResolveFileCallback() {
                     @Override
                     public void onBegin() {
                         System.out.println("Download started");

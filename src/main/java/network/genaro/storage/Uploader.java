@@ -1,23 +1,5 @@
 package network.genaro.storage;
 
-import com.backblaze.erasure.OutputInputByteTableCodingLoop;
-import com.backblaze.erasure.ReedSolomon;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Response;
-import okhttp3.Request;
-import okhttp3.MediaType;
-import okhttp3.RequestBody;
-
-import javax.crypto.CipherInputStream;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.Mac;
-import static javax.crypto.Cipher.ENCRYPT_MODE;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,9 +27,28 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeoutException;
 
-import org.xbill.DNS.utils.base16;
+import javax.crypto.CipherInputStream;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.Mac;
+import static javax.crypto.Cipher.ENCRYPT_MODE;
+
+import com.backblaze.erasure.OutputInputByteTableCodingLoop;
+import com.backblaze.erasure.ReedSolomon;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Response;
+import okhttp3.Request;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
 
 import org.bouncycastle.util.encoders.Hex;
+
+import org.xbill.DNS.utils.base16;
 
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;

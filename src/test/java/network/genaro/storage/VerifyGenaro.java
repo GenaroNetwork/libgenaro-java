@@ -1,5 +1,8 @@
 package network.genaro.storage;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -10,9 +13,6 @@ import network.genaro.storage.GenaroCallback.ListMirrorsCallback;
 import network.genaro.storage.GenaroCallback.DeleteFileCallback;
 import network.genaro.storage.GenaroCallback.ResolveFileCallback;
 import network.genaro.storage.GenaroCallback.StoreFileCallback;
-
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /*
 * before run the tests, run MockBridgeFarmer first. (read "README.md" of "MockBridgeFarmer-C" directory)
@@ -202,7 +202,7 @@ public final class VerifyGenaro {
         if (!tempDir.endsWith("/")) {
             tempDir += "/";
         }
-        Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, null, null, true, new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, true, null, null, new ResolveFileCallback() {
             @Override
             public void onFinish(long fileBytes, byte[] sha256) {
                 Assert.assertEquals(BasicUtil.byteArrayToHexStr(sha256), "5b2eb5f37cc1bfaaf73670cafac5ab7ce247ca06e973e7de0dae940d3af6784b");
@@ -214,5 +214,20 @@ public final class VerifyGenaro {
         });
 
         downloader.join();
+    }
+
+    public void verifyEncryptAndDecryptMeta() throws Exception {
+        Genaro api = new Genaro(testBridgeUrl, testPrivKey);
+
+        if (!tempDir.endsWith("/")) {
+            tempDir += "/";
+        }
+
+        String text = "Hello你好";
+        String filePath = tempDir + "encrypted.data";
+        api.encryptMetaToFile(text, filePath);
+        String decryptedText = api.decryptMetaFromFile(filePath);
+
+        Assert.assertEquals(decryptedText, text);
     }
 }

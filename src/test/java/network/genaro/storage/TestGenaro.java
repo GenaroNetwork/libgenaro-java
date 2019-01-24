@@ -1,11 +1,11 @@
 package network.genaro.storage;
 
-import org.bouncycastle.util.encoders.Hex;
-import org.testng.annotations.Test;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import org.bouncycastle.util.encoders.Hex;
+import org.testng.annotations.Test;
 
 import network.genaro.storage.GenaroCallback.GetBucketsCallback;
 import network.genaro.storage.GenaroCallback.DeleteBucketCallback;
@@ -228,9 +228,9 @@ public final class TestGenaro {
     public void testResolveFile() throws Exception {
         Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
 
-        // Downloader downloader = api.resolveFile(testBucketId, "5c3c5d38926e422b70d1fb09", "/Users/dingyi/Genaro/test/download/500m3.data", true, null, null, new ResolveFileCallback() {
-//         Downloader downloader = api.resolveFile(testBucketId, "5c4813482e2d60343699b47a", "/Users/dingyi/Genaro/test/download/genaroNetwork-windows.zip", true, null, null, true, new ResolveFileCallback() {
-        Downloader downloader = api.resolveFile(testBucketId, "5c46e2ed2e2d60343699b38c", "/Users/dingyi/Genaro/test/download/spam.txt", true, null, null, true, new GenaroCallback.ResolveFileCallback() {
+        // Downloader downloader = api.resolveFile(testBucketId, "5c3c5d38926e422b70d1fb09", "/Users/dingyi/Genaro/test/download/500m3.data", true, true, null, null, new ResolveFileCallback() {
+         Downloader downloader = api.resolveFile(testBucketId, "5c492c1a2e2d60343699b5b4", "/Users/dingyi/Genaro/test/download/spam.txt", true, true, null, null, new ResolveFileCallback() {
+//        Downloader downloader = api.resolveFile(testBucketId, "5c46e2ed2e2d60343699b38c", "/Users/dingyi/Genaro/test/download/spam.txt", true, true, null, null, new GenaroCallback.ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
@@ -259,7 +259,7 @@ public final class TestGenaro {
     public void testResolveFileCancel() throws Exception {
         Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
 
-        Downloader downloader = api.resolveFile(testBucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", true, null, null, true, new ResolveFileCallback() {
+        Downloader downloader = api.resolveFile(testBucketId, "5c08d01c963d402a1f3ede80", "/Users/dingyi/Genaro/test/download/r.zip", true, true, null, null, new ResolveFileCallback() {
             @Override
             public void onBegin() {
                 System.out.println("Download started");
@@ -294,7 +294,7 @@ public final class TestGenaro {
 
         try {
             for(int i = 0; i < 5; i++) {
-                Downloader downloader = api.resolveFile(testBucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", true, null, null, true, new ResolveFileCallback() {
+                Downloader downloader = api.resolveFile(testBucketId, "5bf7c98165390d21283c15f5", "/Users/dingyi/Genaro/test/download/spam" + i + ".txt", true, true, null, null, new ResolveFileCallback() {
                     @Override
                     public void onBegin() {
                         System.out.println("Download started");
@@ -341,7 +341,7 @@ public final class TestGenaro {
 
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/513m.data", "513m.data", testBucketId, ei, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/3g.data", "3g1.data", testBucketId, ei, new StoreFileCallback() {
-        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", "spam22.txt", testBucketId, ei, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", "spam33.txt", testBucketId, ei, new StoreFileCallback() {
             //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/2097153.data", "2097153.data", testBucketId, ei, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", testBucketId, ei, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/genaro.tar", "1.tar", testBucketId, ei, new StoreFileCallback() {
@@ -440,5 +440,75 @@ public final class TestGenaro {
         }
 
         uploaders.stream().forEach(uploader -> uploader.join());
+    }
+
+    public void testDecryptFileToText() throws Exception {
+        Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
+        EncryptionInfo ei = api.generateEncryptionInfo(null, testBucketId);
+        byte[] key = ei.getKey();
+        byte[] ctr = ei.getCtr();
+        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", "spam37.txt", testBucketId, ei, new StoreFileCallback() {
+            @Override
+            public void onBegin(long fileSize) {
+                System.out.println("Upload started");
+            }
+            @Override
+            public void onProgress(float progress) {
+//                System.out.printf("Upload progress: %.1f%%\n", progress * 100);
+            }
+            @Override
+            public void onFail(String error) {
+                System.out.println("Upload failed, reason: " + (error != null ? error : "Unknown"));
+            }
+            @Override
+            public void onCancel() {
+                System.out.println("Upload is cancelled");
+            }
+
+            @Override
+            public void onFinish(String fileId, byte[] sha256OfEncrypted) {
+                try {
+                    Downloader downloader = api.resolveFile(testBucketId, fileId, "/Users/dingyi/Genaro/test/download/spam_undecrypted.txt", true, false, null, null, new ResolveFileCallback() {
+                        @Override
+                        public void onBegin() {
+                            System.out.println("Download started");
+                        }
+                        @Override
+                        public void onProgress(float progress) {
+//                            System.out.printf("Download progress: %.1f%%\n", progress * 100);
+                        }
+                        @Override
+                        public void onFail(String error) {
+                            System.out.println("Download failed, reason: " + (error != null ? error : "Unknown"));
+                        }
+                        @Override
+                        public void onCancel() {
+                            System.out.println("Download is cancelled");
+                        }
+                        @Override
+                        public void onFinish(long fileBytes, byte[] sha256) {
+                            try {
+                                String text = Genaro.decryptFileToText("/Users/dingyi/Genaro/test/download/spam_undecrypted.txt", key, ctr);
+                                System.out.println(text);
+                            } catch (Exception e) {
+                            }
+                        }
+                    });
+
+                    downloader.join();
+                } catch (Exception e) {
+                }
+            }
+        });
+
+        uploader.join();
+    }
+
+    public void test() throws Exception {
+        Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
+        String text = "Hello你好";
+        api.encryptMetaToFile(text, "/Users/dingyi/Genaro/test/download/encrypted.data");
+        String decryptedText = api.decryptMetaFromFile("/Users/dingyi/Genaro/test/download/encrypted.data");
+        System.out.println("The decrypted text:" + decryptedText);
     }
 }

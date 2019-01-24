@@ -1,17 +1,13 @@
 package network.genaro.storage;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.MediaType;
-import okhttp3.RequestBody;
-
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketTimeoutException;
@@ -26,10 +22,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import javax.crypto.CipherInputStream;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.appender.ConsoleAppender;
 import org.apache.logging.log4j.core.config.Configurator;
@@ -38,10 +37,22 @@ import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilder;
 import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
 import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
 
-import org.web3j.crypto.CipherException;
-
 import org.bouncycastle.util.encoders.Hex;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
+
+import org.web3j.crypto.CipherException;
+
+import static javax.crypto.Cipher.DECRYPT_MODE;
 import static network.genaro.storage.CryptoUtil.*;
 import static network.genaro.storage.Parameters.*;
 import static network.genaro.storage.Pointer.PointerStatus.*;
@@ -877,47 +888,6 @@ public final class Genaro {
         }
     }
 
-    public String getInfo() {
-        CompletableFuture<String> fu = CompletableFuture.supplyAsync(() -> {
-            verifyInit(false);
-            Request request = new Request.Builder()
-                    .url(bridgeUrl)
-                    .get()
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                String responseBody = response.body().string();
-
-                if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
-
-                ObjectMapper om = new ObjectMapper();
-
-                JsonNode bodyNode = om.readTree(responseBody);
-                JsonNode infoNode = bodyNode.get("info");
-
-                String title = infoNode.get("title").asText();
-                String description = infoNode.get("description").asText();
-                String version = infoNode.get("version").asText();
-                String host = bodyNode.get("host").asText();
-
-                return "Title:       " + title + "\n" +
-                        "Description: " + description + "\n" +
-                        "Version:     " + version + "\n" +
-                        "Host:        " + host + "\n";
-            } catch (IOException e) {
-                throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-            }
-        });
-
-        String info;
-        try {
-            info = fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
-        }  catch (Exception e) {
-            return null;
-        }
-        return info;
-    }
-
     Bucket getBucket(final Uploader uploader, final String bucketId) throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture<Bucket> fu = CompletableFuture.supplyAsync(() -> {
             verifyInit(true);
@@ -969,188 +939,6 @@ public final class Genaro {
             uploader.setFutureGetBucket(fu);
         }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
-    }
-
-    /**
-     * @brief List available buckets for a user.
-     *
-     * @param[in] callback The callback when complete
-     * @return A CompletableFuture.
-     */
-    public CompletableFuture<Void> getBuckets(final GetBucketsCallback callback) {
-        return CompletableFuture.supplyAsync(() -> {
-            verifyInit(true);
-            String signature;
-            try {
-                signature = signRequest("GET", "/buckets", "");
-            } catch (NoSuchAlgorithmException e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + "/buckets")
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .get()
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                String responseBody = response.body().string();
-
-                if (code == 401) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                    return null;
-                } else if (code != 200 && code != 304) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                    return null;
-                }
-
-                ObjectMapper om = new ObjectMapper();
-                Bucket[] buckets = om.readValue(responseBody, Bucket[].class);
-
-                try {
-                    // decrypt
-                    for (Bucket b : buckets) {
-                        if (b.getNameIsEncrypted()) {
-                            b.setName(CryptoUtil.decryptMetaHmacSha512(b.getName(), getPrivateKey(), BUCKET_NAME_MAGIC));
-                            b.setNameIsEncrypted(false);
-                        }
-                    }
-                } catch (Exception e) {
-                    callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                    return null;
-                }
-
-                callback.onFinish(buckets);
-            } catch (SocketTimeoutException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                return null;
-            } catch (IOException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                return null;
-            }
-
-            return null;
-        });
-    }
-
-    /**
-     * @brief Delete a bucket.
-     *
-     * @param[in] bucketId The bucket id
-     * @param[in] callback The callback when complete
-     * @return A CompletableFuture.
-     */
-    public CompletableFuture<Void> deleteBucket(final String bucketId, final DeleteBucketCallback callback) {
-        return CompletableFuture.supplyAsync(() -> {
-            verifyInit(true);
-            String signature;
-            try {
-                signature = signRequest("DELETE", "/buckets/" + bucketId, "");
-            } catch (Exception e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + "/buckets/" + bucketId)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .delete()
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                response.close();
-
-                if (code == 401) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                    return null;
-                } else if (code == 404) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
-                    return null;
-                } else if (code != 200 && code != 204) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                    return null;
-                }
-
-                callback.onFinish();
-            } catch (SocketTimeoutException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                return null;
-            } catch (IOException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                return null;
-            }
-
-            return null;
-        });
-    }
-
-    /**
-     * @brief Rename a bucket.
-     *
-     * @param[in] bucketId The bucket id
-     * @param[in] callback The callback when complete
-     * @return A CompletableFuture.
-     */
-    public CompletableFuture<Void> renameBucket(final String bucketId, final String name, final RenameBucketCallback callback) {
-        return CompletableFuture.supplyAsync(() -> {
-            verifyInit(true);
-            String encryptedName;
-            try {
-                encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), getPrivateKey(), BUCKET_NAME_MAGIC);
-            } catch (Exception e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-            String jsonStrBody = String.format("{\"name\": \"%s\", \"nameIsEncrypted\": true}", encryptedName);
-
-            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-            RequestBody body = RequestBody.create(JSON, jsonStrBody);
-            String signature;
-            try {
-                signature = signRequest("POST", "/buckets/" + bucketId, jsonStrBody);
-            } catch (Exception e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + "/buckets/" + bucketId)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .post(body)
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                response.close();
-
-                if (code == 401) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                    return null;
-                } else if (code == 404) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
-                    return null;
-                } else if (code != 200) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                    return null;
-                }
-
-                callback.onFinish();
-            } catch (SocketTimeoutException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                return null;
-            } catch (IOException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                return null;
-            }
-
-            return null;
-        });
     }
 
     GenaroFile getFileInfo(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
@@ -1233,208 +1021,6 @@ public final class Genaro {
             downloader.setFutureGetFileInfo(fu);
         }
         return fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
-    }
-
-    public CompletableFuture<Void> listMirrors(final String bucketId, final String fileId, final ListMirrorsCallback callback) {
-        return CompletableFuture.supplyAsync(() -> {
-            verifyInit(true);
-            String path = String.format("/buckets/%s/files/%s/mirrors", bucketId, fileId);
-            String signature;
-            try {
-                signature = signRequest("GET", path, "");
-            } catch (Exception e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + path)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .get()
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                String responseBody = response.body().string();
-
-                if(code == 403 || code == 401) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                    return null;
-                } else if (code == 404 || code == 400) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
-                    return null;
-                } else if(code == 500) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
-                    return null;
-                } else if (code != 200 && code != 304){
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                    return null;
-                }
-
-                String retText = "";
-
-                ObjectMapper om = new ObjectMapper();
-                JsonNode bodyNode = om.readTree(responseBody);
-
-                int i = 0;
-                for (JsonNode itemNode: bodyNode) {
-                    JsonNode establishedNode = itemNode.get("established");
-
-                    int j = 0;
-                    for (JsonNode subNode: establishedNode) {
-                        if (j == 0) {
-                            retText += String.format("Shard %d: %s\n", i, subNode.get("shardHash").asText());
-                        }
-
-                        retText += String.format("\tnodeID: %s\n", subNode.get("contract").get("farmer_id").asText());
-                        j++;
-                    }
-                    i++;
-                }
-
-                if (retText.isEmpty()) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_JSON_ERROR));
-                } else {
-                    callback.onFinish(retText);
-                }
-            } catch (SocketTimeoutException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                return null;
-            } catch (IOException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                return null;
-            }
-
-            return null;
-        });
-    }
-
-    /**
-     * @brief Get a list of all files in a bucket.
-     *
-     * @param[in] bucketId The bucket id
-     * @param[in] callback The callback when complete
-     * @return A CompletableFuture.
-     */
-    public CompletableFuture<Void> listFiles(final String bucketId, final ListFilesCallback callback) {
-        return CompletableFuture.supplyAsync(() -> {
-            verifyInit(true);
-            String path = String.format("/buckets/%s/files", bucketId);
-            String signature;
-            try {
-                signature = signRequest("GET", path, "");
-            } catch (Exception e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + path)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .get()
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                String responseBody = response.body().string();
-                ObjectMapper om = new ObjectMapper();
-
-                if (code == 404) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
-                    return null;
-                } else if (code == 400) {
-                    callback.onFail("Bucket id [" + bucketId + "] is invalid");
-                    return null;
-                } else if (code == 401) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                    return null;
-                } else if (code != 200) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                    return null;
-                }
-
-                GenaroFile[] files = om.readValue(responseBody, GenaroFile[].class);
-
-                // decrypt
-                for (GenaroFile f : files) {
-                    String realName = f.getFilename();
-                    try {
-                        realName = CryptoUtil.decryptMetaHmacSha512(realName, getPrivateKey(), Hex.decode(bucketId));
-                        f.setFilename(realName);
-                    } catch (Exception e) {
-                        // do nothing
-                    }
-                }
-
-                callback.onFinish(files);
-            } catch (SocketTimeoutException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                return null;
-            } catch (IOException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                return null;
-            }
-
-            return null;
-        });
-    }
-
-    /**
-     * @brief Delete a file in a bucket.
-     *
-     * @param[in] bucketId The bucket id
-     * @param[in] fileId The file id
-     * @param[in] callback The callback when complete
-     * @return A CompletableFuture.
-     */
-    public CompletableFuture<Void> deleteFile(final String bucketId, final String fileId, final DeleteFileCallback callback) {
-        return CompletableFuture.supplyAsync(() -> {
-            verifyInit(true);
-            String path = String.format("/buckets/%s/files/%s", bucketId, fileId);
-            String signature;
-            try {
-                signature = signRequest("DELETE", path, "");
-            } catch (Exception e) {
-                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
-                return null;
-            }
-            String pubKey = getPublicKeyHexString();
-            Request request = new Request.Builder()
-                    .url(bridgeUrl + path)
-                    .header("x-signature", signature)
-                    .header("x-pubkey", pubKey)
-                    .delete()
-                    .build();
-
-            try (Response response = genaroHttpClient.newCall(request).execute()) {
-                int code = response.code();
-                response.close();
-
-                if (code == 401) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
-                    return null;
-                } else if (code == 404) {
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
-                    return null;
-                } else if (code != 200 && code != 204){
-                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                    return null;
-                }
-
-                callback.onFinish();
-            } catch (SocketTimeoutException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
-                return null;
-            } catch (IOException e) {
-                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
-                return null;
-            }
-
-            return null;
-        });
     }
 
     List<Pointer> requestPointers(final Downloader downloader, final String bucketId, final String fileId) throws InterruptedException, ExecutionException, TimeoutException {
@@ -1670,6 +1256,444 @@ public final class Genaro {
     }
 
     /**
+     * @brief Get Genaro bridge API information.
+     *
+     * @return The Genaro bridge API information.
+     */
+    public String getInfo() {
+        CompletableFuture<String> fu = CompletableFuture.supplyAsync(() -> {
+            verifyInit(false);
+            Request request = new Request.Builder()
+                    .url(bridgeUrl)
+                    .get()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                String responseBody = response.body().string();
+
+                if (!response.isSuccessful()) throw new GenaroRuntimeException("Unexpected code " + response);
+
+                ObjectMapper om = new ObjectMapper();
+
+                JsonNode bodyNode = om.readTree(responseBody);
+                JsonNode infoNode = bodyNode.get("info");
+
+                String title = infoNode.get("title").asText();
+                String description = infoNode.get("description").asText();
+                String version = infoNode.get("version").asText();
+                String host = bodyNode.get("host").asText();
+
+                return "Title:       " + title + "\n" +
+                        "Description: " + description + "\n" +
+                        "Version:     " + version + "\n" +
+                        "Host:        " + host + "\n";
+            } catch (IOException e) {
+                throw new GenaroRuntimeException(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+            }
+        });
+
+        String info;
+        try {
+            info = fu.get(GENARO_HTTP_TIMEOUT, TimeUnit.SECONDS);
+        }  catch (Exception e) {
+            return null;
+        }
+        return info;
+    }
+
+    /**
+     * @brief List available buckets for a user.
+     *
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
+    public CompletableFuture<Void> getBuckets(final GetBucketsCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String signature;
+            try {
+                signature = signRequest("GET", "/buckets", "");
+            } catch (NoSuchAlgorithmException e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + "/buckets")
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                String responseBody = response.body().string();
+
+                if (code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code != 200 && code != 304) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                ObjectMapper om = new ObjectMapper();
+                Bucket[] buckets = om.readValue(responseBody, Bucket[].class);
+
+                try {
+                    // decrypt
+                    for (Bucket b : buckets) {
+                        if (b.getNameIsEncrypted()) {
+                            b.setName(CryptoUtil.decryptMetaHmacSha512(b.getName(), getPrivateKey(), BUCKET_NAME_MAGIC));
+                            b.setNameIsEncrypted(false);
+                        }
+                    }
+                } catch (Exception e) {
+                    callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                    return null;
+                }
+
+                callback.onFinish(buckets);
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * @brief Delete a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
+    public CompletableFuture<Void> deleteBucket(final String bucketId, final DeleteBucketCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String signature;
+            try {
+                signature = signRequest("DELETE", "/buckets/" + bucketId, "");
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + "/buckets/" + bucketId)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .delete()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                response.close();
+
+                if (code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code == 404) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
+                    return null;
+                } else if (code != 200 && code != 204) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                callback.onFinish();
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * @brief Rename a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
+    public CompletableFuture<Void> renameBucket(final String bucketId, final String name, final RenameBucketCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String encryptedName;
+            try {
+                encryptedName = CryptoUtil.encryptMetaHmacSha512(BasicUtil.string2Bytes(name), getPrivateKey(), BUCKET_NAME_MAGIC);
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String jsonStrBody = String.format("{\"name\": \"%s\", \"nameIsEncrypted\": true}", encryptedName);
+
+            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+            RequestBody body = RequestBody.create(JSON, jsonStrBody);
+            String signature;
+            try {
+                signature = signRequest("POST", "/buckets/" + bucketId, jsonStrBody);
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + "/buckets/" + bucketId)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .post(body)
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                response.close();
+
+                if (code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code == 404) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
+                    return null;
+                } else if (code != 200) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                callback.onFinish();
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * @brief Get a list of all files in a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
+    public CompletableFuture<Void> listFiles(final String bucketId, final ListFilesCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String path = String.format("/buckets/%s/files", bucketId);
+            String signature;
+            try {
+                signature = signRequest("GET", path, "");
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                String responseBody = response.body().string();
+                ObjectMapper om = new ObjectMapper();
+
+                if (code == 404) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_BUCKET_NOTFOUND_ERROR));
+                    return null;
+                } else if (code == 400) {
+                    callback.onFail("Bucket id [" + bucketId + "] is invalid");
+                    return null;
+                } else if (code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code != 200) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                GenaroFile[] files = om.readValue(responseBody, GenaroFile[].class);
+
+                // decrypt
+                for (GenaroFile f : files) {
+                    String realName = f.getFilename();
+                    try {
+                        realName = CryptoUtil.decryptMetaHmacSha512(realName, getPrivateKey(), Hex.decode(bucketId));
+                        f.setFilename(realName);
+                    } catch (Exception e) {
+                        // do nothing
+                    }
+                }
+
+                callback.onFinish(files);
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * @brief Get mirror data for a file.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] fileId The file id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
+    public CompletableFuture<Void> listMirrors(final String bucketId, final String fileId, final ListMirrorsCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String path = String.format("/buckets/%s/files/%s/mirrors", bucketId, fileId);
+            String signature;
+            try {
+                signature = signRequest("GET", path, "");
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .get()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                String responseBody = response.body().string();
+
+                if(code == 403 || code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code == 404 || code == 400) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                    return null;
+                } else if(code == 500) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_INTERNAL_ERROR));
+                    return null;
+                } else if (code != 200 && code != 304){
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                String retText = "";
+
+                ObjectMapper om = new ObjectMapper();
+                JsonNode bodyNode = om.readTree(responseBody);
+
+                int i = 0;
+                for (JsonNode itemNode: bodyNode) {
+                    JsonNode establishedNode = itemNode.get("established");
+
+                    int j = 0;
+                    for (JsonNode subNode: establishedNode) {
+                        if (j == 0) {
+                            retText += String.format("Shard %d: %s\n", i, subNode.get("shardHash").asText());
+                        }
+
+                        retText += String.format("\tnodeID: %s\n", subNode.get("contract").get("farmer_id").asText());
+                        j++;
+                    }
+                    i++;
+                }
+
+                if (retText.isEmpty()) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_JSON_ERROR));
+                } else {
+                    callback.onFinish(retText);
+                }
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * @brief Delete a file in a bucket.
+     *
+     * @param[in] bucketId The bucket id
+     * @param[in] fileId The file id
+     * @param[in] callback The callback when complete
+     * @return A CompletableFuture.
+     */
+    public CompletableFuture<Void> deleteFile(final String bucketId, final String fileId, final DeleteFileCallback callback) {
+        return CompletableFuture.supplyAsync(() -> {
+            verifyInit(true);
+            String path = String.format("/buckets/%s/files/%s", bucketId, fileId);
+            String signature;
+            try {
+                signature = signRequest("DELETE", path, "");
+            } catch (Exception e) {
+                callback.onFail(genaroStrError(GENARO_ALGORITHM_ERROR));
+                return null;
+            }
+            String pubKey = getPublicKeyHexString();
+            Request request = new Request.Builder()
+                    .url(bridgeUrl + path)
+                    .header("x-signature", signature)
+                    .header("x-pubkey", pubKey)
+                    .delete()
+                    .build();
+
+            try (Response response = genaroHttpClient.newCall(request).execute()) {
+                int code = response.code();
+                response.close();
+
+                if (code == 401) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_AUTH_ERROR));
+                    return null;
+                } else if (code == 404) {
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_FILE_NOTFOUND_ERROR));
+                    return null;
+                } else if (code != 200 && code != 204){
+                    callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                    return null;
+                }
+
+                callback.onFinish();
+            } catch (SocketTimeoutException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_TIMEOUT_ERROR));
+                return null;
+            } catch (IOException e) {
+                callback.onFail(genaroStrError(GENARO_BRIDGE_REQUEST_ERROR));
+                return null;
+            }
+
+            return null;
+        });
+    }
+
+    /**
      * @brief Download a file
      *
      * @param[in] bucketId The bucket id
@@ -1683,8 +1707,8 @@ public final class Genaro {
      * @return A Downloader.
      */
     public Downloader resolveFile(final String bucketId, final String fileId, final String filePath, final boolean overwrite,
-                                  final String key, final String ctr, final boolean isDecrypt, final ResolveFileCallback callback) throws GenaroException {
-        Downloader downloader = new Downloader(this, bucketId, fileId, filePath, overwrite, key, ctr, isDecrypt, callback);
+                                  final boolean isDecrypt, final String keyBase16, final String ctrBase16, final ResolveFileCallback callback) throws GenaroException {
+        Downloader downloader = new Downloader(this, bucketId, fileId, filePath, overwrite, isDecrypt, keyBase16, ctrBase16, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(downloader);
         downloader.setFutureBelongsTo(fu);
 
@@ -1709,5 +1733,98 @@ public final class Genaro {
         uploader.setFutureBelongsTo(fu);
 
         return uploader;
+    }
+
+    /**
+     * @brief Decrypt a file
+     *
+     * @param[in] filePath The undecrypted file path
+     * @param[in] key The key of AES
+     * @param[in] iv The ctr of AES
+     * @return The decrypted text.
+     */
+    public static String decryptFileToText(String filePath, byte[] key, byte[] iv) throws GenaroException {
+        SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+
+        javax.crypto.Cipher cipher;
+        try {
+            cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
+            cipher.init(DECRYPT_MODE, keySpec, ivSpec);
+        } catch (Exception e) {
+            throw new GenaroException("Init decryption context error");
+        }
+
+        InputStream bis;
+        try {
+            bis = new BufferedInputStream(new CipherInputStream(new FileInputStream(filePath), cipher));
+        } catch (IOException e) {
+            throw new GenaroException(e.getMessage());
+        }
+
+        StringBuilder sb = new StringBuilder();
+        byte[] data = new byte[BLOCK_BYTES];
+        int readBytes;
+
+        try {
+            while ((readBytes = bis.read(data)) != -1) {
+                sb.append(new String(data, 0, readBytes));
+            }
+        } catch (IOException e) {
+            throw new GenaroException(e.getMessage());
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * @brief Encrypt the meta use AES-256-GCM combined with HMAC-SHA512 to filePath
+     *
+     * @param[in] meta The meta to be decrypted
+     * @param[in] filePath The file path
+     */
+    public void encryptMetaToFile(String meta, String filePath) throws GenaroException {
+        String encryptedMeta;
+        try {
+            encryptedMeta = CryptoUtil.encryptMetaHmacSha512(meta.getBytes(), getPrivateKey(), BUCKET_NAME_MAGIC);
+        } catch (Exception e) {
+            throw new GenaroException("Encrypt meta error");
+        }
+
+        try {
+            OutputStream bos = new BufferedOutputStream(new FileOutputStream(new File(filePath)));
+            bos.write(encryptedMeta.getBytes());
+            bos.close();
+        } catch (IOException e) {
+            throw new GenaroException(e.getMessage());
+        }
+    }
+
+    /**
+     * @brief Decrypt the meta in filePath use AES-256-GCM combined with HMAC-SHA512
+     *
+     * @param[in] filePath The file path
+     * @return The decrypted meta.
+     */
+    public String decryptMetaFromFile(String filePath) throws GenaroException {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+            InputStream bis = new BufferedInputStream(new FileInputStream(new File(filePath)));
+            byte[] data = new byte[BLOCK_BYTES];
+            int readBytes;
+            while ((readBytes = bis.read(data)) != -1) {
+                sb.append(new String(data, 0, readBytes));
+            }
+        } catch (IOException e) {
+            throw new GenaroException(e.getMessage());
+        }
+
+        try {
+            return CryptoUtil.decryptMetaHmacSha512(sb.toString(), getPrivateKey(), BUCKET_NAME_MAGIC);
+        } catch (Exception e) {
+            throw new GenaroException("Decrypt meta error");
+        }
     }
 }

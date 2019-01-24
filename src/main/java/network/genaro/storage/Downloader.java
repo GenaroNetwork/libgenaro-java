@@ -1,25 +1,5 @@
 package network.genaro.storage;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.OkHttpClient;
-import okhttp3.Response;
-import okhttp3.Request;
-import okhttp3.MediaType;
-import okhttp3.RequestBody;
-
-import org.bouncycastle.util.encoders.Hex;
-import org.xbill.DNS.utils.base16;
-
-import javax.crypto.CipherInputStream;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-import static javax.crypto.Cipher.DECRYPT_MODE;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
@@ -45,6 +25,26 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeoutException;
+
+import javax.crypto.CipherInputStream;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import static javax.crypto.Cipher.DECRYPT_MODE;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Response;
+import okhttp3.Request;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
+
+import org.bouncycastle.util.encoders.Hex;
+import org.xbill.DNS.utils.base16;
 
 import com.backblaze.erasure.OutputInputByteTableCodingLoop;
 import com.backblaze.erasure.ReedSolomon;
@@ -125,7 +125,7 @@ public final class Downloader implements Runnable {
     private boolean isDecrypt;
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String filePath, final boolean overwrite,
-                      final String keyStr, final String ctrStr, final boolean isDecrypt, final ResolveFileCallback resolveFileCallback) throws GenaroException {
+                      final boolean isDecrypt, final String keyStr, final String ctrStr, final ResolveFileCallback resolveFileCallback) throws GenaroException {
         if (bridge == null || bucketId == null || fileId == null || filePath == null || resolveFileCallback == null) {
             throw new GenaroException("Illegal arguments");
         }
@@ -157,8 +157,8 @@ public final class Downloader implements Runnable {
     }
 
     public Downloader(final Genaro bridge, final String bucketId, final String fileId, final String path, final boolean overwrite,
-                      final String keyStr, final String ctrStr, final boolean isDecrypt) throws GenaroException {
-        this(bridge, bucketId, fileId, path, overwrite, keyStr, ctrStr, isDecrypt, new ResolveFileCallback() {});
+                      final boolean isDecrypt, final String keyStr, final String ctrStr) throws GenaroException {
+        this(bridge, bucketId, fileId, path, overwrite, isDecrypt, keyStr, ctrStr, new ResolveFileCallback() {});
     }
 
     public List<Pointer> getPointers() {
@@ -888,7 +888,6 @@ public final class Downloader implements Runnable {
         }
 
         byte[] sha256;
-        InputStream ins = null;
         InputStream cypherIns = null;
         if (isDecrypt) {
             // decryption:
@@ -897,7 +896,7 @@ public final class Downloader implements Runnable {
             byte[] fileIdBytes = Hex.decode(fileId);
 
             // key for decryption
-            byte[] fileKey;
+            byte[] keyBytes;
             // ctr for decryption
             byte[] ivBytes;
 
@@ -905,19 +904,19 @@ public final class Downloader implements Runnable {
 
             try {
                 if (keyStr != null && ctrStr != null) {
-                    fileKey = base16.fromString(keyStr);
+                    keyBytes = base16.fromString(keyStr);
                     ivBytes = base16.fromString(ctrStr);
                 } else if (indexStr != null && indexStr.length() == 64) {
                     // calculate decryption key based on index
                     byte[] index = Hex.decode(indexStr);
 
-                    fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, index);
+                    keyBytes = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, index);
                     ivBytes = Arrays.copyOf(index, 16);
                 } else {
                     // calculate decryption key based on file id
-                    fileKey = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, fileIdBytes);
-                    fileKey = Hex.encode(fileKey);
-                    fileKey = CryptoUtil.sha256(fileKey);
+                    keyBytes = CryptoUtil.generateFileKey(bridge.getPrivateKey(), bucketIdBytes, fileIdBytes);
+                    keyBytes = Hex.encode(keyBytes);
+                    keyBytes = CryptoUtil.sha256(keyBytes);
                     ivBytes = Arrays.copyOf(CryptoUtil.ripemd160(fileId.getBytes()), 16);
                 }
             } catch (Exception e) {
@@ -926,28 +925,22 @@ public final class Downloader implements Runnable {
                 return;
             }
 
-            SecretKeySpec keySpec = new SecretKeySpec(fileKey, "AES");
-            IvParameterSpec iv = new IvParameterSpec(ivBytes);
+            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+            IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
 
             javax.crypto.Cipher cipher;
             try {
                 cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
-                cipher.init(DECRYPT_MODE, keySpec, iv);
+                cipher.init(DECRYPT_MODE, keySpec, ivSpec);
             } catch (Exception e) {
                 stop();
                 resolveFileCallback.onFail("Init decryption context error");
                 return;
             }
 
-            // check if cancel() is called
-            if (isCanceled) {
-                resolveFileCallback.onCancel();
-                return;
-            }
-
+            // decrypt file use key and ctr
             try {
-                ins = Channels.newInputStream(downFileChannel);
-                cypherIns = new CipherInputStream(ins, cipher);
+                cypherIns = new CipherInputStream(Channels.newInputStream(downFileChannel), cipher);
 
                 // transfer InputStream to FileChannel
                 downFileChannel.transferFrom(Channels.newChannel(cypherIns), 0, fileSize);
@@ -967,6 +960,12 @@ public final class Downloader implements Runnable {
             return;
         }
 
+        // check if cancel() is called
+        if (isCanceled) {
+            resolveFileCallback.onCancel();
+            return;
+        }
+
         FileChannel destFileChannel;
         try {
             if (overwrite) {
@@ -979,9 +978,6 @@ public final class Downloader implements Runnable {
 
             downFileChannel.transferTo(0, downFileChannel.size(), destFileChannel);
 
-            if (ins != null) {
-                ins.close();
-            }
             if (cypherIns != null) {
                 cypherIns.close();
             }
