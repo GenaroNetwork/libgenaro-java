@@ -339,12 +339,12 @@ public final class TestGenaro {
         ei.setRsaKey(rsaKey);
         ei.setRsaCtr(rsaCtr);
 
-//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/513m.data", "513m.data", testBucketId, ei, new StoreFileCallback() {
-//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/3g.data", "3g1.data", testBucketId, ei, new StoreFileCallback() {
+//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/513m.data", true, "513m.data", testBucketId, ei, new StoreFileCallback() {
+//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/3g.data", true, "3g1.data", testBucketId, ei, new StoreFileCallback() {
         Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", true, "spam33.txt", testBucketId, ei, new StoreFileCallback() {
-            //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/2097153.data", "2097153.data", testBucketId, ei, new StoreFileCallback() {
-//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", testBucketId, ei, new StoreFileCallback() {
-//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/genaro.tar", "1.tar", testBucketId, ei, new StoreFileCallback() {
+            //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/2097153.data", true, "2097153.data", testBucketId, ei, new StoreFileCallback() {
+//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", true, "25.zip", testBucketId, ei, new StoreFileCallback() {
+//        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/genaro.tar", true, "1.tar", testBucketId, ei, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");
