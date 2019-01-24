@@ -192,11 +192,13 @@ try {
         @Override
         public void onBegin(long fileSize) { }
         @Override
+        public void onProgress(float progress) { }
+        @Override
+        public void onCancel() { }
+        @Override
         public void onFail(String error) { }
         @Override
-        public void onFinish(String fileId) { }
-        @Override
-        public void onProgress(float progress) { }
+        public void onFinish(String fileId, byte[] sha256OfEncrypted) { }
     });
 } catch (GenaroException e) { }
 
@@ -213,15 +215,17 @@ String filePath = "xxxxxx";
 
 Downloader downloader = null;
 try {
-    downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, new ResolveFileCallback() {
+    downloader = genaro.resolveFile(bucketId, fileId, path, true, null, null, true, new ResolveFileCallback() {
         @Override
         public void onBegin() { }
         @Override
+        public void onProgress(float progress) { }
+        @Override
+        public void onCancel() { }
+        @Override
         public void onFail(String error) { }
         @Override
-        public void onFinish() { }
-        @Override
-        public void onProgress(float progress) { }
+        public void onFinish(long fileBytes, byte[] sha256) { }
     });
 } catch (GenaroException e) { }
 

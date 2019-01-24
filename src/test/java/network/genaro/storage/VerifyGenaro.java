@@ -205,7 +205,7 @@ public final class VerifyGenaro {
         Downloader downloader = api.resolveFile(testBucketId, testFileId, tempDir + testDownloadFileName, true, null, null, true, new ResolveFileCallback() {
             @Override
             public void onFinish(long fileBytes, byte[] sha256) {
-                // check the sha256 of the file is: 5b2eb5f37cc1bfaaf73670cafac5ab7ce247ca06e973e7de0dae940d3af6784b
+                Assert.assertEquals(BasicUtil.byteArrayToHexStr(sha256), "5b2eb5f37cc1bfaaf73670cafac5ab7ce247ca06e973e7de0dae940d3af6784b");
             }
             @Override
             public void onFail(String error) {
