@@ -229,7 +229,7 @@ public final class TestGenaro {
         Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
 
         // Downloader downloader = api.resolveFile(testBucketId, "5c3c5d38926e422b70d1fb09", "/Users/dingyi/Genaro/test/download/500m3.data", true, true, null, null, new ResolveFileCallback() {
-         Downloader downloader = api.resolveFile(testBucketId, "5c492c1a2e2d60343699b5b4", "/Users/dingyi/Genaro/test/download/spam.txt", true, true, null, null, new ResolveFileCallback() {
+         Downloader downloader = api.resolveFile(testBucketId, "5c4984932e2d60343699b71b", "/Users/dingyi/Genaro/test/download/spam.txt", true, true, null, null, new ResolveFileCallback() {
 //        Downloader downloader = api.resolveFile(testBucketId, "5c46e2ed2e2d60343699b38c", "/Users/dingyi/Genaro/test/download/spam.txt", true, true, null, null, new GenaroCallback.ResolveFileCallback() {
             @Override
             public void onBegin() {
@@ -341,7 +341,7 @@ public final class TestGenaro {
 
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/513m.data", "513m.data", testBucketId, ei, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/3g.data", "3g1.data", testBucketId, ei, new StoreFileCallback() {
-        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", "spam33.txt", testBucketId, ei, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", true, "spam33.txt", testBucketId, ei, new StoreFileCallback() {
             //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/2097153.data", "2097153.data", testBucketId, ei, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "25.zip", testBucketId, ei, new StoreFileCallback() {
 //        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/genaro.tar", "1.tar", testBucketId, ei, new StoreFileCallback() {
@@ -374,7 +374,7 @@ public final class TestGenaro {
         Genaro api = new Genaro(testBridgeUrl, V3JSON, "111111");
         EncryptionInfo ei = api.generateEncryptionInfo(null, testBucketId);
 
-        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", "27.zip", testBucketId, ei, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/下载器苹果电脑Mac版.zip", true, "27.zip", testBucketId, ei, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");
@@ -409,7 +409,7 @@ public final class TestGenaro {
         List<Uploader> uploaders = new ArrayList<>();
 
         for (int i = 0; i < 5; i++) {
-            Uploader uploader = api.storeFile(true, "/Users/dingyi/test/spam.txt", "spam2" + i + ".txt", testBucketId, ei, new StoreFileCallback() {
+            Uploader uploader = api.storeFile(true, "/Users/dingyi/test/spam.txt", true, "spam2" + i + ".txt", testBucketId, ei, new StoreFileCallback() {
                 @Override
                 public void onBegin(long fileSize) {
                     System.out.println("Upload started");
@@ -447,7 +447,7 @@ public final class TestGenaro {
         EncryptionInfo ei = api.generateEncryptionInfo(null, testBucketId);
         byte[] key = ei.getKey();
         byte[] ctr = ei.getCtr();
-        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", "spam37.txt", testBucketId, ei, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(true, "/Users/dingyi/Downloads/spam.txt", true, "spam41.txt", testBucketId, ei, new StoreFileCallback() {
             @Override
             public void onBegin(long fileSize) {
                 System.out.println("Upload started");

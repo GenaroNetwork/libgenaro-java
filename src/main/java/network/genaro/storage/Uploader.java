@@ -1,9 +1,12 @@
 package network.genaro.storage;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.File;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketTimeoutException;
@@ -137,17 +140,40 @@ public final class Uploader implements Runnable {
 
     private final OkHttpClient upHttpClient;
 
-    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName,
+    // when para isFilePath of the constructor is false, will create a temp file to store fileOrData
+    File tmpFile;
+
+    public Uploader(final Genaro bridge, final boolean rs, final String fileOrData, final boolean isFilePath, final String fileName,
                     final String bucketId, final EncryptionInfo ei, final StoreFileCallback storeFileCallback) throws GenaroException {
-        if (bridge == null || filePath == null || fileName == null || bucketId == null || ei == null || storeFileCallback == null) {
+        if (bridge == null || fileOrData == null || fileName == null || bucketId == null || ei == null || storeFileCallback == null) {
             throw new GenaroException("Illegal arguments");
         }
 
         this.bridge = bridge;
         this.rs = rs;
-        this.originPath = filePath;
+
+        if (isFilePath) {
+            this.originPath = fileOrData;
+        } else {
+            try {
+                this.tmpFile = File.createTempFile("tmp-", "");
+            } catch (Exception e) {
+                throw new GenaroException("Create temp file failed");
+            }
+
+            try {
+                OutputStream bos = new BufferedOutputStream(new FileOutputStream(tmpFile));
+                bos.write(fileOrData.getBytes());
+                bos.close();
+            } catch (IOException e) {
+                throw new GenaroException(e.getMessage());
+            }
+
+            this.originPath = tmpFile.getPath();
+        }
+
         this.fileName = fileName;
-        this.originFile = new File(filePath);
+        this.originFile = new File(this.originPath);
         this.bucketId = bucketId;
         this.storeFileCallback = storeFileCallback;
 
@@ -168,8 +194,8 @@ public final class Uploader implements Runnable {
         upHttpClient = builder.build();
     }
 
-    public Uploader(final Genaro bridge, final boolean rs, final String filePath, final String fileName, final String bucketId, final EncryptionInfo ei) throws GenaroException {
-        this(bridge, rs, filePath, fileName, bucketId, ei, new StoreFileCallback() {});
+    public Uploader(final Genaro bridge, final boolean rs, final String fileOrData, final boolean isFilePath, final String fileName, final String bucketId, final EncryptionInfo ei) throws GenaroException {
+        this(bridge, rs, fileOrData, isFilePath, fileName, bucketId, ei, new StoreFileCallback() {});
     }
 
     public boolean isCanceled() {
@@ -946,6 +972,10 @@ public final class Uploader implements Runnable {
             stop();
             storeFileCallback.onFail(genaroStrError(GENARO_FILE_ENCRYPTION_ERROR));
             return;
+        }
+
+        if (tmpFile != null) {
+            tmpFile.delete();
         }
 
         if (rs && !createParityFile()) {

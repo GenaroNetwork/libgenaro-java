@@ -181,7 +181,7 @@ public final class VerifyGenaro {
             tempDir += "/";
         }
 
-        Uploader uploader = api.storeFile(true, tempDir + testUploadFileName, testUploadFileName, testBucketId, ei, new StoreFileCallback() {
+        Uploader uploader = api.storeFile(true, tempDir + testUploadFileName, true, testUploadFileName, testBucketId, ei, new StoreFileCallback() {
             @Override
             public void onFinish(String fileId, byte[] sha256OfEncrypted) {
                 Assert.assertEquals(fileId, "85fb0ed00de1196dc22e0f6d");

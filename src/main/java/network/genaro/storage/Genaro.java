@@ -1726,9 +1726,9 @@ public final class Genaro {
      * @param[in] callback The callback on progress or when complete
      * @return A Uploader.
      */
-    public Uploader storeFile(final boolean rs, final String filePath, final String fileName, final String bucketId,
+    public Uploader storeFile(final boolean rs, final String fileOrData, final boolean isFilePath, final String fileName, final String bucketId,
                               EncryptionInfo ei, final StoreFileCallback callback) throws GenaroException {
-        Uploader uploader = new Uploader(this, rs, filePath, fileName, bucketId, ei, callback);
+        Uploader uploader = new Uploader(this, rs, fileOrData, isFilePath, fileName, bucketId, ei, callback);
         CompletableFuture<Void> fu = CompletableFuture.runAsync(uploader);
         uploader.setFutureBelongsTo(fu);
 
@@ -1756,26 +1756,23 @@ public final class Genaro {
             throw new GenaroException("Init decryption context error");
         }
 
-        InputStream bis;
-        try {
-            bis = new BufferedInputStream(new CipherInputStream(new FileInputStream(filePath), cipher));
-        } catch (IOException e) {
-            throw new GenaroException(e.getMessage());
-        }
+        try (InputStream bis = new BufferedInputStream(new CipherInputStream(new FileInputStream(filePath), cipher))) {
+            StringBuilder sb = new StringBuilder();
+            byte[] data = new byte[BLOCK_BYTES];
+            int readBytes;
 
-        StringBuilder sb = new StringBuilder();
-        byte[] data = new byte[BLOCK_BYTES];
-        int readBytes;
-
-        try {
-            while ((readBytes = bis.read(data)) != -1) {
-                sb.append(new String(data, 0, readBytes));
+            try {
+                while ((readBytes = bis.read(data)) != -1) {
+                    sb.append(new String(data, 0, readBytes));
+                }
+            } catch (IOException e) {
+                throw new GenaroException(e.getMessage());
             }
+
+            return sb.toString();
         } catch (IOException e) {
             throw new GenaroException(e.getMessage());
         }
-
-        return sb.toString();
     }
 
     /**

@@ -283,7 +283,7 @@ final class Cli {
             EncryptionInfo ei = genaro.generateEncryptionInfo(null, bucketId);
             Uploader uploader = null;
             try {
-                uploader = genaro.storeFile(false, path, name, bucketId, ei, new StoreFileCallback() {
+                uploader = genaro.storeFile(false, path, true, name, bucketId, ei, new StoreFileCallback() {
                     @Override
                     public void onBegin(long fileSize) {
                         System.out.println("Upload started");
