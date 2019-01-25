@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/GenaroNetwork/libgenaro-java.svg?branch=master)](https://travis-ci.org/GenaroNetwork/libgenaro-java)
 
-Asynchronous Java library and CLI for encrypted file transfer on the Genaro network. It's developed on Java 8, but should be able to run on latest android. Compatible with [libgenaro](https://github.com/GenaroNetwork/libgenaro).
+Asynchronous Java library and CLI for encrypted file transfer on the Genaro network written in Java 8. It's Compatible with [libgenaro](https://github.com/GenaroNetwork/libgenaro).
 
 ## Features
 
