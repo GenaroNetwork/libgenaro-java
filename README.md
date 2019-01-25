@@ -48,19 +48,19 @@ Asynchronous Java library and CLI for encrypted file transfer on the Genaro netw
 on Linux/Mac:
 
 ```shell
-./gradlew build
+./gradlew clean build
 ```
 
 on Windows:
 
 ```cmd
-gradlew build
+gradlew clean build
 ```
 
 or if you want to use your local gardle:
 
 ```shell
-gradle build
+gradle clean build
 ```
 
 ### Maven
