@@ -57,7 +57,7 @@ on Windows:
 gradlew clean build
 ```
 
-or if you want to use your local gardle:
+or if you want to use your local gradle:
 
 ```shell
 gradle clean build
